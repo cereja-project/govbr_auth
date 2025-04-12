@@ -1,0 +1,41 @@
+[project]
+name = "govbr-auth"
+dynamic = ["version"]
+description = "Biblioteca de autenticação com o Gov.br para FastAPI, Flask e Django."
+authors = [
+    { name="Joab Leite", email="leitejoab@gmail.com" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+keywords = ["gov.br", "autenticação", "fastapi", "flask", "django"]
+requires-python = ">=3.8"
+
+# Dependências essenciais (núcleo)
+dependencies = [
+    "httpx",
+    "pyjwt",
+    "cryptography",
+    "python-dotenv",
+    "pydantic",
+    "cereja"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "govbr_auth.__version__"}
+
+# Extras opcionais por framework
+[project.optional-dependencies]
+fastapi = ["fastapi"]
+flask = ["flask"]
+django = ["django"]
+full = ["fastapi", "flask", "django"]
+dev = ["uvicorn", "pytest", "pytest-asyncio", "black"]
+
+[project.urls]
+Homepage = "https://github.com/cereja-project/govbr_auth"
+Repository = "https://github.com/cereja-project/govbr_auth"
+Documentation = "https://github.com/cereja-project/govbr_auth#readme"
+
+[build-system]
+requires = ["setuptools", "wheel", "cereja"]
+build-backend = "setuptools.build_meta"
