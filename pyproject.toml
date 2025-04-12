@@ -37,5 +37,5 @@ Repository = "https://github.com/cereja-project/govbr_auth"
 Documentation = "https://github.com/cereja-project/govbr_auth#readme"
 
 [build-system]
-requires = ["setuptools", "wheel", "cereja"]
+requires = ["setuptools", "wheel", "cereja", "pytest"]
 build-backend = "setuptools.build_meta"
