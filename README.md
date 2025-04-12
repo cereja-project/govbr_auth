@@ -6,7 +6,6 @@ Autentique usuários com o Gov.br usando FastAPI, Flask, Django ou sua própria 
 ## 💡 Motivação
 
 A criação desta biblioteca nasceu de uma necessidade real: ao tentar integrar com o Login Único Gov.br, enfrentei diversas dificuldades iniciais —
-
 desde entender o fluxo de autenticação com PKCE, até decidir qual abordagem seria mais segura: fazer tudo no frontend ou delegar ao backend?
 
 Veja também: [🔒 Boas práticas adotadas](docs/boas_praticas_adotadas.md)
