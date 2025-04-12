@@ -12,7 +12,7 @@ def get_urlpatterns(config: GovBrConfig):
     :return: Lista de URLs do Django.
     """
     urlpatterns = [
-        path(config.authorize_endpoint, GovBrUrlView.as_view(), name='govbr-auth-url'),
-        path(config.authenticate_endpoint, GovBrCallbackView.as_view(), name='govbr-auth-callback'),
+        path(config.authorize_endpoint, GovBrUrlView.as_view(),{'config': config}, name='govbr-auth-url'),
+        path(config.authenticate_endpoint, GovBrCallbackView.as_view(),{'config': config}, name='govbr-auth-callback'),
     ]
     return urlpatterns
