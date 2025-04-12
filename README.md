@@ -163,7 +163,3 @@ pytest tests/
 
 ## 📄 Licença
 MIT
-
----
-
-Feito com 💙 para integrar com o Login Único Gov.br
