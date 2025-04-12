@@ -1,7 +1,17 @@
 # GovBR Auth
 
 Autentique usuários com o Gov.br usando FastAPI, Flask, Django ou sua própria stack personalizada.
+---
 
+## 💡 Motivação
+
+A criação desta biblioteca nasceu de uma necessidade real: ao tentar integrar com o Login Único Gov.br, enfrentei diversas dificuldades iniciais —
+
+desde entender o fluxo de autenticação com PKCE, até decidir qual abordagem seria mais segura: fazer tudo no frontend ou delegar ao backend?
+
+Veja também: [🔒 Boas práticas adotadas](docs/boas_praticas_adotadas.md)
+
+---
 ## 🚀 Instalação
 
 Instalação mínima (somente núcleo de serviços):
@@ -138,49 +148,7 @@ Ideal para:
 - Serviços Lambda/FaaS
 - Apps que não usam frameworks web tradicionais
 
-## 🔁 Fluxo de autenticação Backend + Frontend
-O fluxo de autenticação com o Gov.br utiliza o protocolo OAuth 2.0 com PKCE (Proof Key for Code Exchange) para garantir uma troca segura de tokens entre o cliente e o servidor. Abaixo está uma visão geral do processo:
-1. **Solicitação da URL de login**: O frontend solicita ao backend a URL de autorização gerada pelo **GovBrAuthorize** com os parâmetros necessários, como **state** e **code_challenge**.
-2. **Redirecionamento para o Gov.br**: O usuário é redirecionado para o Gov.br, onde realiza a autenticação.
-3. **Retorno ao frontend**: Após a autenticação, o Gov.br redireciona o usuário para o **REDIRECT_URI** configurado, enviando o **code** e o **state**.
-4. **Troca de código por token**: O frontend envia o **code** e o **state** para o backend, que utiliza o **GovBrIntegration** para trocar o código por tokens e decodificar os dados do usuário autenticado.
-```
-        ┌────────────────┐
-        │  Frontend App  │
-        └────────┬───────┘
-                 │
-                 │ (1) Solicita URL de login (authorize_endpoint)
-                 ▼
-    ┌─────────────────────────────┐
-    │ GovBrAuthorize (Backend)    │
-    │ build_authorize_url()       │
-    └────────────┬────────────────┘
-                 │
-                 │ retorna URL com state + challenge
-                 ▼
-           (2) Redireciona usuário
-           para GOV.BR com PKCE
-                 │
-                 ▼
-    ┌────────────────────────┐
-    │   GOV.BR Autenticação  │
-    └────────────┬───────────┘
-                 │
-                 │ redirect para
-                 ▼
-          REDIRECT_URI (frontend)
-                 │
-                 │ (3) Frontend envia `code` + `state` (authenticate_endpoint)
-                 ▼
-    ┌───────────────────────────────┐
-    │  GovBrIntegration (Backend)   │
-    │  exchange_code_for_token()    │
-    └────────────┬──────────────────┘
-                 │
-                 │ troca por token + decodifica ID
-                 ▼
-         Dados do usuário autenticado
-```
+
 
 ## 📌 Endpoints Disponíveis (padrão)
 
