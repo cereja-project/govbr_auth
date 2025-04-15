@@ -90,26 +90,50 @@ connector.init_fastapi(app)
 
 ## 🌐 Uso com Flask
 ```python
-from flask import Flask
-from govbr_auth.controller import GovBrConnector
+from flask import Flask, jsonify, request
+from govbr_auth import GovBrConnector, GovBrConfig
 
-app = Flask(__name__)
+def after_auth(data, request):
+    user = data["id_token_decoded"]
+    return jsonify({
+        "mensagem": "Login efetuado com sucesso!",
+        "usuario": user["name"],
+        "cpf": user["sub"]
+    })
+
+config = GovBrConfig.from_env()
 connector = GovBrConnector(config,
                            prefix="/auth",
                            authorize_endpoint="/govbr/authorize",
                            authenticate_endpoint="/govbr/callback",
+                           on_auth_success=after_auth
                            )
+
+app = Flask(__name__)
 connector.init_flask(app)
 ```
 
 ## 🛠️ Uso com Django
 ```python
-from govbr_auth.controller import GovBrConnector
+from django.http import JsonResponse
+from govbr_auth import GovBrConnector, GovBrConfig
+
+def after_auth(data, request):
+    user = data["id_token_decoded"]
+    return JsonResponse({
+        "mensagem": "Usuário autenticado!",
+        "nome": user.get("name"),
+        "cpf": user.get("sub")
+    })
+
+
+config = GovBrConfig.from_env()
 
 connector = GovBrConnector(config,
                            prefix="/auth",
                            authorize_endpoint="/govbr/authorize",
                            authenticate_endpoint="/govbr/callback",
+                           on_auth_success=after_auth
                            )
 
 urlpatterns = [

@@ -4,7 +4,6 @@ from fastapi import FastAPI
 
 from govbr_auth.controller import GovBrConnector
 from govbr_auth.core.config import GovBrConfig
-from govbr_auth.fastapi_ext.routes import get_router
 
 
 @pytest.fixture
