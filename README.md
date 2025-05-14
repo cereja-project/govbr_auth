@@ -78,12 +78,19 @@ print(generate_cript_verifier_secret())
 ```python
 from fastapi import FastAPI
 from govbr_auth.controller import GovBrConnector
-
+def after_auth(data, request):
+    user = data["id_token_decoded"]
+    return {
+        "mensagem": "Login efetuado com sucesso!",
+        "usuario": user["name"],
+        "cpf": user["sub"]
+    }
 app = FastAPI()
 connector = GovBrConnector(config,
                            prefix="/auth",
                            authorize_endpoint="/govbr/authorize",
                            authenticate_endpoint="/govbr/callback",
+                           on_auth_success=after_auth
                            )
 connector.init_fastapi(app)
 ```

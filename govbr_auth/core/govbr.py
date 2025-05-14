@@ -80,17 +80,19 @@ class GovBrIntegration:
     async def async_exchange_code_for_token(self,
                                             code: str,
                                             state: str) -> dict:
-        return self.__exchange_code_for_token(code, state, async_mode=True)
+
+        data, headers = self.__make_request_for_token(code, state)
+        return await self.__exchange_async(data, headers)
 
     def exchange_code_for_token_sync(self,
                                      code: str,
                                      state: str) -> dict:
-        return self.__exchange_code_for_token(code, state, async_mode=False)
+        data, headers = self.__make_request_for_token(code, state)
+        return self.__exchange_sync(data, headers)
 
-    def __exchange_code_for_token(self,
-                                  code: str,
-                                  state: str,
-                                  async_mode: bool) -> dict:
+    def __make_request_for_token(self,
+                                 code: str,
+                                 state: str):
         if not self.config.client_id or not self.config.client_secret:
             return {"error": "Necessário informar client_id e client_secret"}
 
@@ -112,10 +114,7 @@ class GovBrIntegration:
             "Authorization": f"Basic {client_credential}",
         }
 
-        if async_mode:
-            return self.__exchange_async(data, headers)
-        else:
-            return self.__exchange_sync(data, headers)
+        return data, headers
 
     async def __exchange_async(self,
                                data: dict,
