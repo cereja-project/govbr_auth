@@ -1,3 +1,4 @@
+import asyncio
 from typing import Callable, Optional
 
 from govbr_auth.core.config import GovBrConfig
@@ -78,7 +79,9 @@ class GovBrConnector:
             integration = GovBrIntegration(self.config)
             result = await integration.async_exchange_code_for_token(data.code, data.state)
             if self.on_auth_success:
-                return self.on_auth_success(result, request)
+                result = self.on_auth_success(result, request)
+                if asyncio.iscoroutine(result):
+                    return await result
             return result
 
         app.include_router(router)

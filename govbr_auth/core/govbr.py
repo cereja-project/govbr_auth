@@ -9,7 +9,23 @@ import httpx
 from cryptography.fernet import Fernet
 from govbr_auth.core.config import GovBrConfig
 
-__all__ = ["GovBrAuthorize", "GovBrIntegration"]
+__all__ = ["GovBrAuthorize", "GovBrIntegration",
+           "GovBrException", "GovBrAuthenticationError"]
+
+
+# excpetions
+class GovBrException(Exception):
+    """
+    Exceção personalizada para erros relacionados ao Gov.br.
+    """
+    pass
+
+
+class GovBrAuthenticationError(GovBrException):
+    """
+    Exceção personalizada para erros de autenticação no Gov.br.
+    """
+    pass
 
 
 class GovBrAuthorize:
@@ -134,11 +150,12 @@ class GovBrIntegration:
     def __parse_response(self,
                          resp: httpx.Response) -> dict:
         if not resp.is_success:
-            return {"error": "Falha ao tentar autenticar no Govbr", "status_code": resp.status_code}
+            raise GovBrAuthenticationError(
+                    f"Erro ao trocar o código pelo token: {resp.status_code} - {resp.text}")
 
         token_json = resp.json()
         if "id_token" not in token_json:
-            return {"error": "Falta 'id_token' na resposta do token"}
+            raise GovBrAuthenticationError("Token de ID não encontrado na resposta")
 
         id_token_decoded = self.jwt_payload_decode(token_json["id_token"])
         return {"token": token_json, "id_token_decoded": id_token_decoded}
