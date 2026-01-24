@@ -85,7 +85,7 @@ class GovBrIntegration:
         padding = 4 - len(b64_data) % 4
         if padding:
             b64_data += '=' * padding
-        return base64.b64decode(b64_data).decode('utf-8')
+        return base64.urlsafe_b64decode(b64_data).decode('utf-8')
 
     def jwt_payload_decode(self,
                            id_token: str) -> dict:

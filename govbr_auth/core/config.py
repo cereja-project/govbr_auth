@@ -33,6 +33,7 @@ class GovBrConfig(BaseModel):
     :raises ValueError: Se as variáveis obrigatórias não estiverem presentes no ambiente.
     :raises ValueError: Se a chave de criptografia não for válida.
     """
+
     client_id: str
     client_secret: str
     redirect_uri: str
