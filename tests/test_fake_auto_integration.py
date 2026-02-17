@@ -31,7 +31,7 @@ class TestFakeAutoIntegration:
             token_url="http://localhost:8000/fake-govbr/token"
         )
 
-        connector = GovBrConnector(config=config)
+        connector = GovBrConnector(config=config, enable_fake_mode=True)
 
         assert connector.is_fake_mode is True
         assert connector.fake_service is not None
@@ -67,7 +67,8 @@ class TestFakeAutoIntegration:
 
         connector = GovBrConnector(
             config=config,
-            fake_users=create_default_fake_users()
+            fake_users=create_default_fake_users(),
+            enable_fake_mode=True
         )
         connector.init_fastapi(app)
 
@@ -99,7 +100,7 @@ class TestFakeAutoIntegration:
             token_url="http://localhost:8000/fake-govbr/token"
         )
 
-        connector = GovBrConnector(config=config)
+        connector = GovBrConnector(config=config, enable_fake_mode=True)
         connector.init_fastapi(app)
 
         client = TestClient(app)
@@ -150,7 +151,8 @@ class TestFakeAutoIntegration:
 
         connector = GovBrConnector(
             config=config,
-            fake_users=custom_users
+            fake_users=custom_users,
+            enable_fake_mode=True
         )
         connector.init_fastapi(app)
 
@@ -201,10 +203,94 @@ class TestFakeAutoIntegration:
             token_url="http://127.0.0.1:8000/fake-govbr/token"
         )
 
-        connector = GovBrConnector(config=config)
+        connector = GovBrConnector(config=config, enable_fake_mode=True)
 
         assert connector.is_fake_mode is True
         assert connector.fake_service is not None
+
+    def test_fake_mode_blocked_without_explicit_enable(self, valid_cript_secret):
+        """Testa que modo fake é bloqueado sem habilitação explícita"""
+        config = GovBrConfig(
+            client_id="test",
+            client_secret="test",
+            redirect_uri="http://localhost/callback",
+            cript_verifier_secret=valid_cript_secret,
+            auth_url="http://localhost:8000/fake-govbr/authorize",
+            token_url="http://localhost:8000/fake-govbr/token"
+        )
+
+        # Deve lançar ValueError quando fake mode é detectado mas não habilitado
+        with pytest.raises(ValueError) as exc_info:
+            GovBrConnector(config=config)
+        
+        assert "ATENÇÃO: Modo fake do Gov.br foi detectado" in str(exc_info.value)
+        assert "enable_fake_mode=True" in str(exc_info.value)
+
+    def test_fake_mode_with_env_var_govbr_allow(self, valid_cript_secret, monkeypatch):
+        """Testa que modo fake funciona com variável GOVBR_ALLOW_FAKE_MODE=true"""
+        monkeypatch.setenv("GOVBR_ALLOW_FAKE_MODE", "true")
+        
+        config = GovBrConfig(
+            client_id="test",
+            client_secret="test",
+            redirect_uri="http://localhost/callback",
+            cript_verifier_secret=valid_cript_secret,
+            auth_url="http://localhost:8000/fake-govbr/authorize",
+            token_url="http://localhost:8000/fake-govbr/token"
+        )
+
+        connector = GovBrConnector(config=config)
+        assert connector.is_fake_mode is True
+        assert connector.fake_service is not None
+
+    def test_fake_mode_with_env_var_debug(self, valid_cript_secret, monkeypatch):
+        """Testa que modo fake funciona com variável DEBUG=true"""
+        monkeypatch.setenv("DEBUG", "true")
+        
+        config = GovBrConfig(
+            client_id="test",
+            client_secret="test",
+            redirect_uri="http://localhost/callback",
+            cript_verifier_secret=valid_cript_secret,
+            auth_url="http://localhost:8000/fake-govbr/authorize",
+            token_url="http://localhost:8000/fake-govbr/token"
+        )
+
+        connector = GovBrConnector(config=config)
+        assert connector.is_fake_mode is True
+        assert connector.fake_service is not None
+
+    def test_fake_mode_with_env_var_environment(self, valid_cript_secret, monkeypatch):
+        """Testa que modo fake funciona com ENVIRONMENT=development"""
+        monkeypatch.setenv("ENVIRONMENT", "development")
+        
+        config = GovBrConfig(
+            client_id="test",
+            client_secret="test",
+            redirect_uri="http://localhost/callback",
+            cript_verifier_secret=valid_cript_secret,
+            auth_url="http://localhost:8000/fake-govbr/authorize",
+            token_url="http://localhost:8000/fake-govbr/token"
+        )
+
+        connector = GovBrConnector(config=config)
+        assert connector.is_fake_mode is True
+        assert connector.fake_service is not None
+
+    def test_warning_emitted_when_fake_mode_enabled(self, valid_cript_secret):
+        """Testa que um warning é emitido quando fake mode está ativo"""
+        config = GovBrConfig(
+            client_id="test",
+            client_secret="test",
+            redirect_uri="http://localhost/callback",
+            cript_verifier_secret=valid_cript_secret,
+            auth_url="http://localhost:8000/fake-govbr/authorize",
+            token_url="http://localhost:8000/fake-govbr/token"
+        )
+
+        # Verifica se o warning é emitido
+        with pytest.warns(UserWarning, match="MODO FAKE DO GOV.BR ESTÁ ATIVO"):
+            GovBrConnector(config=config, enable_fake_mode=True)
 
 
 if __name__ == "__main__":

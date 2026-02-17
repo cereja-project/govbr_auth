@@ -1,4 +1,6 @@
 import asyncio
+import os
+import warnings
 from typing import Callable, Optional
 
 from govbr_auth.core.config import GovBrConfig
@@ -66,7 +68,8 @@ class GovBrConnector:
                  authenticate_endpoint="authenticate",
                  on_auth_success: Optional[Callable[[dict, object], object]] = None,
                  fake_users: Optional[dict] = None,
-                 fake_jwt_secret: str = "fake-govbr-dev-secret"
+                 fake_jwt_secret: str = "fake-govbr-dev-secret",
+                 enable_fake_mode: bool = False
                  ):
         """
         Inicializa a classe GovBrConnector com as configurações necessárias.
@@ -78,6 +81,10 @@ class GovBrConnector:
         :param on_auth_success: Função de callback a ser chamada após a autenticação bem-sucedida.
         :param fake_users: Dicionário de usuários fake (opcional, apenas para modo fake).
         :param fake_jwt_secret: Chave secreta para JWT fake (opcional, apenas para modo fake).
+        :param enable_fake_mode: Habilita explicitamente o modo fake. Para segurança, o modo fake
+                                  só será ativado se este parâmetro for True OU se as variáveis de
+                                  ambiente GOVBR_ALLOW_FAKE_MODE=true ou DEBUG=true estiverem definidas.
+                                  NUNCA habilite isso em produção! (padrão: False)
         """
         self.config = config
         self.config.prefix = prefix.strip("/ ")
@@ -86,7 +93,31 @@ class GovBrConnector:
         self.on_auth_success = on_auth_success
 
         # Detecta se está em modo fake e inicializa o serviço
-        self.is_fake_mode = _is_fake_mode(config)
+        fake_mode_detected = _is_fake_mode(config)
+        
+        # Verifica se o modo fake está explicitamente permitido
+        allow_fake_from_env = (
+            os.getenv("GOVBR_ALLOW_FAKE_MODE", "").lower() == "true" or
+            os.getenv("DEBUG", "").lower() == "true" or
+            os.getenv("ENVIRONMENT", "").lower() in ["development", "dev", "local"]
+        )
+        
+        fake_mode_allowed = enable_fake_mode or allow_fake_from_env
+        
+        # Se fake mode foi detectado mas não está permitido, lança erro
+        if fake_mode_detected and not fake_mode_allowed:
+            raise ValueError(
+                "⚠️  ATENÇÃO: Modo fake do Gov.br foi detectado nas URLs de configuração, "
+                "mas não está explicitamente habilitado. Isso previne ativação acidental em produção.\n\n"
+                "Para habilitar o modo fake, faça UMA das seguintes opções:\n"
+                "  1. Defina enable_fake_mode=True no construtor GovBrConnector\n"
+                "  2. Defina a variável de ambiente GOVBR_ALLOW_FAKE_MODE=true\n"
+                "  3. Defina a variável de ambiente DEBUG=true\n"
+                "  4. Defina a variável de ambiente ENVIRONMENT=development (ou 'dev' ou 'local')\n\n"
+                "IMPORTANTE: NUNCA habilite o modo fake em produção!"
+            )
+        
+        self.is_fake_mode = fake_mode_detected and fake_mode_allowed
         self.fake_service = None
 
         if self.is_fake_mode:
@@ -101,7 +132,15 @@ class GovBrConnector:
 
             import logging
             logger = logging.getLogger(__name__)
-            logger.info(f"🧪 Modo FAKE Gov.br ativado - Endpoints fake serão registrados automaticamente")
+            
+            # Emite warning explícito
+            warning_msg = (
+                "⚠️  MODO FAKE DO GOV.BR ESTÁ ATIVO! ⚠️\n"
+                "Endpoints de simulação serão registrados automaticamente.\n"
+                "NUNCA use isso em produção!"
+            )
+            warnings.warn(warning_msg, UserWarning, stacklevel=2)
+            logger.warning(warning_msg)
 
     def init_fastapi(self, app):
         from fastapi.routing import APIRouter
