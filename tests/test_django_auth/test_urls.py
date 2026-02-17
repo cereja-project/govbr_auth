@@ -4,9 +4,9 @@ from govbr_auth.core.config import GovBrConfig
 config = GovBrConfig(
         client_id="dummy_id",
         client_secret="dummy_secret",
-        auth_url="https://localhost/authorize",
-        token_url="https://localhost/token",
-        redirect_uri="https://localhost/callback",
+        auth_url="https://sso.staging.acesso.gov.br/authorize",
+        token_url="https://sso.staging.acesso.gov.br/token",
+        redirect_uri="https://example.com/callback",
         cript_verifier_secret="GN6DdLRiwO7ylIR7PEKXN0xtPnagRqwI8T6wXxI5cso="
 )
 
