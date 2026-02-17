@@ -27,8 +27,9 @@ if USE_FAKE:
         redirect_uri="http://localhost:8000/auth/govbr/callback",
         cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
         # URLs locais ativam automaticamente o modo fake
-        auth_url="http://localhost:8000/fake-govbr/authorize",
-        token_url="http://localhost:8000/fake-govbr/token"
+        govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+        govbr_token_url="http://localhost:8000/fake-govbr/token",
+            use_fake=True
     )
 else:
     config = GovBrConfig(
@@ -36,8 +37,8 @@ else:
         client_secret=os.getenv("GOVBR_CLIENT_SECRET"),
         redirect_uri=os.getenv("GOVBR_REDIRECT_URI"),
         cript_verifier_secret=os.getenv("CRIPT_VERIFIER_SECRET"),
-        auth_url="https://sso.staging.acesso.gov.br/authorize",
-        token_url="https://sso.staging.acesso.gov.br/token"
+        govbr_auth_url="https://sso.staging.acesso.gov.br/authorize",
+        govbr_token_url="https://sso.staging.acesso.gov.br/token"
     )
 
 app = FastAPI(title="Exemplo Simplificado - Gov.br Auth")

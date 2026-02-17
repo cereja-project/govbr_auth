@@ -9,7 +9,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Adicionado
 - 🧪 **Modo Fake Gov.br**: Simulador completo do fluxo OAuth 2.0 para desenvolvimento
-  - Detecção automática quando URLs locais são configuradas
+  - Ativação explícita via flag `use_fake` ou env `USE_FAKE_GOVBR`
   - Endpoints fake criados automaticamente (`/fake-govbr/authorize`, `/fake-govbr/login`, `/fake-govbr/token`, `/fake-govbr/users`)
   - Página de login HTML estilizada
   - Usuários de teste pré-configurados
@@ -25,8 +25,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Documentação detalhada do modo fake em `docs/modo_fake.md`
 
 ### Alterado
-- `GovBrConnector` agora detecta automaticamente URLs locais e ativa modo fake
-- Atualizada documentação principal (README.md) com seção sobre modo fake
+- `GovBrConnector` agora exige flag/env para ativar modo fake e registra endpoints quando habilitado
+- Atualizada documentação principal (README.md) com seção sobre modo fake (opt-in)
 - Atualizada documentação de boas práticas com avisos de segurança do modo fake
 - Exportações do módulo principal incluem classes e funções do fake_govbr
 

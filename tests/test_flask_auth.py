@@ -9,8 +9,8 @@ def create_app():
     config = GovBrConfig(
             client_id="dummy_id",
             client_secret="dummy_secret",
-            auth_url="https://localhost/authorize",
-            token_url="https://localhost/token",
+            govbr_auth_url="https://localhost/authorize",
+            govbr_token_url="https://localhost/token",
             redirect_uri="https://localhost/callback",
             cript_verifier_secret="GN6DdLRiwO7ylIR7PEKXN0xtPnagRqwI8T6wXxI5cso=",
     )

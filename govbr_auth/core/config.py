@@ -18,8 +18,8 @@ class GovBrConfig(BaseModel):
     :param client_secret: Segredo do cliente registrado na plataforma Gov.br.
     :param redirect_uri: URI de redirecionamento após a autenticação.
     :param cript_verifier_secret: Segredo usado para criptografar o código de verificação.
-    :param auth_url: URL de autorização da plataforma Gov.br.
-    :param token_url: URL de token da plataforma Gov.br.
+    :param govbr_auth_url: URL de autorização da plataforma Gov.br.
+    :param govbr_token_url: URL de token da plataforma Gov.br.
     :param scope: Escopo de acesso solicitado (padrão: "openid profile email").
     :param response_type: Tipo de resposta esperado (padrão: "code").
     :param code_challenge_method: Método de desafio de código (padrão: "S256").
@@ -29,6 +29,7 @@ class GovBrConfig(BaseModel):
     :param prefix: Prefixo para as rotas de autenticação (padrão: None).
     :param authorize_endpoint: Endpoint de autorização (padrão: None).
     :param authenticate_endpoint: Endpoint de autenticação (padrão: None).
+    :param use_fake: Ativa explicitamente o modo fake via configuração (padrão: False).
 
     :raises ValueError: Se as variáveis obrigatórias não estiverem presentes no ambiente.
     :raises ValueError: Se a chave de criptografia não for válida.
@@ -40,8 +41,8 @@ class GovBrConfig(BaseModel):
     cript_verifier_secret: str
 
     # URLs da plataforma Gov.br
-    auth_url: str
-    token_url: str
+    govbr_auth_url: str
+    govbr_token_url: str
 
     # Comportamento padrão do fluxo
     scope: str = "openid profile email"
@@ -57,6 +58,9 @@ class GovBrConfig(BaseModel):
     prefix: str = None
     authorize_endpoint: str = None
     authenticate_endpoint: str = None
+
+    # Flags de modo
+    use_fake: bool = False
 
     @field_validator("authorize_endpoint", "authenticate_endpoint", "prefix")
     def validate_endpoint(cls,
@@ -84,12 +88,13 @@ class GovBrConfig(BaseModel):
                 client_secret=os.getenv("GOVBR_CLIENT_SECRET"),
                 redirect_uri=os.getenv("GOVBR_REDIRECT_URI"),
                 cript_verifier_secret=os.getenv("CRIPT_VERIFIER_SECRET"),
-                auth_url=os.getenv("GOVBR_AUTH_URL", "https://sso.acesso.gov.br/authorize"),
-                token_url=os.getenv("GOVBR_TOKEN_URL", "https://sso.acesso.gov.br/token"),
+                govbr_auth_url=os.getenv("GOVBR_AUTH_URL", "https://sso.acesso.gov.br/authorize"),
+                govbr_token_url=os.getenv("GOVBR_TOKEN_URL", "https://sso.acesso.gov.br/token"),
                 scope=os.getenv("GOVBR_SCOPE", "openid"),
                 response_type=os.getenv("GOVBR_RESPONSE_TYPE", "code"),
                 code_challenge_method=os.getenv("GOVBR_CODE_CHALLENGE_METHOD", "S256"),
                 jwt_secret=os.getenv("JWT_SECRET"),
                 jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
                 jwt_expire_minutes=int(os.getenv("JWT_EXPIRE_MINUTES", 30)),
+                use_fake=os.getenv("USE_FAKE_GOVBR", "false").lower() in ("1", "true", "yes", "y"),
         )

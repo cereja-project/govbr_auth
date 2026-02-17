@@ -27,8 +27,8 @@ class TestFakeAutoIntegration:
             client_secret="test",
             redirect_uri="http://localhost/callback",
             cript_verifier_secret=valid_cript_secret,
-            auth_url="http://localhost:8000/fake-govbr/authorize",
-            token_url="http://localhost:8000/fake-govbr/token"
+            govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+            govbr_token_url="http://localhost:8000/fake-govbr/token"
         )
 
         connector = GovBrConnector(config=config)
@@ -43,8 +43,8 @@ class TestFakeAutoIntegration:
             client_secret="test",
             redirect_uri="https://example.com/callback",
             cript_verifier_secret=valid_cript_secret,
-            auth_url="https://sso.staging.acesso.gov.br/authorize",
-            token_url="https://sso.staging.acesso.gov.br/token"
+            govbr_auth_url="https://sso.staging.acesso.gov.br/authorize",
+            govbr_token_url="https://sso.staging.acesso.gov.br/token"
         )
 
         connector = GovBrConnector(config=config)
@@ -61,8 +61,8 @@ class TestFakeAutoIntegration:
             client_secret="test-secret",
             redirect_uri="http://localhost:8000/callback",
             cript_verifier_secret=valid_cript_secret,
-            auth_url="http://localhost:8000/fake-govbr/authorize",
-            token_url="http://localhost:8000/fake-govbr/token"
+            govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+            govbr_token_url="http://localhost:8000/fake-govbr/token"
         )
 
         connector = GovBrConnector(
@@ -95,8 +95,8 @@ class TestFakeAutoIntegration:
             client_secret="test-secret",
             redirect_uri="http://localhost:8000/callback",
             cript_verifier_secret=valid_cript_secret,
-            auth_url="http://localhost:8000/fake-govbr/authorize",
-            token_url="http://localhost:8000/fake-govbr/token"
+            govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+            govbr_token_url="http://localhost:8000/fake-govbr/token"
         )
 
         connector = GovBrConnector(config=config)
@@ -144,8 +144,8 @@ class TestFakeAutoIntegration:
             client_secret="test-secret",
             redirect_uri="http://localhost:8000/callback",
             cript_verifier_secret=valid_cript_secret,
-            auth_url="http://localhost:8000/fake-govbr/authorize",
-            token_url="http://localhost:8000/fake-govbr/token"
+            govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+            govbr_token_url="http://localhost:8000/fake-govbr/token"
         )
 
         connector = GovBrConnector(
@@ -173,8 +173,8 @@ class TestFakeAutoIntegration:
             client_secret="test",
             redirect_uri="https://example.com/callback",
             cript_verifier_secret=valid_cript_secret,
-            auth_url="https://sso.staging.acesso.gov.br/authorize",
-            token_url="https://sso.staging.acesso.gov.br/token"
+            govbr_auth_url="https://sso.staging.acesso.gov.br/authorize",
+            govbr_token_url="https://sso.staging.acesso.gov.br/token"
         )
 
         connector = GovBrConnector(config=config)
@@ -197,8 +197,25 @@ class TestFakeAutoIntegration:
             client_secret="test",
             redirect_uri="http://127.0.0.1/callback",
             cript_verifier_secret=valid_cript_secret,
-            auth_url="http://127.0.0.1:8000/fake-govbr/authorize",
-            token_url="http://127.0.0.1:8000/fake-govbr/token"
+            govbr_auth_url="http://127.0.0.1:8000/fake-govbr/authorize",
+            govbr_token_url="http://127.0.0.1:8000/fake-govbr/token"
+        )
+
+        connector = GovBrConnector(config=config)
+
+        assert connector.is_fake_mode is True
+        assert connector.fake_service is not None
+
+    def test_force_fake_mode_with_flag(self, valid_cript_secret):
+        """Força modo fake via flag mesmo com URLs não locais."""
+        config = GovBrConfig(
+            client_id="test",
+            client_secret="test",
+            redirect_uri="https://example.com/callback",
+            cript_verifier_secret=valid_cript_secret,
+            govbr_auth_url="https://sso.acesso.gov.br/authorize",
+            govbr_token_url="https://sso.acesso.gov.br/token",
+            use_fake=True,
         )
 
         connector = GovBrConnector(config=config)
@@ -209,4 +226,3 @@ class TestFakeAutoIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

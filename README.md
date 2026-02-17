@@ -23,7 +23,7 @@ desde entender o fluxo de autenticação com PKCE, até decidir qual abordagem s
 
 Esta biblioteca oferece:
 - ✅ Integração simplificada com Gov.br
-- 🧪 Modo fake automático para desenvolvimento
+- 🧪 Modo fake configurável para desenvolvimento
 - 🔒 Implementação segura com PKCE
 - 🚀 Suporte para FastAPI, Flask e Django
 - 📦 API de baixo nível para stacks customizadas
@@ -44,7 +44,7 @@ Veja também: [🔒 Boas práticas adotadas](docs/boas_praticas_adotadas.md)
 | 🔒 State Criptografado | Proteção contra CSRF | ✅ |
 | 📝 Bem Documentado | Exemplos e guias completos | ✅ |
 | 🧩 API Baixo Nível | Use sem frameworks | ✅ |
-| ⚡ Zero Config (Fake) | Detecção automática de modo | ✅ |
+| ⚡ Configuração simples (Fake) | Habilite via flag/env para desenvolvimento | ✅ |
 | 🎨 UI de Login (Fake) | Página estilizada para testes | ✅ |
 
 ---
@@ -84,26 +84,30 @@ from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
 
 # Configuração para modo fake (desenvolvimento)
 config = GovBrConfig(
-    client_id="fake-client-id",
-    client_secret="fake-client-secret",
-    redirect_uri="http://localhost:8000/auth/govbr/callback",
-    cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
-    auth_url="http://localhost:8000/fake-govbr/authorize",
-    token_url="http://localhost:8000/fake-govbr/token"
+        client_id="fake-client-id",
+        client_secret="fake-client-secret",
+        redirect_uri="http://localhost:8000/auth/govbr/callback",
+        cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
+        govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+        govbr_token_url="http://localhost:8000/fake-govbr/token",
+        use_fake=True,
 )
 
 app = FastAPI()
 
+
 # Callback de sucesso
-def handle_success(data, request):
+def handle_success(data,
+                   request):
     user = data["id_token_decoded"]
     return {"mensagem": f"Bem-vindo, {user['name']}!", "cpf": user["sub"]}
 
+
 # Inicializa o connector (endpoints fake criados automaticamente!)
 connector = GovBrConnector(
-    config=config,
-    on_auth_success=handle_success,
-    fake_users=create_default_fake_users()
+        config=config,
+        on_auth_success=handle_success,
+        fake_users=create_default_fake_users()
 )
 connector.init_fastapi(app)
 
@@ -124,12 +128,12 @@ GOVBR_REDIRECT_URI=
 GOVBR_CLIENT_ID=
 GOVBR_CLIENT_SECRET=
 GOVBR_CODE_CHALLENGE_METHOD=S256
-GOVBR_SCOPE=openid email profile
+GOVBR_SCOPE=openid profile email
 GOVBR_RESPONSE_TYPE=code
 CRIPT_VERIFIER_SECRET=
 GOVBR_AUTH_URL=https://sso.staging.acesso.gov.br/authorize
 GOVBR_TOKEN_URL=https://sso.staging.acesso.gov.br/token
-GOVBR_USER_INFO=https://api.acesso.gov.br/userinfo
+USE_FAKE_GOVBR=false
 JWT_SECRET=chave_super_secreta
 JWT_EXPIRES_MINUTES=60
 JWT_ALGORITHM=HS256
@@ -174,41 +178,59 @@ print(generate_cript_verifier_secret())
 - 🧪 **Testes facilitados**: Usuários de teste pré-configurados
 - 🔄 **Fluxo completo**: Simula todo o processo OAuth 2.0 com PKCE
 - 🎨 **Interface visual**: Página de login estilizada para testes
-- 🔌 **Zero config**: Detecta URLs locais e ativa automaticamente
+- 🔌 **Configuração explícita**: Ative via flag/env quando precisar do simulador
 
 ### Como ativar
 
-O modo fake é ativado **automaticamente** quando você usa URLs locais na configuração:
+O modo fake agora é **opt-in**. Defina `use_fake=True` (ou `USE_FAKE_GOVBR=true` no `.env`) e aponte as URLs para os endpoints fake.
 
 ```python
 from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
 
-# URLs locais ativam automaticamente o modo fake!
 config = GovBrConfig(
-    client_id="fake-client-id",
-    client_secret="fake-client-secret",
-    redirect_uri="http://localhost:8000/auth/govbr/callback",
-    cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
-    auth_url="http://localhost:8000/fake-govbr/authorize",  # ← localhost = modo fake
-    token_url="http://localhost:8000/fake-govbr/token"
+        client_id="fake-client-id",
+        client_secret="fake-client-secret",
+        redirect_uri="http://localhost:8000/auth/govbr/callback",
+        cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
+        govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+        govbr_token_url="http://localhost:8000/fake-govbr/token",
+        use_fake=True,
 )
+```
 
+Ou via `.env`:
+
+```bash
+USE_FAKE_GOVBR=true
+GOVBR_CLIENT_ID=fake-client-id
+GOVBR_CLIENT_SECRET=fake-client-secret
+GOVBR_REDIRECT_URI=http://localhost:8000/auth/govbr/callback
+CRIPT_VERIFIER_SECRET=Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=
+GOVBR_AUTH_URL=http://localhost:8000/fake-govbr/authorize
+GOVBR_TOKEN_URL=http://localhost:8000/fake-govbr/token
+```
+
+```python
+config = GovBrConfig.from_env()
+```
+
+```python
 # Opcional: customize os usuários de teste
 fake_users = create_default_fake_users()  # ou crie seu próprio dict
 
 connector = GovBrConnector(
-    config=config,
-    on_auth_success=handle_success,
-    fake_users=fake_users  # opcional
+        config=config,
+        on_auth_success=handle_success,
+        fake_users=fake_users  # opcional
 )
 
-# Endpoints fake são registrados automaticamente!
+# Endpoints fake são registrados automaticamente quando use_fake=True
 connector.init_fastapi(app)
 ```
 
 ### Endpoints fake criados automaticamente
 
-Quando o modo fake é detectado, os seguintes endpoints são criados:
+Quando `use_fake=True` está configurado, os seguintes endpoints são criados automaticamente:
 
 - `GET /fake-govbr/authorize` - Página de login fake (HTML)
 - `POST /fake-govbr/login` - Processar autenticação
@@ -289,7 +311,7 @@ connector = GovBrConnector(
 )
 connector.init_fastapi(app)
 
-# Se usar URLs locais na config, endpoints fake são criados automaticamente!
+# Se usar `use_fake=True` na config, endpoints fake são criados automaticamente!
 ```
 
 ## 🌐 Uso com Flask
@@ -318,7 +340,7 @@ connector = GovBrConnector(
 )
 connector.init_flask(app)
 
-# Se usar URLs locais na config, endpoints fake são criados automaticamente!
+# Se usar `use_fake=True` na config, endpoints fake são criados automaticamente!
 ```
 
 ## 🛠️ Uso com Django
@@ -349,7 +371,7 @@ urlpatterns = [
     *connector.init_django(),
 ]
 
-# Se usar URLs locais na config, endpoints fake são criados automaticamente!
+# Se usar `use_fake=True` na config, endpoints fake são criados automaticamente!
 ```
 
 ## 🧱 Uso com Stack Personalizada (baixo nível)
@@ -395,7 +417,7 @@ Ideal para:
 
 ### Endpoints Fake (modo desenvolvimento)
 
-Quando URLs locais são detectadas na configuração, os seguintes endpoints são criados automaticamente:
+Quando `use_fake=True` está configurado, os seguintes endpoints são criados automaticamente:
 
 - `GET /fake-govbr/authorize` → Página de login fake (HTML estilizado)
 - `POST /fake-govbr/login` → Processar login com CPF/email

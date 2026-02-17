@@ -10,24 +10,6 @@ from govbr_auth import GovBrIntegration
 __all__ = ["GovBrConnector"]
 
 
-def _is_fake_mode(config: GovBrConfig) -> bool:
-    """
-    Detecta se a configuração está usando o modo fake Gov.br baseado nas URLs.
-
-    Args:
-        config: Configuração do Gov.br
-
-    Returns:
-        True se estiver em modo fake, False caso contrário
-    """
-    # Verifica se as URLs apontam para localhost ou contêm "fake"
-    auth_is_local = "localhost" in config.auth_url.lower() or "127.0.0.1" in config.auth_url
-    token_is_local = "localhost" in config.token_url.lower() or "127.0.0.1" in config.token_url
-    has_fake_in_url = "fake" in config.auth_url.lower() or "fake" in config.token_url.lower()
-
-    return (auth_is_local and token_is_local) or has_fake_in_url
-
-
 class AuthenticationSchema(BaseModel):
     """
     Schema para o corpo da requisição de autenticação.
@@ -87,7 +69,7 @@ class GovBrConnector:
         self.on_auth_success = on_auth_success
 
         # Detecta se está em modo fake e inicializa o serviço
-        self.is_fake_mode = _is_fake_mode(config)
+        self.is_fake_mode = self._is_fake_mode()
         self.fake_service = None
 
         if self.is_fake_mode:
@@ -103,6 +85,25 @@ class GovBrConnector:
             import logging
             logger = logging.getLogger(__name__)
             logger.info(f"🧪 Modo FAKE Gov.br ativado - Endpoints fake serão registrados automaticamente")
+
+    def _is_fake_mode(self):
+        """
+        Verifica se o modo fake está habilitado.
+
+        Retorna True quando o flag `use_fake` está ativo na configuração
+        ou quando as URLs configuradas apontam para hosts locais,
+        preservando compatibilidade com a heurística existente.
+        """
+        if getattr(self.config, "use_fake", False):
+            return True
+
+        auth_host = urlparse(self.config.govbr_auth_url).hostname
+        token_host = urlparse(self.config.govbr_token_url).hostname
+        local_hosts = {"localhost", "127.0.0.1"}
+        if auth_host in local_hosts and token_host in local_hosts:
+            return True
+
+        return False
 
     def init_fastapi(self, app):
         from fastapi.routing import APIRouter
@@ -133,7 +134,7 @@ class GovBrConnector:
             from govbr_auth.fake_govbr import render_fake_login_page, process_fake_login, AuthorizationRequest
 
             # Extrai o path base da URL fake
-            parsed_url = urlparse(self.config.auth_url)
+            parsed_url = urlparse(self.config.govbr_auth_url)
             path_parts = parsed_url.path.rstrip('/').split('/')
             auth_path = '/'.join(path_parts[:-1]) if len(path_parts) > 1 else ''
 
@@ -247,7 +248,7 @@ class GovBrConnector:
             from govbr_auth.fake_govbr import render_fake_login_page, process_fake_login, AuthorizationRequest
 
             # Extrai o path base da URL fake
-            auth_path = self.config.auth_url.split('://')[-1]
+            auth_path = self.config.govbr_auth_url.split('://')[-1]
             auth_path = '/' + '/'.join(auth_path.split('/')[1:-1])
 
             fake_bp = Blueprint('fake_govbr', __name__, url_prefix=auth_path)
@@ -365,4 +366,3 @@ class GovBrConnector:
         ]
 
         return [path(f"{self.config.prefix}/", include(urls_patterns))]
-

@@ -32,24 +32,32 @@ O modo fake é um simulador completo do fluxo OAuth 2.0 com PKCE do Gov.br que r
 
 ## Como Funciona?
 
-### Detecção Automática
+### Ativação Explícita
 
-O modo fake é ativado automaticamente quando o `GovBrConnector` detecta que as URLs de autenticação (`auth_url` e `token_url`) apontam para `localhost` ou `127.0.0.1`.
+O modo fake agora depende de uma configuração explícita. Defina `use_fake=True` (ou `USE_FAKE_GOVBR=true` no `.env`) **e** aponte as URLs para os endpoints fake.
 
 ```python
-# ✅ Isso ATIVA o modo fake
+# ✅ Isso ATIVA o modo fake (flag + URLs fake)
 config = GovBrConfig(
-    auth_url="http://localhost:8000/fake-govbr/authorize",
-    token_url="http://localhost:8000/fake-govbr/token",
-    # ...
+    govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+    govbr_token_url="http://localhost:8000/fake-govbr/token",
+    use_fake=True,
+    # demais campos obrigatórios...
 )
 
-# ❌ Isso NÃO ativa o modo fake (URLs reais)
+# ❌ Isso NÃO ativa o modo fake sem a flag use_fake
 config = GovBrConfig(
-    auth_url="https://sso.staging.acesso.gov.br/authorize",
-    token_url="https://sso.staging.acesso.gov.br/token",
+    govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+    govbr_token_url="http://localhost:8000/fake-govbr/token",
+    use_fake=False,
     # ...
 )
+```
+
+A flag pode ser definida via variável de ambiente:
+
+```bash
+USE_FAKE_GOVBR=true
 ```
 
 ### Fluxo de Autenticação
@@ -108,29 +116,30 @@ config = GovBrConfig(
 
 ## Configuração
 
-### Configuração Básica (Automática)
+### Configuração Básica (Opt-in)
 
 ```python
 from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
 from fastapi import FastAPI
 
-# Configuração com URLs locais (ativa o fake automaticamente)
+# Configuração com URLs locais + flag use_fake (necessário)
 config = GovBrConfig(
-    client_id="fake-client-id",
-    client_secret="fake-client-secret",
-    redirect_uri="http://localhost:8000/auth/govbr/callback",
-    cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
-    auth_url="http://localhost:8000/fake-govbr/authorize",
-    token_url="http://localhost:8000/fake-govbr/token"
+        client_id="fake-client-id",
+        client_secret="fake-client-secret",
+        redirect_uri="http://localhost:8000/auth/govbr/callback",
+        cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
+        govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+        govbr_token_url="http://localhost:8000/fake-govbr/token",
+        use_fake=True,
 )
 
 app = FastAPI()
 
-# O connector detecta automaticamente e registra endpoints fake
+# O connector registra endpoints fake quando use_fake=True
 connector = GovBrConnector(
-    config=config,
-    on_auth_success=handle_success,
-    fake_users=create_default_fake_users()  # Opcional
+        config=config,
+        on_auth_success=handle_success,
+        fake_users=create_default_fake_users()  # Opcional
 )
 
 connector.init_fastapi(app)
@@ -361,7 +370,7 @@ class FakeUserData(BaseModel):
 ### Exemplo 1: FastAPI Completo
 
 Veja [`examples/example_simple_app.py`](../examples/example_simple_app.py) para um exemplo funcional completo com:
-- Detecção automática de modo
+- Flag `use_fake` para ativação explícita
 - Página inicial com instruções
 - Health check endpoint
 - Listagem de usuários fake
@@ -373,31 +382,34 @@ import pytest
 from fastapi.testclient import TestClient
 from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
 
+
 @pytest.fixture
 def app():
     from fastapi import FastAPI
-    
+
     config = GovBrConfig(
-        client_id="test-id",
-        client_secret="test-secret",
-        redirect_uri="http://localhost:8000/callback",
-        cript_verifier_secret="test-secret",
-        auth_url="http://localhost:8000/fake-govbr/authorize",
-        token_url="http://localhost:8000/fake-govbr/token"
+            client_id="test-id",
+            client_secret="test-secret",
+            redirect_uri="http://localhost:8000/callback",
+            cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
+            govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+            govbr_token_url="http://localhost:8000/fake-govbr/token",
+            use_fake=True,
     )
-    
+
     app = FastAPI()
     connector = GovBrConnector(
-        config=config,
-        fake_users=create_default_fake_users()
+            config=config,
+            fake_users=create_default_fake_users()
     )
     connector.init_fastapi(app)
-    
+
     return app
+
 
 def test_fake_login(app):
     client = TestClient(app)
-    
+
     # Listar usuários disponíveis
     response = client.get("/fake-govbr/users")
     assert response.status_code == 200
