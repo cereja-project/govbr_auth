@@ -48,7 +48,7 @@ class GovBrAuthorize:
             nonce = secrets.token_urlsafe(32)
             encoded_redirect_uri = urllib.parse.quote_plus(self.config.redirect_uri)
             url = (
-                f"{self.config.auth_url}?response_type={self.config.response_type}"
+                f"{self.config.govbr_auth_url}?response_type={self.config.response_type}"
                 f"&client_id={self.config.client_id}"
                 f"&scope={self.config.scope}"
                 f"&redirect_uri={encoded_redirect_uri}"
@@ -85,7 +85,7 @@ class GovBrIntegration:
         padding = 4 - len(b64_data) % 4
         if padding:
             b64_data += '=' * padding
-        return base64.b64decode(b64_data).decode('utf-8')
+        return base64.urlsafe_b64decode(b64_data).decode('utf-8')
 
     def jwt_payload_decode(self,
                            id_token: str) -> dict:
@@ -136,7 +136,7 @@ class GovBrIntegration:
                                data: dict,
                                headers: dict) -> dict:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(self.config.token_url, data=data, headers=headers, follow_redirects=False,
+            resp = await client.post(self.config.govbr_token_url, data=data, headers=headers, follow_redirects=False,
                                      timeout=10)
         return self.__parse_response(resp)
 
@@ -144,7 +144,7 @@ class GovBrIntegration:
                         data: dict,
                         headers: dict) -> dict:
         with httpx.Client() as client:
-            resp = client.post(self.config.token_url, data=data, headers=headers, follow_redirects=False, timeout=10)
+            resp = client.post(self.config.govbr_token_url, data=data, headers=headers, follow_redirects=False, timeout=10)
         return self.__parse_response(resp)
 
     def __parse_response(self,

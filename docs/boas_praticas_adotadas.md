@@ -53,6 +53,60 @@ O fluxo de autenticação com o Gov.br utiliza o protocolo OAuth 2.0 com PKCE (P
          Dados do usuário autenticado
 ```
 ---
+
+## 🧪 Modo Fake para Desenvolvimento
+
+A biblioteca inclui um **modo fake configurável** que facilita o desenvolvimento sem necessidade de cadastro no Gov.br:
+
+### Vantagens
+- ✅ **Configuração explícita**: Controle quando o simulador deve ser usado
+- ✅ **Endpoints automáticos**: Cria rotas fake sem código adicional
+- ✅ **Fluxo completo**: Simula OAuth 2.0 + PKCE corretamente
+- ✅ **Testes facilitados**: Usuários pré-configurados
+- ✅ **Interface visual**: Página de login estilizada
+
+### Como funciona
+Agora o modo fake é ativado apenas quando você configura explicitamente:
+
+```python
+from govbr_auth import GovBrConfig
+
+config = GovBrConfig(
+    client_id="fake-client-id",
+    client_secret="fake-client-secret",
+    redirect_uri="http://localhost:8000/auth/govbr/callback",
+    cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
+    govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
+    govbr_token_url="http://localhost:8000/fake-govbr/token",
+    use_fake=True,
+)
+```
+
+Ou via `.env`:
+
+```env
+USE_FAKE_GOVBR=true
+GOVBR_CLIENT_ID=fake-client-id
+GOVBR_CLIENT_SECRET=fake-client-secret
+GOVBR_REDIRECT_URI=http://localhost:8000/auth/govbr/callback
+CRIPT_VERIFIER_SECRET=Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=
+GOVBR_AUTH_URL=http://localhost:8000/fake-govbr/authorize
+GOVBR_TOKEN_URL=http://localhost:8000/fake-govbr/token
+```
+
+### Segurança do modo fake
+⚠️ **IMPORTANTE**: O modo fake é apenas para desenvolvimento!
+
+- Usa senhas simplificadas (CPF = senha)
+- Não valida CPF real
+- JWT secret é conhecido
+- Sem limitação de tentativas
+- Sessões em memória
+
+**Nunca use o modo fake em produção!** Veja a [documentação completa do modo fake](modo_fake.md) para mais detalhes.
+
+---
+
 ## ✅ Por que isso é considerado uma boa prática?
 
 | Item                         | Justificativa                                                                 |
