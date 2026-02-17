@@ -138,8 +138,8 @@ class GovBrConnector:
             path_parts = parsed_url.path.rstrip('/').split('/')
             auth_path = '/'.join(path_parts[:-1]) if len(path_parts) > 1 else ''
             # Garante que sempre comece com /
-            if not auth_path.startswith('/'):
-                auth_path = '/' + auth_path if auth_path else ''
+            if auth_path and not auth_path.startswith('/'):
+                auth_path = '/' + auth_path
 
             fake_router = APIRouter(prefix=auth_path, tags=["Fake Gov.br (Dev Only)"])
 
