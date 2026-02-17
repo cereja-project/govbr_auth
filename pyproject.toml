@@ -17,7 +17,8 @@ dependencies = [
     "cryptography",
     "python-dotenv",
     "pydantic",
-    "cereja"
+    "cereja",
+    "python-multipart"
 ]
 
 [tool.setuptools.dynamic]
