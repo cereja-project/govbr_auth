@@ -16,5 +16,5 @@ try:
 except ImportError:
     pass  # noqa: E402
 
-VERSION = "0.1.4.final.0"
+VERSION = "0.2.0.final.0"
 __version__ = get_version_pep440_compliant(VERSION)

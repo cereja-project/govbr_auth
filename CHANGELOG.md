@@ -5,7 +5,7 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
-## [0.1.4] - 2026-02-17
+## [0.2.0] - 2026-02-17
 
 ### Adicionado
 - 🧪 **Modo Fake Gov.br**: Simulador completo do fluxo OAuth 2.0 para desenvolvimento
