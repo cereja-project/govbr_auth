@@ -11,12 +11,6 @@ logger = logging.getLogger(__name__)
 _SESSION_DATA = {}
 
 
-class TokenRequest(BaseModel):
-    grant_type: str
-    code: str
-    redirect_uri: str
-    code_verifier: str
-
 class AuthorizationRequest(BaseModel):
     response_type: str
     client_id: str
