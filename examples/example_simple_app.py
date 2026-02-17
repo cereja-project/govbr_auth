@@ -83,15 +83,11 @@ async def home():
     users_info = ""
     if USE_FAKE and connector.fake_service:
         users_info = """
-        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <div id=\"users-card\" style=\"background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;\">
             <h3>👥 Usuários de Teste</h3>
             <p>Use qualquer CPF abaixo (senha = próprio CPF):</p>
-            <ul style="list-style: none; padding: 0;">
-                <li>📋 CPF: <code>12345678901</code> - João da Silva</li>
-                <li>📋 CPF: <code>98765432100</code> - Maria Oliveira</li>
-                <li>📋 CPF: <code>11122233344</code> - José Santos</li>
-            </ul>
-            <p><small><a href="/fake-govbr/users">Ver lista completa (JSON)</a></small></p>
+            <ul id=\"users-list\" style=\"list-style: none; padding: 0;\"></ul>
+            <p><small><a href=\"/fake-govbr/users\">Ver lista completa (JSON)</a></small></p>
         </div>
         """
 
@@ -122,6 +118,8 @@ async def home():
                 text-decoration: none;
                 border-radius: 4px;
                 font-weight: bold;
+                border: none;
+                cursor: pointer;
             }}
             .btn:hover {{
                 background: #0c3f8d;
@@ -149,7 +147,7 @@ async def home():
         <div class="card">
             <h2>Fazer Login</h2>
             <p>Clique no botão abaixo para autenticar:</p>
-            <a href="/auth/govbr/authorize" class="btn">🔐 Entrar com Gov.br</a>
+            <button id="login-btn" class="btn" type="button">🔐 Entrar com Gov.br</button>
         </div>
         
         {users_info}
@@ -172,6 +170,58 @@ async def home():
                 {'<li><a href="/fake-govbr/users">Lista de Usuários Fake (JSON)</a></li>' if USE_FAKE else ''}
             </ul>
         </div>
+        <script>
+            const loginButton = document.getElementById("login-btn");
+            const isFakeMode = {"true" if USE_FAKE else "false"};
+            if (loginButton) {{
+                loginButton.addEventListener("click", async () => {{
+                    loginButton.disabled = true;
+                    loginButton.textContent = "Redirecionando...";
+                    try {{
+                        const response = await fetch("/auth/govbr/authorize");
+                        if (!response.ok) {{
+                            throw new Error("Falha ao obter URL de autorização.");
+                        }}
+                        const payload = await response.json();
+                        if (!payload.url) {{
+                            throw new Error("URL de autorização não recebida.");
+                        }}
+                        window.location.href = payload.url;
+                    }} catch (error) {{
+                        alert(error.message || "Erro ao iniciar login com Gov.br.");
+                        loginButton.disabled = false;
+                        loginButton.textContent = "🔐 Entrar com Gov.br";
+                    }}
+                }});
+            }}
+
+            async function loadFakeUsers() {{
+                // Busca lista de usuários fake e renderiza na página
+                const usersList = document.getElementById("users-list");
+                if (!usersList) {{
+                    return;
+                }}
+                try {{
+                    const response = await fetch("/fake-govbr/users");
+                    if (!response.ok) {{
+                        throw new Error("Não foi possível carregar os usuários de teste.");
+                    }}
+                    const data = await response.json();
+                    usersList.innerHTML = "";
+                    (data.usuarios_de_teste || []).forEach((user) => {{
+                        const li = document.createElement("li");
+                        li.innerHTML = `📋 CPF: <code>${{user.cpf}}</code> - ${{user.nome}} (<small>${{user.email}}</small>)`;
+                        usersList.appendChild(li);
+                    }});
+                }} catch (error) {{
+                    usersList.innerHTML = `<li style="color: red;">${{error.message}}</li>`;
+                }}
+            }}
+
+            if (isFakeMode) {{
+                loadFakeUsers();
+            }}
+        </script>
     </body>
     </html>
     """

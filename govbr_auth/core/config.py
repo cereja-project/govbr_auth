@@ -92,6 +92,4 @@ class GovBrConfig(BaseModel):
                 jwt_secret=os.getenv("JWT_SECRET"),
                 jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
                 jwt_expire_minutes=int(os.getenv("JWT_EXPIRE_MINUTES", 30)),
-                auth_url_path=os.getenv("GOVBR_AUTH_URL_PATH", "/auth/govbr/url"),
-                callback_url_path=os.getenv("GOVBR_CALLBACK_URL_PATH", "/auth/govbr/callback")
         )

@@ -53,6 +53,41 @@ O fluxo de autenticação com o Gov.br utiliza o protocolo OAuth 2.0 com PKCE (P
          Dados do usuário autenticado
 ```
 ---
+
+## 🧪 Modo Fake para Desenvolvimento
+
+A biblioteca inclui um **modo fake automático** que facilita o desenvolvimento sem necessidade de cadastro no Gov.br:
+
+### Vantagens
+- ✅ **Zero configuração**: Detecta automaticamente URLs locais
+- ✅ **Endpoints automáticos**: Cria rotas fake sem código adicional
+- ✅ **Fluxo completo**: Simula OAuth 2.0 + PKCE corretamente
+- ✅ **Testes facilitados**: Usuários pré-configurados
+- ✅ **Interface visual**: Página de login estilizada
+
+### Como funciona
+O modo fake é ativado automaticamente quando você configura URLs locais:
+
+```python
+config = GovBrConfig(
+    auth_url="http://localhost:8000/fake-govbr/authorize",  # localhost = fake mode
+    token_url="http://localhost:8000/fake-govbr/token"
+)
+```
+
+### Segurança do modo fake
+⚠️ **IMPORTANTE**: O modo fake é apenas para desenvolvimento!
+
+- Usa senhas simplificadas (CPF = senha)
+- Não valida CPF real
+- JWT secret é conhecido
+- Sem limitação de tentativas
+- Sessões em memória
+
+**Nunca use o modo fake em produção!** Veja a [documentação completa do modo fake](modo_fake.md) para mais detalhes.
+
+---
+
 ## ✅ Por que isso é considerado uma boa prática?
 
 | Item                         | Justificativa                                                                 |

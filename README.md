@@ -1,6 +1,19 @@
 # GovBR Auth
 
+<div align="center">
+
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![FastAPI](https://img.shields.io/badge/FastAPI-compatible-green)](https://fastapi.tiangolo.com/)
+[![Flask](https://img.shields.io/badge/Flask-compatible-green)](https://flask.palletsprojects.com/)
+[![Django](https://img.shields.io/badge/Django-compatible-green)](https://www.djangoproject.com/)
+
 Autentique usuários com o Gov.br usando FastAPI, Flask, Django ou sua própria stack personalizada.
+
+🧪 **Novo!** Modo fake integrado para desenvolvimento sem necessidade de cadastro no Gov.br!
+
+</div>
+
 ---
 
 ## 💡 Motivação
@@ -8,7 +21,31 @@ Autentique usuários com o Gov.br usando FastAPI, Flask, Django ou sua própria 
 A criação desta biblioteca nasceu de uma necessidade real: ao tentar integrar com o Login Único Gov.br, enfrentei diversas dificuldades iniciais —
 desde entender o fluxo de autenticação com PKCE, até decidir qual abordagem seria mais segura: fazer tudo no frontend ou delegar ao backend?
 
+Esta biblioteca oferece:
+- ✅ Integração simplificada com Gov.br
+- 🧪 Modo fake automático para desenvolvimento
+- 🔒 Implementação segura com PKCE
+- 🚀 Suporte para FastAPI, Flask e Django
+- 📦 API de baixo nível para stacks customizadas
+
 Veja também: [🔒 Boas práticas adotadas](docs/boas_praticas_adotadas.md)
+
+---
+
+## ✨ Features
+
+| Feature | Descrição | Status |
+|---------|-----------|--------|
+| 🔐 OAuth 2.0 + PKCE | Implementação completa do fluxo seguro | ✅ |
+| 🌐 Multi-framework | FastAPI, Flask, Django | ✅ |
+| 🧪 Modo Fake | Desenvolvimento sem Gov.br real | ✅ |
+| 🔄 Async/Sync | Suporte para ambos paradigmas | ✅ |
+| 🎯 Type Hints | Totalmente tipado com Pydantic | ✅ |
+| 🔒 State Criptografado | Proteção contra CSRF | ✅ |
+| 📝 Bem Documentado | Exemplos e guias completos | ✅ |
+| 🧩 API Baixo Nível | Use sem frameworks | ✅ |
+| ⚡ Zero Config (Fake) | Detecção automática de modo | ✅ |
+| 🎨 UI de Login (Fake) | Página estilizada para testes | ✅ |
 
 ---
 ## 🚀 Instalação
@@ -31,6 +68,53 @@ Instalação completa (todos os frameworks):
 ```bash
 pip install govbr-auth[full]
 ```
+
+---
+
+## ⚡ Quick Start
+
+```python
+# 1. Instale a biblioteca
+# pip install govbr-auth[fastapi]
+
+# 2. Execute o exemplo pronto
+import os
+from fastapi import FastAPI
+from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
+
+# Configuração para modo fake (desenvolvimento)
+config = GovBrConfig(
+    client_id="fake-client-id",
+    client_secret="fake-client-secret",
+    redirect_uri="http://localhost:8000/auth/govbr/callback",
+    cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
+    auth_url="http://localhost:8000/fake-govbr/authorize",
+    token_url="http://localhost:8000/fake-govbr/token"
+)
+
+app = FastAPI()
+
+# Callback de sucesso
+def handle_success(data, request):
+    user = data["id_token_decoded"]
+    return {"mensagem": f"Bem-vindo, {user['name']}!", "cpf": user["sub"]}
+
+# Inicializa o connector (endpoints fake criados automaticamente!)
+connector = GovBrConnector(
+    config=config,
+    on_auth_success=handle_success,
+    fake_users=create_default_fake_users()
+)
+connector.init_fastapi(app)
+
+# 3. Execute: uvicorn seu_arquivo:app --reload
+# 4. Acesse: http://localhost:8000/auth/govbr/authorize
+# 5. Use CPF: 12345678901 | Senha: 12345678901
+```
+
+💡 **Próximos passos**: Configure o [Gov.br real](#️-configuração) quando estiver pronto para homologação/produção.
+
+---
 
 ## ⚙️ Configuração
 
@@ -74,10 +158,116 @@ print(generate_cript_verifier_secret())
 
 ```
 
+---
+
+## 🧪 Modo Fake Gov.br (Desenvolvimento)
+
+<p align="center">
+  <img src="docs/media/fake_gov.gif" alt="Demonstração do modo fake em uso" />
+</p>
+
+**Novo!** A biblioteca agora possui um simulador do gov.br, ao ativar o modo fake são criados endpoints simulados do Gov.br sem necessidade de configuração adicionais!
+
+### Por que usar o modo fake?
+
+- 🚀 **Desenvolvimento rápido**: Não precisa cadastrar sua aplicação no Gov.br
+- 🧪 **Testes facilitados**: Usuários de teste pré-configurados
+- 🔄 **Fluxo completo**: Simula todo o processo OAuth 2.0 com PKCE
+- 🎨 **Interface visual**: Página de login estilizada para testes
+- 🔌 **Zero config**: Detecta URLs locais e ativa automaticamente
+
+### Como ativar
+
+O modo fake é ativado **automaticamente** quando você usa URLs locais na configuração:
+
+```python
+from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
+
+# URLs locais ativam automaticamente o modo fake!
+config = GovBrConfig(
+    client_id="fake-client-id",
+    client_secret="fake-client-secret",
+    redirect_uri="http://localhost:8000/auth/govbr/callback",
+    cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
+    auth_url="http://localhost:8000/fake-govbr/authorize",  # ← localhost = modo fake
+    token_url="http://localhost:8000/fake-govbr/token"
+)
+
+# Opcional: customize os usuários de teste
+fake_users = create_default_fake_users()  # ou crie seu próprio dict
+
+connector = GovBrConnector(
+    config=config,
+    on_auth_success=handle_success,
+    fake_users=fake_users  # opcional
+)
+
+# Endpoints fake são registrados automaticamente!
+connector.init_fastapi(app)
+```
+
+### Endpoints fake criados automaticamente
+
+Quando o modo fake é detectado, os seguintes endpoints são criados:
+
+- `GET /fake-govbr/authorize` - Página de login fake (HTML)
+- `POST /fake-govbr/login` - Processar autenticação
+- `POST /fake-govbr/token` - Trocar code por token
+- `GET /fake-govbr/users` - Listar usuários disponíveis (JSON)
+
+### Usuários de teste padrão
+
+| CPF | Nome | E-mail | Senha |
+|-----|------|--------|-------|
+| 12345678901 | João da Silva | joao.silva@example.com | 12345678901 |
+| 98765432100 | Maria Oliveira | maria.oliveira@example.com | 98765432100 |
+| 11122233344 | José Santos | jose.santos@example.com | 11122233344 |
+
+> 💡 **Dica**: A senha é sempre o próprio CPF!
+
+### Customizando usuários fake
+
+```python
+from govbr_auth.fake_govbr import FakeUserData
+
+fake_users = {
+    "11111111111": FakeUserData(
+        cpf="11111111111",
+        nome="Teste da Silva",
+        email="teste@example.com",
+        picture="https://exemplo.com/foto.jpg"  # opcional
+    ),
+    "22222222222": FakeUserData(
+        cpf="22222222222",
+        nome="Usuário Teste",
+        email="usuario@example.com"
+    )
+}
+
+connector = GovBrConnector(config, fake_users=fake_users)
+```
+
+### Exemplo completo
+
+Veja um exemplo funcional em [`examples/example_simple_app.py`](examples/example_simple_app.py)
+
+```bash
+# Rodar em modo fake
+USE_FAKE_GOVBR=true uvicorn examples.example_simple_app:app --reload
+
+# Acessar em http://localhost:8000
+```
+
+📚 **Para documentação completa do modo fake**, veja: [docs/modo_fake.md](docs/modo_fake.md)
+
+---
+
 ## 🧩 Uso com FastAPI
 ```python
 from fastapi import FastAPI
 from govbr_auth.controller import GovBrConnector
+from govbr_auth import GovBrConfig, create_default_fake_users
+
 def after_auth(data, request):
     user = data["id_token_decoded"]
     return {
@@ -85,20 +275,27 @@ def after_auth(data, request):
         "usuario": user["name"],
         "cpf": user["sub"]
     }
+
+config = GovBrConfig.from_env()  # ou configure manualmente
+
 app = FastAPI()
-connector = GovBrConnector(config,
-                           prefix="/auth",
-                           authorize_endpoint="/govbr/authorize",
-                           authenticate_endpoint="/govbr/callback",
-                           on_auth_success=after_auth
-                           )
+connector = GovBrConnector(
+    config,
+    prefix="/auth/govbr",
+    authorize_endpoint="authorize",
+    authenticate_endpoint="authenticate",
+    on_auth_success=after_auth,
+    fake_users=create_default_fake_users()  # opcional, apenas para modo fake
+)
 connector.init_fastapi(app)
+
+# Se usar URLs locais na config, endpoints fake são criados automaticamente!
 ```
 
 ## 🌐 Uso com Flask
 ```python
 from flask import Flask, jsonify, request
-from govbr_auth import GovBrConnector, GovBrConfig
+from govbr_auth import GovBrConnector, GovBrConfig, create_default_fake_users
 
 def after_auth(data, request):
     user = data["id_token_decoded"]
@@ -109,21 +306,25 @@ def after_auth(data, request):
     })
 
 config = GovBrConfig.from_env()
-connector = GovBrConnector(config,
-                           prefix="/auth",
-                           authorize_endpoint="/govbr/authorize",
-                           authenticate_endpoint="/govbr/callback",
-                           on_auth_success=after_auth
-                           )
 
 app = Flask(__name__)
+connector = GovBrConnector(
+    config,
+    prefix="/auth/govbr",
+    authorize_endpoint="authorize",
+    authenticate_endpoint="authenticate",
+    on_auth_success=after_auth,
+    fake_users=create_default_fake_users()  # opcional, apenas para modo fake
+)
 connector.init_flask(app)
+
+# Se usar URLs locais na config, endpoints fake são criados automaticamente!
 ```
 
 ## 🛠️ Uso com Django
 ```python
 from django.http import JsonResponse
-from govbr_auth import GovBrConnector, GovBrConfig
+from govbr_auth import GovBrConnector, GovBrConfig, create_default_fake_users
 
 def after_auth(data, request):
     user = data["id_token_decoded"]
@@ -133,19 +334,22 @@ def after_auth(data, request):
         "cpf": user.get("sub")
     })
 
-
 config = GovBrConfig.from_env()
 
-connector = GovBrConnector(config,
-                           prefix="/auth",
-                           authorize_endpoint="/govbr/authorize",
-                           authenticate_endpoint="/govbr/callback",
-                           on_auth_success=after_auth
-                           )
+connector = GovBrConnector(
+    config,
+    prefix="auth/govbr",
+    authorize_endpoint="authorize",
+    authenticate_endpoint="authenticate",
+    on_auth_success=after_auth,
+    fake_users=create_default_fake_users()  # opcional, apenas para modo fake
+)
 
 urlpatterns = [
     *connector.init_django(),
 ]
+
+# Se usar URLs locais na config, endpoints fake são criados automaticamente!
 ```
 
 ## 🧱 Uso com Stack Personalizada (baixo nível)
@@ -180,17 +384,73 @@ Ideal para:
 
 
 
-## 📌 Endpoints Disponíveis (padrão)
+## 📌 Endpoints Disponíveis
+
+### Endpoints de Autenticação (padrão)
 
 - `GET /auth/govbr/authorize` → Retorna a URL de autorização Gov.br com PKCE
-- `GET /auth/govbr/authenticate` → Recebe `code` e `state`, troca por tokens e retorna dados decodificados
+- `POST /auth/govbr/authenticate` → Recebe `code` e `state`, troca por tokens e retorna dados decodificados
 
-> Os caminhos podem ser personalizados via `GovBrConfig`
+> Os caminhos podem ser personalizados via parâmetros do `GovBrConnector`
+
+### Endpoints Fake (modo desenvolvimento)
+
+Quando URLs locais são detectadas na configuração, os seguintes endpoints são criados automaticamente:
+
+- `GET /fake-govbr/authorize` → Página de login fake (HTML estilizado)
+- `POST /fake-govbr/login` → Processar login com CPF/email
+- `POST /fake-govbr/token` → Trocar code por token (OAuth)
+- `GET /fake-govbr/users` → Listar usuários de teste disponíveis (JSON)
+
+---
+
+## 📚 Documentação Adicional
+
+- 📖 [Boas Práticas Adotadas](docs/boas_praticas_adotadas.md) - Entenda as decisões de segurança e arquitetura
+- 🧪 [Modo Fake Gov.br](docs/modo_fake.md) - Guia completo sobre desenvolvimento com o simulador
+- 📝 [CHANGELOG](CHANGELOG.md) - Histórico de mudanças e versões
+- 🚀 [Exemplo Completo](examples/example_simple_app.py) - App FastAPI funcional com modo fake
+
+---
 
 ## ✅ Testes
 ```bash
 pytest tests/
 ```
 
+## 📁 Estrutura do Projeto
+
+```
+govbr_auth/
+├── govbr_auth/
+│   ├── core/
+│   │   ├── config.py      # Configurações e validação
+│   │   └── govbr.py       # Lógica principal OAuth 2.0 + PKCE
+│   ├── controller.py      # Conectores para frameworks
+│   ├── fake_govbr.py      # Serviço fake para desenvolvimento
+│   └── utils.py           # Utilitários (geração de secrets, etc)
+├── examples/
+│   └── example_simple_app.py  # Exemplo funcional completo
+├── tests/                 # Testes automatizados
+└── docs/
+    └── boas_praticas_adotadas.md  # Documentação técnica
+
+```
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Para contribuir:
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona MinhaFeature'`)
+4. Push para a branch (`git push origin feature/MinhaFeature`)
+5. Abra um Pull Request
+
+## 🐛 Reportando Problemas
+
+Se encontrar um bug ou tiver uma sugestão, por favor [abra uma issue](https://github.com/cereja-project/govbr_auth/issues) no GitHub.
+
 ## 📄 Licença
 MIT
+

@@ -153,7 +153,7 @@ GOVBR_LOGIN_PAGE_FAKE = f"""
 <body>
     <div class="login-container">            
         <div class="logo">
-            <h1>gov.br</h1>
+            <h1>Simulador gov.br</h1>
             <p>Acesso Simplificado</p>
         </div>
         
