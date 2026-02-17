@@ -1,5 +1,6 @@
 import asyncio
 from typing import Callable, Optional
+from urllib.parse import urlparse
 
 from govbr_auth.core.config import GovBrConfig
 from pydantic import BaseModel
@@ -132,8 +133,9 @@ class GovBrConnector:
             from govbr_auth.fake_govbr import render_fake_login_page, process_fake_login, AuthorizationRequest
 
             # Extrai o path base da URL fake
-            auth_path = self.config.auth_url.split('://')[-1]
-            auth_path = '/' + '/'.join(auth_path.split('/')[1:-1])
+            parsed_url = urlparse(self.config.auth_url)
+            path_parts = parsed_url.path.rstrip('/').split('/')
+            auth_path = '/'.join(path_parts[:-1]) if len(path_parts) > 1 else ''
 
             fake_router = APIRouter(prefix=auth_path, tags=["Fake Gov.br (Dev Only)"])
 
