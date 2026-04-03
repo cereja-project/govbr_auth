@@ -13,7 +13,7 @@ __all__ = ["GovBrAuthorize", "GovBrIntegration",
            "GovBrException", "GovBrAuthenticationError"]
 
 
-# excpetions
+# exceptions
 class GovBrException(Exception):
     """
     Exceção personalizada para erros relacionados ao Gov.br.
@@ -43,6 +43,15 @@ class GovBrAuthorize:
         return encrypted_verifier, code_challenge
 
     def build_authorize_url(self) -> dict:
+        """
+        Build the Gov.br authorization URL with PKCE parameters.
+
+        Returns:
+            Dict with the authorization URL.
+
+        Raises:
+            GovBrException: If URL generation fails.
+        """
         try:
             encrypted_verifier, code_challenge = self.__generate_codes()
             nonce = secrets.token_urlsafe(32)
@@ -59,7 +68,7 @@ class GovBrAuthorize:
             )
             return {"url": url}
         except Exception as e:
-            return {"error": f"Failed to build authorize URL: {str(e)}"}
+            raise GovBrException(f"Failed to build authorize URL: {str(e)}")
 
     def build_authorize_url_sync(self) -> dict:
         return self.build_authorize_url()
@@ -110,11 +119,11 @@ class GovBrIntegration:
                                  code: str,
                                  state: str):
         if not self.config.client_id or not self.config.client_secret:
-            return {"error": "Necessário informar client_id e client_secret"}
+            raise GovBrException("client_id and client_secret are required")
 
         code_verifier = self.__decrypt_code_verifier(state)
         if code_verifier is None:
-            return {"error": "Código de verificação inválido"}
+            raise GovBrAuthenticationError("Invalid verification code")
 
         data = {
             "grant_type":    "authorization_code",
