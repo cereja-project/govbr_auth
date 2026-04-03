@@ -55,9 +55,9 @@ class GovBrConfig(BaseModel):
     jwt_expire_minutes: int = 30
 
     # URLs internas da aplicação
-    prefix: str = None
-    authorize_endpoint: str = None
-    authenticate_endpoint: str = None
+    prefix: Optional[str] = None
+    authorize_endpoint: Optional[str] = None
+    authenticate_endpoint: Optional[str] = None
 
     # Flags de modo
     use_fake: bool = False
@@ -65,6 +65,8 @@ class GovBrConfig(BaseModel):
     @field_validator("authorize_endpoint", "authenticate_endpoint", "prefix")
     def validate_endpoint(cls,
                           v):
+        if v is None:
+            return v
         return v.strip("/ ")
 
     @field_validator("cript_verifier_secret")
@@ -90,7 +92,7 @@ class GovBrConfig(BaseModel):
                 cript_verifier_secret=os.getenv("CRIPT_VERIFIER_SECRET"),
                 govbr_auth_url=os.getenv("GOVBR_AUTH_URL", "https://sso.acesso.gov.br/authorize"),
                 govbr_token_url=os.getenv("GOVBR_TOKEN_URL", "https://sso.acesso.gov.br/token"),
-                scope=os.getenv("GOVBR_SCOPE", "openid"),
+                scope=os.getenv("GOVBR_SCOPE", "openid profile email"),
                 response_type=os.getenv("GOVBR_RESPONSE_TYPE", "code"),
                 code_challenge_method=os.getenv("GOVBR_CODE_CHALLENGE_METHOD", "S256"),
                 jwt_secret=os.getenv("JWT_SECRET"),
