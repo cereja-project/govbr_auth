@@ -67,8 +67,8 @@ class GovBrAuthorize:
                 f"&code_challenge_method={self.config.code_challenge_method}"
             )
             return {"url": url}
-        except Exception as e:
-            raise GovBrException(f"Failed to build authorize URL: {str(e)}")
+        except (ValueError, KeyError, AttributeError) as e:
+            raise GovBrException(f"Falha ao gerar URL de autorização: {str(e)}")
 
     def build_authorize_url_sync(self) -> dict:
         return self.build_authorize_url()
@@ -119,11 +119,11 @@ class GovBrIntegration:
                                  code: str,
                                  state: str):
         if not self.config.client_id or not self.config.client_secret:
-            raise GovBrException("client_id and client_secret are required")
+            raise GovBrException("client_id e client_secret são obrigatórios")
 
         code_verifier = self.__decrypt_code_verifier(state)
         if code_verifier is None:
-            raise GovBrAuthenticationError("Invalid verification code")
+            raise GovBrAuthenticationError("Código de verificação inválido")
 
         data = {
             "grant_type":    "authorization_code",

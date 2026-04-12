@@ -3,6 +3,7 @@ from typing import Callable, Optional
 from urllib.parse import urlparse
 
 from govbr_auth.core.config import GovBrConfig
+from govbr_auth.core.govbr import GovBrException, GovBrAuthenticationError
 from pydantic import BaseModel
 from govbr_auth import GovBrAuthorize
 from govbr_auth import GovBrIntegration
@@ -113,17 +114,25 @@ class GovBrConnector:
 
         @router.get(f"/{self.config.authorize_endpoint}")
         async def get_authorize_url():
-            return GovBrAuthorize(self.config).build_authorize_url()
+            try:
+                return GovBrAuthorize(self.config).build_authorize_url()
+            except GovBrException as e:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail=str(e))
 
         @router.post(f"/{self.config.authenticate_endpoint}")
         async def govbr_callback(data: AuthenticationSchema, request: Request):
-            integration = GovBrIntegration(self.config)
-            result = await integration.async_exchange_code_for_token(data.code, data.state)
-            if self.on_auth_success:
-                result = self.on_auth_success(result, request)
-                if asyncio.iscoroutine(result):
-                    return await result
-            return result
+            try:
+                integration = GovBrIntegration(self.config)
+                result = await integration.async_exchange_code_for_token(data.code, data.state)
+                if self.on_auth_success:
+                    result = self.on_auth_success(result, request)
+                    if asyncio.iscoroutine(result):
+                        return await result
+                return result
+            except (GovBrException, GovBrAuthenticationError) as e:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=401, detail=str(e))
 
         app.include_router(router)
 
@@ -224,8 +233,11 @@ class GovBrConnector:
 
         @bp.route(f'/{self.config.authorize_endpoint}', methods=['GET'])
         def get_authorize_url():
-            authorize = GovBrAuthorize(self.config)
-            return jsonify(authorize.build_authorize_url())
+            try:
+                authorize = GovBrAuthorize(self.config)
+                return jsonify(authorize.build_authorize_url())
+            except (GovBrException, GovBrAuthenticationError) as e:
+                return jsonify({"error": str(e)}), 400
 
         @bp.route(f'/{self.config.authenticate_endpoint}', methods=['POST'])
         def govbr_callback():
@@ -233,12 +245,15 @@ class GovBrConnector:
             state = request.args.get("state")
             if not code or not state:
                 return jsonify({"error": "Missing 'code' or 'state' parameter"}), 400
-            integration = GovBrIntegration(self.config)
-            result = integration.exchange_code_for_token_sync(code, state)
-            if self.on_auth_success:
-                return self.on_auth_success(result, request)
-            else:
-                return jsonify(result)
+            try:
+                integration = GovBrIntegration(self.config)
+                result = integration.exchange_code_for_token_sync(code, state)
+                if self.on_auth_success:
+                    return self.on_auth_success(result, request)
+                else:
+                    return jsonify(result)
+            except (GovBrException, GovBrAuthenticationError) as e:
+                return jsonify({"error": str(e)}), 401
 
         app.register_blueprint(bp)
 
@@ -331,7 +346,10 @@ class GovBrConnector:
 
             def get(self,
                     request):
-                return JsonResponse(GovBrAuthorize(self.config).build_authorize_url())
+                try:
+                    return JsonResponse(GovBrAuthorize(self.config).build_authorize_url())
+                except (GovBrException, GovBrAuthenticationError) as e:
+                    return JsonResponse({"error": str(e)}, status=400)
 
         class GovBrCallbackView(View):
             config = None
@@ -351,11 +369,14 @@ class GovBrConnector:
                 state = request.POST.get('state')
                 if not code or not state:
                     return JsonResponse({"error": "Missing 'code' or 'state' parameter"}, status=400)
-                result = asyncio.run(GovBrIntegration(self.config).async_exchange_code_for_token(code, state))
-                if self.on_auth_success:
-                    return self.on_auth_success(result, request)
-                else:
-                    return JsonResponse(result)
+                try:
+                    result = asyncio.run(GovBrIntegration(self.config).async_exchange_code_for_token(code, state))
+                    if self.on_auth_success:
+                        return self.on_auth_success(result, request)
+                    else:
+                        return JsonResponse(result)
+                except (GovBrException, GovBrAuthenticationError) as e:
+                    return JsonResponse({"error": str(e)}, status=401)
 
         urls_patterns = [
             path(self.config.authorize_endpoint, GovBrUrlView.as_view(), {'config': self.config},
