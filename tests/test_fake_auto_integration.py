@@ -14,7 +14,7 @@ from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
 @pytest.fixture
 def valid_cript_secret():
     """Gera uma chave Fernet válida para testes"""
-    return base64.urlsafe_b64encode(Fernet.generate_key()).decode('utf-8')[:44]
+    return Fernet.generate_key().decode('utf-8')
 
 
 class TestFakeAutoIntegration:
