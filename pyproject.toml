@@ -35,7 +35,8 @@ dev = ["uvicorn", "pytest", "pytest-asyncio", "black"]
 [project.urls]
 Homepage = "https://github.com/cereja-project/govbr_auth"
 Repository = "https://github.com/cereja-project/govbr_auth"
-Documentation = "https://github.com/cereja-project/govbr_auth#readme"
+Documentation = "https://govbr-auth.readthedocs.io/"
+Issues = "https://github.com/cereja-project/govbr_auth/issues"
 
 [build-system]
 requires = ["setuptools", "wheel", "cereja"]
