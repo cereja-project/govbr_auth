@@ -177,3 +177,8 @@ cython_debug/
 
 # Claude/LLM agent skills and private documentation
 .claude/
+
+# Agent documentation (local only, not versioned)
+AGENTS.md
+.github/**/*.md
+
