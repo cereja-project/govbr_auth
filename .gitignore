@@ -173,7 +173,6 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .idea
-.github/**/*.md
 
 # Claude/LLM agent skills and private documentation
 .claude/
