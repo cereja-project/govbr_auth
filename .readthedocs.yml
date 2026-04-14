@@ -26,10 +26,6 @@ formats:
   - pdf
   - epub
 
-# Build pull request previews for pull requests coming from forks
-# Set to false to skip building pull request previews
-build_pull_requests: true
-
 # If using Jupyter Notebooks only convert them to RST if they are referenced
 # from a standard reStructuredText file or if they are listed in the
 # `formats` key.
