@@ -329,8 +329,10 @@ class GovBrConnector:
 
     def init_django(self):
         from django.urls import path
-        from django.http import JsonResponse
+        from django.http import HttpResponse, JsonResponse
+        from django.shortcuts import redirect
         from django.views import View
+        from django.views.decorators.csrf import csrf_exempt
         from django.urls import include
         import asyncio
 
@@ -363,10 +365,10 @@ class GovBrConnector:
                 self.on_auth_success = kwargs.pop('on_auth_success', None)
                 return super().dispatch(request, *args, **kwargs)
 
-            def post(self,
-                     request):
-                code = request.POST.get('code')
-                state = request.POST.get('state')
+            def _handle_callback(self,
+                                 request):
+                code = request.POST.get('code') or request.GET.get('code')
+                state = request.POST.get('state') or request.GET.get('state')
                 if not code or not state:
                     return JsonResponse({"error": "Missing 'code' or 'state' parameter"}, status=400)
                 try:
@@ -378,12 +380,149 @@ class GovBrConnector:
                 except (GovBrException, GovBrAuthenticationError) as e:
                     return JsonResponse({"error": str(e)}, status=401)
 
+            def get(self,
+                    request):
+                return self._handle_callback(request)
+
+            def post(self,
+                     request):
+                return self._handle_callback(request)
+
+        class FakeGovBrAuthorizeView(View):
+            config = None
+            service = None
+
+            def dispatch(self,
+                         request,
+                         *args,
+                         **kwargs):
+                self.config = kwargs.pop('config', None)
+                self.service = kwargs.pop('service', None)
+                return super().dispatch(request, *args, **kwargs)
+
+            def get(self,
+                    request):
+                from govbr_auth.fake_govbr import AuthorizationRequest, render_fake_login_page
+                from urllib.parse import parse_qs
+
+                params = request.GET
+                if not params:
+                    auth_url = GovBrAuthorize(self.config).build_authorize_url()["url"]
+                    params = {key: values[0] for key, values in parse_qs(urlparse(auth_url).query).items()}
+                auth_request = AuthorizationRequest(
+                    response_type=params.get("response_type"),
+                    client_id=params.get("client_id"),
+                    scope=params.get("scope"),
+                    redirect_uri=params.get("redirect_uri"),
+                    state=params.get("state"),
+                    nonce=params.get("nonce"),
+                    code_challenge=params.get("code_challenge"),
+                    code_challenge_method=params.get("code_challenge_method")
+                )
+                html, _ = render_fake_login_page(self.service, auth_request)
+                return HttpResponse(html)
+
+        class FakeGovBrLoginView(View):
+            service = None
+
+            def dispatch(self,
+                         request,
+                         *args,
+                         **kwargs):
+                self.service = kwargs.pop('service', None)
+                return super().dispatch(request, *args, **kwargs)
+
+            def post(self,
+                     request):
+                from govbr_auth.fake_govbr import process_fake_login
+
+                try:
+                    redirect_url = process_fake_login(
+                        service=self.service,
+                        request_id=request.POST.get("request_id"),
+                        email=request.POST.get("email"),
+                        cpf=request.POST.get("password")
+                    )
+                    return redirect(redirect_url)
+                except ValueError as e:
+                    return JsonResponse({"error": str(e)}, status=401)
+
+        class FakeGovBrTokenView(View):
+            service = None
+
+            def dispatch(self,
+                         request,
+                         *args,
+                         **kwargs):
+                self.service = kwargs.pop('service', None)
+                return super().dispatch(request, *args, **kwargs)
+
+            def post(self,
+                     request):
+                try:
+                    token_data = self.service.exchange_code_for_token(
+                        code=request.POST.get("code"),
+                        code_verifier=request.POST.get("code_verifier"),
+                        redirect_uri=request.POST.get("redirect_uri"),
+                        client_id=request.POST.get("client_id")
+                    )
+                    return JsonResponse(token_data)
+                except ValueError as e:
+                    return JsonResponse({"error": str(e)}, status=400)
+
+        class FakeGovBrUsersView(View):
+            service = None
+
+            def dispatch(self,
+                         request,
+                         *args,
+                         **kwargs):
+                self.service = kwargs.pop('service', None)
+                return super().dispatch(request, *args, **kwargs)
+
+            def get(self,
+                    request):
+                users_list = []
+                for cpf, user in self.service.users.items():
+                    users_list.append({
+                        "cpf": cpf,
+                        "nome": user.nome,
+                        "email": user.email,
+                        "senha": cpf
+                    })
+                return JsonResponse({"usuarios_de_teste": users_list})
+
         urls_patterns = [
             path(self.config.authorize_endpoint, GovBrUrlView.as_view(), {'config': self.config},
                  name='govbr-auth-url'),
-            path(self.config.authenticate_endpoint, GovBrCallbackView.as_view(), {'config':          self.config,
-                                                                                  "on_auth_success": self.on_auth_success},
+            path(self.config.authenticate_endpoint, csrf_exempt(GovBrCallbackView.as_view()), {'config':          self.config,
+                                                                                                "on_auth_success": self.on_auth_success},
                  name='govbr-auth-callback'),
         ]
 
-        return [path(f"{self.config.prefix}/", include(urls_patterns))]
+        redirect_endpoint = urlparse(self.config.redirect_uri).path.rstrip("/").split("/")[-1]
+        if redirect_endpoint and redirect_endpoint != self.config.authenticate_endpoint:
+            urls_patterns.append(
+                path(redirect_endpoint, csrf_exempt(GovBrCallbackView.as_view()), {'config':          self.config,
+                                                                                   "on_auth_success": self.on_auth_success},
+                     name='govbr-auth-redirect-callback')
+            )
+
+        django_urls = [path(f"{self.config.prefix}/", include(urls_patterns))]
+
+        if self.is_fake_mode and self.fake_service:
+            auth_path = self.config.govbr_auth_url.split('://')[-1]
+            auth_path = '/'.join(auth_path.split('/')[1:-1]).strip("/")
+            fake_patterns = [
+                path("authorize", FakeGovBrAuthorizeView.as_view(), {'config': self.config, 'service': self.fake_service},
+                     name='fake-govbr-authorize'),
+                path("login", csrf_exempt(FakeGovBrLoginView.as_view()), {'service': self.fake_service},
+                     name='fake-govbr-login'),
+                path("token", csrf_exempt(FakeGovBrTokenView.as_view()), {'service': self.fake_service},
+                     name='fake-govbr-token'),
+                path("users", FakeGovBrUsersView.as_view(), {'service': self.fake_service},
+                     name='fake-govbr-users'),
+            ]
+            django_urls.append(path(f"{auth_path}/", include(fake_patterns)))
+
+        return django_urls
