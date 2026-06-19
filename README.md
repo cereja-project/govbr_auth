@@ -273,6 +273,8 @@ connector = GovBrConnector(config, fake_users=fake_users)
 
 Veja um exemplo funcional em [`examples/example_simple_app.py`](examples/example_simple_app.py)
 
+Para Django, consulte o projeto executável em [`examples/django_example/`](examples/django_example/README.md).
+
 ```bash
 # Rodar em modo fake
 USE_FAKE_GOVBR=true uvicorn examples.example_simple_app:app --reload
