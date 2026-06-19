@@ -1,10 +1,13 @@
 import base64
-import secrets
 import hashlib
-from datetime import datetime, timedelta
-from pydantic import BaseModel
-import jwt
 import logging
+import secrets
+from datetime import datetime, timedelta
+from html import escape
+
+import jwt
+from pydantic import BaseModel
+
 logger = logging.getLogger(__name__)
 
 
@@ -447,13 +450,16 @@ class FakeGovBrService:
 
 # Funções auxiliares para integração com frameworks
 def render_fake_login_page(service: FakeGovBrService,
-                          auth_request: AuthorizationRequest) -> tuple[str, str]:
+                           auth_request: AuthorizationRequest,
+                           *,
+                           login_url: str = "/fake-govbr/login") -> tuple[str, str]:
     """
     Renderiza a página de login fake e cria a sessão OAuth.
 
     Args:
         service: Instância do FakeGovBrService.
         auth_request: Dados da requisição de autorização.
+        login_url: Endpoint que receberá o formulário de login.
 
     Returns:
         Tupla com (HTML da página, request_id da sessão).
@@ -466,8 +472,12 @@ def render_fake_login_page(service: FakeGovBrService,
         scope=auth_request.scope
     )
 
-    # Injeta o request_id no HTML
-    html = GOVBR_LOGIN_PAGE_FAKE.replace('value=""', f'value="{request_id}"')
+    # Injeta a rota configurada e o request_id no HTML.
+    html = GOVBR_LOGIN_PAGE_FAKE.replace(
+        'action="/fake-govbr/login"',
+        f'action="{escape(login_url, quote=True)}"',
+    )
+    html = html.replace('value=""', f'value="{request_id}"')
 
     return html, request_id
 

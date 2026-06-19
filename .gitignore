@@ -180,4 +180,4 @@ cython_debug/
 # Agent documentation (local only, not versioned)
 AGENTS.md
 .github/**/*.md
-
+.aiassistant

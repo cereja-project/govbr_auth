@@ -30,7 +30,7 @@ fastapi = ["fastapi"]
 flask = ["flask"]
 django = ["django"]
 full = ["fastapi", "flask", "django"]
-dev = ["uvicorn", "pytest", "pytest-asyncio", "black"]
+dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black"]
 
 [project.urls]
 Homepage = "https://github.com/cereja-project/govbr_auth"
