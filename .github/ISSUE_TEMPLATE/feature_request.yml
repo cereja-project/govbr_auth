@@ -1,0 +1,43 @@
+name: Propor uma funcionalidade
+description: Descreva um problema que pode exigir uma nova capacidade da biblioteca.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema
+      description: Explique a limitação ou necessidade concreta antes de propor a solução.
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired_solution
+    attributes:
+      label: Solução desejada
+      description: Descreva o comportamento esperado do ponto de vista de quem usa a biblioteca.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+      description: Informe soluções temporárias ou abordagens descartadas, se houver.
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Impacto na API e compatibilidade
+      description: Indique mudanças esperadas na API pública, frameworks suportados ou versões do Python.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: sensitive_data
+    attributes:
+      label: Dados sensíveis
+      options:
+        - label: Esta proposta não contém credenciais, tokens, chaves ou dados reais de usuários.
+          required: true

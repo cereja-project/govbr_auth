@@ -1,0 +1,80 @@
+name: Relatar um bug
+description: Informe um comportamento incorreto ou inesperado da biblioteca.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Não inclua credenciais, tokens, chaves nem dados reais de usuários.
+
+  - type: input
+    id: package_version
+    attributes:
+      label: Versão do govbr-auth
+      placeholder: "0.2.2"
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Versão do Python
+      placeholder: "3.12.4"
+    validations:
+      required: true
+
+  - type: input
+    id: framework
+    attributes:
+      label: Framework e versão
+      description: Informe FastAPI, Flask, Django ou "API de baixo nível".
+      placeholder: "FastAPI 0.116.1"
+    validations:
+      required: true
+
+  - type: input
+    id: operating_system
+    attributes:
+      label: Sistema operacional
+      placeholder: "Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reprodução mínima
+      description: Liste os passos e inclua o menor exemplo de código capaz de reproduzir o problema.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Comportamento esperado
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed_behavior
+    attributes:
+      label: Comportamento observado
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs ou traceback sanitizados
+      description: Remova informações sensíveis antes de enviar.
+      render: shell
+
+  - type: checkboxes
+    id: sensitive_data
+    attributes:
+      label: Dados sensíveis
+      options:
+        - label: Removi credenciais, tokens, chaves e dados reais de usuários deste relato.
+          required: true
