@@ -56,7 +56,7 @@ black govbr_auth tests examples
 Execute a verificação bloqueante usada pela CI:
 
 ```bash
-flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+flake8 govbr_auth tests examples --count --select=E9,F63,F7,F82 --show-source --statistics
 ```
 
 ## Branches e commits
