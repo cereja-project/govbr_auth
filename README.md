@@ -463,17 +463,15 @@ govbr_auth/
 
 ## 🤝 Contribuindo
 
-Contribuições são bem-vindas! Para contribuir:
+Antes de começar, leia o [guia de contribuição](CONTRIBUTING.md) e o [Código de Conduta](CODE_OF_CONDUCT.md).
 
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona MinhaFeature'`)
-4. Push para a branch (`git push origin feature/MinhaFeature`)
-5. Abra um Pull Request
+- Encontrou um defeito reproduzível? [Relate um bug](https://github.com/cereja-project/govbr_auth/issues/new?template=bug_report.yml).
+- Precisa de uma nova capacidade? [Proponha uma funcionalidade](https://github.com/cereja-project/govbr_auth/issues/new?template=feature_request.yml).
+- Quer implementar uma mudança? Verifique as [issues existentes](https://github.com/cereja-project/govbr_auth/issues) e mantenha o pull request focado.
 
 ## 🐛 Reportando Problemas
 
-Se encontrar um bug ou tiver uma sugestão, por favor [abra uma issue](https://github.com/cereja-project/govbr_auth/issues) no GitHub.
+Use os formulários acima e remova credenciais, tokens, chaves e dados reais de usuários antes de enviar logs ou exemplos.
 
 ## 📄 Licença
 MIT
