@@ -1,0 +1,370 @@
+"""Tests for the asynchronous Gov.br OAuth HTTP client."""
+
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
+
+import httpx
+import pytest
+from pydantic import SecretStr
+
+from govbr_auth.core.client import AuthenticationResult, GovBrClient
+from govbr_auth.core.errors import GovBrAuthError, InvalidIdTokenError
+from govbr_auth.core.models import AuthTransaction
+from govbr_auth.core.settings import GovBrSettings
+
+FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
+SENSITIVE_CODE = "sensitive-authorization-code"
+SENSITIVE_STATE = "sensitive-oauth-state"
+SENSITIVE_ACCESS_TOKEN = "sensitive-access-token"
+SENSITIVE_ID_TOKEN = "sensitive-id-token"
+SENSITIVE_CLIENT_SECRET = "sensitive-client-secret"
+
+
+class RecordingTransactionStore:
+    """Return one deterministic transaction and record transaction operations."""
+
+    def __init__(self) -> None:
+        self.transaction = AuthTransaction(
+            transaction_id="transaction-123",
+            code_verifier=SecretStr("sensitive-code-verifier"),
+            nonce=SecretStr("sensitive-expected-nonce"),
+            issued_at=FIXED_NOW,
+            expires_at=FIXED_NOW + timedelta(minutes=5),
+        )
+        self.consume_calls: list[tuple[str, datetime]] = []
+
+    def create(self, *, now: datetime) -> tuple[str, AuthTransaction]:
+        return SENSITIVE_STATE, self.transaction
+
+    def consume(self, state: str, *, now: datetime) -> AuthTransaction:
+        self.consume_calls.append((state, now))
+        return self.transaction
+
+
+class RecordingIdTokenValidator:
+    """Return deterministic claims and record the security binding inputs."""
+
+    def __init__(self, *, error: InvalidIdTokenError | None = None) -> None:
+        self.error = error
+        self.calls: list[tuple[SecretStr, SecretStr, datetime]] = []
+
+    def validate(
+        self,
+        id_token: SecretStr,
+        expected_nonce: SecretStr,
+        *,
+        now: datetime,
+    ) -> Mapping[str, object]:
+        self.calls.append((id_token, expected_nonce, now))
+        if self.error is not None:
+            raise self.error
+        return {
+            "sub": "12345678900",
+            "nonce": expected_nonce.get_secret_value(),
+        }
+
+
+@pytest.fixture
+def settings() -> GovBrSettings:
+    return GovBrSettings(
+        authorization_url="https://sso.example.test/authorize",
+        token_url="https://sso.example.test/token",
+        userinfo_url="https://sso.example.test/userinfo",
+        client_id="test-client",
+        client_secret=SecretStr(SENSITIVE_CLIENT_SECRET),
+        redirect_uri="https://consumer.example.test/oauth/callback",
+        transaction_secret=SecretStr("sensitive-transaction-secret"),
+        issuer="https://sso.example.test",
+        jwks_url="https://sso.example.test/jwk",
+        connect_timeout_seconds=2,
+        read_timeout_seconds=3,
+    )
+
+
+def _token_response() -> dict[str, object]:
+    return {
+        "access_token": SENSITIVE_ACCESS_TOKEN,
+        "id_token": SENSITIVE_ID_TOKEN,
+        "token_type": "Bearer",
+        "expires_in": 300,
+        "scope": "openid profile email",
+    }
+
+
+def _assert_error_is_sanitized(error: BaseException) -> None:
+    messages: list[str] = []
+    pending = [error]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        messages.append(str(current))
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
+    rendered = " ".join(messages)
+
+    assert SENSITIVE_CODE not in rendered
+    assert SENSITIVE_STATE not in rendered
+    assert SENSITIVE_ACCESS_TOKEN not in rendered
+    assert SENSITIVE_ID_TOKEN not in rendered
+    assert SENSITIVE_CLIENT_SECRET not in rendered
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_returns_tokens_and_claims_after_single_state_consumption(
+    settings: GovBrSettings,
+) -> None:
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=_token_response())
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        result = await client.exchange_code(
+            code=SENSITIVE_CODE,
+            state=SENSITIVE_STATE,
+            now=FIXED_NOW,
+        )
+
+    assert isinstance(result, AuthenticationResult)
+    assert result.tokens.access_token.get_secret_value() == SENSITIVE_ACCESS_TOKEN
+    assert result.id_token_claims == {
+        "sub": "12345678900",
+        "nonce": "sensitive-expected-nonce",
+    }
+    assert transactions.consume_calls == [(SENSITIVE_STATE, FIXED_NOW)]
+    validated_token, validated_nonce, validated_now = validator.calls[0]
+    assert validated_token.get_secret_value() == SENSITIVE_ID_TOKEN
+    assert validated_nonce.get_secret_value() == "sensitive-expected-nonce"
+    assert validated_now == FIXED_NOW
+    assert len(requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_authorization_url_uses_bound_authorization_builder(
+    settings: GovBrSettings,
+) -> None:
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: httpx.Response(500))
+    ) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        request = client.authorization_url(now=FIXED_NOW)
+
+    assert request.state == SENSITIVE_STATE
+    assert "nonce=sensitive-expected-nonce" in request.url
+    assert "code_challenge_method=S256" in request.url
+
+
+@pytest.mark.asyncio
+async def test_userinfo_uses_bearer_token_and_returns_strict_user(
+    settings: GovBrSettings,
+) -> None:
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={"sub": "12345678900", "email_verified": True},
+        )
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        user = await client.userinfo(SecretStr(SENSITIVE_ACCESS_TOKEN))
+
+    request = requests[0]
+    assert user.sub == "12345678900"
+    assert user.email_verified is True
+    assert request.method == "GET"
+    assert request.url == httpx.URL("https://sso.example.test/userinfo")
+    assert request.headers["authorization"] == f"Bearer {SENSITIVE_ACCESS_TOKEN}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("transport_error", "expected_message"),
+    [
+        pytest.param(
+            httpx.ReadTimeout, "Gov.br provider request timed out", id="timeout"
+        ),
+        pytest.param(
+            httpx.ConnectError, "Gov.br provider request failed", id="transport"
+        ),
+    ],
+)
+async def test_exchange_code_sanitizes_transport_failures(
+    transport_error: type[httpx.TransportError],
+    expected_message: str,
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        raise transport_error(SENSITIVE_CODE, request=request)
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(GovBrAuthError, match=expected_message) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    _assert_error_is_sanitized(error.value)
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_sanitizes_oauth_error_response(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={
+                "error": "invalid_grant",
+                "error_description": (
+                    f"rejected {SENSITIVE_CODE} {SENSITIVE_STATE} "
+                    f"{SENSITIVE_ACCESS_TOKEN} {SENSITIVE_CLIENT_SECRET}"
+                ),
+            },
+        )
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br rejected the authorization code",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    _assert_error_is_sanitized(error.value)
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_sanitizes_provider_server_error(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            500,
+            text=f"{SENSITIVE_ACCESS_TOKEN} {SENSITIVE_ID_TOKEN}",
+        )
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br provider request failed",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    _assert_error_is_sanitized(error.value)
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_rejects_invalid_json_without_exposing_body(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=f"not-json {SENSITIVE_ACCESS_TOKEN}")
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br token response is invalid",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    _assert_error_is_sanitized(error.value)
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_rejects_missing_token_fields(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"access_token": SENSITIVE_ACCESS_TOKEN})
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br token response is invalid",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    _assert_error_is_sanitized(error.value)
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_propagates_invalid_id_token_after_consuming_state_once(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_token_response())
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator(
+        error=InvalidIdTokenError("ID token validation failed")
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            InvalidIdTokenError,
+            match="ID token validation failed",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    assert transactions.consume_calls == [(SENSITIVE_STATE, FIXED_NOW)]
+    _assert_error_is_sanitized(error.value)
