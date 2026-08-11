@@ -2,7 +2,16 @@
 
 from enum import StrEnum
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, NonNegativeInt, PositiveFloat, SecretStr, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    NonNegativeInt,
+    PositiveFloat,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 
 
 class ProviderEnvironment(StrEnum):
@@ -33,6 +42,22 @@ class GovBrSettings(BaseModel):
     read_timeout_seconds: PositiveFloat = 10.0
     clock_skew_seconds: NonNegativeInt = 60
 
+    @field_validator("client_id", "scope")
+    @classmethod
+    def validate_nonempty_text(cls, value: str) -> str:
+        """Reject empty values needed to create a valid OAuth request."""
+        if not value:
+            raise ValueError("must not be empty")
+        return value
+
+    @field_validator("client_secret", "transaction_secret")
+    @classmethod
+    def validate_nonempty_secret(cls, value: SecretStr) -> SecretStr:
+        """Reject whitespace-only credentials without exposing their contents."""
+        if not value.get_secret_value().strip():
+            raise ValueError("must not be empty")
+        return value
+
     @model_validator(mode="after")
     def validate_url_schemes(self) -> "GovBrSettings":
         """Require HTTPS except for explicit loopback-only local configuration."""
@@ -41,7 +66,8 @@ class GovBrSettings(BaseModel):
                 continue
             if self.environment is not ProviderEnvironment.LOCAL:
                 raise ValueError("provider URLs must use https outside the local environment")
-            if url.host not in {"localhost", "127.0.0.1", "::1"}:
+            host = (url.host or "").strip("[]")
+            if host not in {"localhost", "127.0.0.1", "::1"}:
                 raise ValueError("local HTTP provider URLs must use a loopback host")
         return self
 

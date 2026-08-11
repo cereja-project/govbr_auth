@@ -50,6 +50,33 @@ def test_local_environment_rejects_http_for_non_loopback_provider_url(
         GovBrSettings(**valid_settings_data, environment=ProviderEnvironment.LOCAL)
 
 
+def test_local_environment_accepts_ipv6_loopback_http(valid_settings_data: dict[str, object]) -> None:
+    valid_settings_data["environment"] = ProviderEnvironment.LOCAL
+    valid_settings_data["authorization_url"] = "http://[::1]:8000/fake-govbr/authorize"
+
+    settings = GovBrSettings(**valid_settings_data)
+
+    assert str(settings.authorization_url) == "http://[::1]:8000/fake-govbr/authorize"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        pytest.param("client_id", "   ", id="blank_client_id"),
+        pytest.param("client_secret", "   ", id="blank_client_secret"),
+        pytest.param("transaction_secret", "   ", id="blank_transaction_secret"),
+        pytest.param("scope", "   ", id="blank_scope"),
+    ],
+)
+def test_settings_rejects_blank_security_critical_values(
+    valid_settings_data: dict[str, object], field_name: str, value: str
+) -> None:
+    valid_settings_data[field_name] = value
+
+    with pytest.raises(ValidationError, match="must not be empty"):
+        GovBrSettings(**valid_settings_data)
+
+
 def test_settings_rejects_unknown_configuration(valid_settings_data: dict[str, object]) -> None:
     with pytest.raises(ValidationError, match="unexpected"):
         GovBrSettings(**valid_settings_data, unexpected="value")

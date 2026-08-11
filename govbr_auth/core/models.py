@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, PositiveInt, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, PositiveInt, SecretStr, field_validator, model_validator
 
 
 class AuthTransaction(BaseModel):
@@ -16,6 +16,14 @@ class AuthTransaction(BaseModel):
     nonce: SecretStr
     issued_at: datetime
     expires_at: datetime
+
+    @field_validator("issued_at", "expires_at")
+    @classmethod
+    def validate_timezone_aware_datetime(cls, value: datetime) -> datetime:
+        """Reject transaction timestamps that do not carry an explicit timezone."""
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("transaction timestamps must be timezone-aware")
+        return value
 
     @model_validator(mode="after")
     def validate_expiration(self) -> "AuthTransaction":
@@ -35,6 +43,19 @@ class TokenSet(BaseModel):
     token_type: Literal["Bearer"]
     expires_in: PositiveInt
     scope: str
+
+
+class GovBrAddress(BaseModel):
+    """Represent the standard address claim returned by OpenID Connect."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    formatted: str | None = None
+    street_address: str | None = None
+    locality: str | None = None
+    region: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
 
 
 class GovBrUser(BaseModel):
@@ -60,5 +81,5 @@ class GovBrUser(BaseModel):
     locale: str | None = None
     phone_number: str | None = None
     phone_number_verified: bool | None = None
-    address: dict[str, object] | None = None
+    address: GovBrAddress | None = None
     updated_at: int | None = None

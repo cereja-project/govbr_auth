@@ -36,6 +36,19 @@ def test_auth_transaction_rejects_expiration_before_issuance() -> None:
         )
 
 
+def test_auth_transaction_rejects_naive_datetimes() -> None:
+    issued_at = datetime(2026, 8, 11)
+
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        AuthTransaction(
+            transaction_id="transaction-123",
+            code_verifier="verifier-secret",
+            nonce="nonce-secret",
+            issued_at=issued_at,
+            expires_at=issued_at + timedelta(minutes=5),
+        )
+
+
 def test_token_set_requires_bearer_tokens() -> None:
     with pytest.raises(ValidationError, match="Bearer"):
         TokenSet(
@@ -50,6 +63,13 @@ def test_token_set_requires_bearer_tokens() -> None:
 def test_govbr_user_rejects_unknown_claims() -> None:
     with pytest.raises(ValidationError, match="unexpected"):
         GovBrUser(sub="subject-123", unexpected="claim")
+
+
+def test_govbr_user_address_is_immutable() -> None:
+    user = GovBrUser(sub="subject-123", address={"country": "BR"})
+
+    with pytest.raises(ValidationError, match="frozen"):
+        user.address.country = "AR"
 
 
 @pytest.mark.parametrize(
