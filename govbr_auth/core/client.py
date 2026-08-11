@@ -27,7 +27,11 @@ _USERINFO_RESPONSE_MESSAGE = "Gov.br userinfo response is invalid"
 
 @dataclass(frozen=True, slots=True)
 class AuthenticationResult:
-    """Return validated token material and immutable ID token claims."""
+    """Return validated tokens and a shallowly immutable ID-claim mapping.
+
+    The top-level mapping cannot be changed. Nested values retain the mutability
+    provided by the token decoder.
+    """
 
     tokens: TokenSet
     id_token_claims: Mapping[str, object]
