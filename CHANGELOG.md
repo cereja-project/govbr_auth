@@ -5,6 +5,35 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+## [0.2.2] - 2026-06-19
+
+### Added
+- Adicionada integração com Django e um exemplo executável para o framework.
+
+### Changed
+- Atualizadas as dependências da cadeia de documentação Sphinx.
+
+### Fixed
+- Corrigidos callbacks do Django e rotas do modo fake para respeitar as URLs configuradas de redirecionamento e endpoints.
+- Adicionadas validações dos parâmetros obrigatórios das views do Django e troca síncrona de tokens no callback.
+
+## [0.2.1] - 2026-04-14
+
+### Added
+- Adicionada documentação com Sphinx e Read the Docs para API, configuração, frameworks, segurança, FAQ e solução de problemas.
+- Adicionada cobertura para configuração, tratamento de erros e verificação de JWT.
+
+### Changed
+- Falhas de autenticação agora lançam exceções em vez de retornar dicionários de erro.
+
+### Fixed
+- Corrigidas a validação de configurações opcionais e o tratamento de erros no controller.
+
+### Security
+- Adicionada verificação da assinatura JWT pelo endpoint JWKS do Gov.br.
+
 ## [0.2.0] - 2026-02-17
 
 ### Adicionado
