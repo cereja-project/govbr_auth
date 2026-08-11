@@ -1,1 +1,2 @@
 -e .[full,dev]
+respx>=0.22,<1
