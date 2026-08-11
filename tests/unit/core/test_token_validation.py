@@ -1,6 +1,8 @@
 """Tests for fail-closed OpenID Connect ID token validation."""
 
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import jwt
 import pytest
@@ -204,6 +206,35 @@ def test_unknown_kid_rejects_id_token(
     assert error.value.code == "invalid_id_token"
 
 
+def test_duplicate_kid_rejects_ambiguous_jwks(
+    settings: GovBrSettings,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    other_rsa_signing_key: rsa.RSAPrivateKey,
+    signed_id_token: SecretStr,
+    expected_nonce: SecretStr,
+) -> None:
+    first_public_jwk: dict[str, object] = jwt.algorithms.RSAAlgorithm.to_jwk(
+        rsa_signing_key.public_key(),
+        as_dict=True,
+    )
+    first_public_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
+    second_public_jwk: dict[str, object] = jwt.algorithms.RSAAlgorithm.to_jwk(
+        other_rsa_signing_key.public_key(),
+        as_dict=True,
+    )
+    second_public_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
+    validator = IdTokenValidator(
+        settings=settings,
+        jwks={"keys": [first_public_jwk, second_public_jwk]},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+    assert isinstance(error.value.__cause__, jwt.PyJWKSetError)
+
+
 @pytest.mark.parametrize(
     "jwk_field,jwk_value",
     [
@@ -231,6 +262,26 @@ def test_non_signing_rs256_jwk_rejects_id_token(
         validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
+
+
+def test_private_rsa_jwk_rejects_id_token_before_decode(
+    settings: GovBrSettings,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    signed_id_token: SecretStr,
+    expected_nonce: SecretStr,
+) -> None:
+    private_jwk: dict[str, object] = jwt.algorithms.RSAAlgorithm.to_jwk(
+        rsa_signing_key,
+        as_dict=True,
+    )
+    private_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
+    validator = IdTokenValidator(settings=settings, jwks={"keys": [private_jwk]})
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+    assert isinstance(error.value.__cause__, jwt.InvalidKeyError)
 
 
 @pytest.mark.parametrize(
@@ -319,6 +370,45 @@ def test_future_iat_rejects_id_token(
         validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
+
+
+def test_future_nbf_rejects_id_token_using_injected_now(
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+    expected_nonce: SecretStr,
+) -> None:
+    valid_claims["nbf"] = int((FIXED_NOW + timedelta(seconds=61)).timestamp())
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+
+
+def test_valid_nbf_returns_claims_using_injected_now(
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+    expected_nonce: SecretStr,
+) -> None:
+    valid_claims["nbf"] = int((FIXED_NOW - timedelta(seconds=1)).timestamp())
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    claims = validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+
+    assert claims["nbf"] == valid_claims["nbf"]
 
 
 @pytest.mark.parametrize(
@@ -430,6 +520,51 @@ def test_numeric_nonce_rejects_id_token(
     assert error.value.code == "invalid_id_token"
 
 
+def test_unicode_nonce_match_returns_claims(
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+) -> None:
+    valid_claims["nonce"] = "transação-segura-🔐"
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    claims = validator.validate(
+        SecretStr(encoded),
+        SecretStr("transação-segura-🔐"),
+        now=FIXED_NOW,
+    )
+
+    assert claims["nonce"] == "transação-segura-🔐"
+
+
+def test_unicode_nonce_mismatch_rejects_id_token(
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+) -> None:
+    valid_claims["nonce"] = "transação-original-🔐"
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(
+            SecretStr(encoded),
+            SecretStr("transação-diferente-🔐"),
+            now=FIXED_NOW,
+        )
+
+    assert error.value.code == "invalid_id_token"
+
+
 def test_nonce_mismatch_rejects_id_token(
     validator: IdTokenValidator,
     rsa_signing_key: rsa.RSAPrivateKey,
@@ -471,6 +606,61 @@ def test_malformed_jwks_rejects_id_token(
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.PyJWKSetError)
+
+
+@pytest.mark.parametrize(
+    "jwks_payload",
+    [
+        pytest.param([], id="array"),
+        pytest.param(None, id="null"),
+        pytest.param("not-a-jwks-object", id="string"),
+        pytest.param(42, id="integer"),
+    ],
+)
+def test_non_mapping_jwks_rejects_id_token(
+    jwks_payload: object,
+    settings: GovBrSettings,
+    signed_id_token: SecretStr,
+    expected_nonce: SecretStr,
+) -> None:
+    # Deliberately cross the static boundary to verify hostile JSON input at runtime.
+    invalid_jwks = cast(Mapping[str, object], jwks_payload)
+    validator = IdTokenValidator(settings=settings, jwks=invalid_jwks)
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+    assert isinstance(error.value.__cause__, jwt.PyJWKSetError)
+
+
+def test_mixed_jwks_with_malformed_member_rejects_entire_set(
+    settings: GovBrSettings,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    signed_id_token: SecretStr,
+    expected_nonce: SecretStr,
+) -> None:
+    public_jwk: dict[str, object] = jwt.algorithms.RSAAlgorithm.to_jwk(
+        rsa_signing_key.public_key(),
+        as_dict=True,
+    )
+    public_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
+    malformed_jwk = {
+        "alg": "RS256",
+        "kid": "malformed-key",
+        "kty": "RSA",
+        "use": "sig",
+    }
+    validator = IdTokenValidator(
+        settings=settings,
+        jwks={"keys": [public_jwk, malformed_jwk]},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+    assert isinstance(error.value.__cause__, jwt.PyJWKError)
 
 
 @pytest.mark.parametrize(

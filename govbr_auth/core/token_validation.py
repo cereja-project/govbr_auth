@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime
 
 import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import SecretStr
 
 from govbr_auth.core.errors import InvalidIdTokenError
@@ -58,6 +59,7 @@ class IdTokenValidator:
                     "require": list(_REQUIRED_CLAIMS),
                     "verify_exp": False,
                     "verify_iat": False,
+                    "verify_nbf": False,
                     "verify_signature": True,
                 },
                 leeway=self._settings.clock_skew_seconds,
@@ -68,7 +70,8 @@ class IdTokenValidator:
 
         nonce = claims["nonce"]
         if not isinstance(nonce, str) or not secrets.compare_digest(
-            nonce, expected_nonce.get_secret_value()
+            nonce.encode("utf-8"),
+            expected_nonce.get_secret_value().encode("utf-8"),
         ):
             raise InvalidIdTokenError(
                 "ID token nonce does not match the authorization transaction"
@@ -83,35 +86,52 @@ class IdTokenValidator:
         if not isinstance(key_id, str) or not key_id:
             raise jwt.InvalidTokenError("ID token does not identify a signing key")
 
+        if not isinstance(self._jwks, Mapping):
+            raise jwt.PyJWKSetError("JWKS must be a JSON object")
         keys = self._jwks.get("keys")
-        if (
-            not isinstance(keys, list)
-            or not keys
-            or any(not isinstance(key, Mapping) for key in keys)
-        ):
+        if not isinstance(keys, list) or not keys:
             raise jwt.PyJWKSetError("JWKS does not contain valid key objects")
 
-        return self._parse_signing_key(key_id)
+        normalized_keys: list[dict[str, object]] = []
+        for key in keys:
+            if not isinstance(key, Mapping):
+                raise jwt.PyJWKSetError("JWKS does not contain valid key objects")
+            normalized_keys.append(dict(key))
+        return self._parse_signing_key(key_id, normalized_keys)
 
-    def _parse_signing_key(self, key_id: str) -> jwt.PyJWK:
+    def _parse_signing_key(
+        self,
+        key_id: str,
+        keys: list[dict[str, object]],
+    ) -> jwt.PyJWK:
         try:
-            key_set = jwt.PyJWKSet.from_dict(dict(self._jwks))
-            signing_key = next(
-                (key for key in key_set.keys if key.key_id == key_id),
-                None,
-            )
-            if signing_key is None:
-                raise jwt.PyJWKClientError("No matching signing key is available")
-            if (
-                signing_key.algorithm_name != _ALLOWED_ALGORITHM
-                or signing_key.public_key_use not in {None, "sig"}
-            ):
-                raise jwt.InvalidAlgorithmError(
-                    "Signing key is not allowed for RS256 signatures"
-                )
-            return signing_key
-        except (TypeError, ValueError) as error:
+            parsed_keys = tuple(jwt.PyJWK.from_dict(key) for key in keys)
+        except (jwt.PyJWTError, TypeError, ValueError) as error:
             raise jwt.PyJWKError("JWKS signing key is malformed") from error
+
+        for key in parsed_keys:
+            self._validate_signing_key(key)
+
+        matching_keys = tuple(key for key in parsed_keys if key.key_id == key_id)
+        if not matching_keys:
+            raise jwt.PyJWKClientError("No matching signing key is available")
+        if len(matching_keys) > 1:
+            raise jwt.PyJWKSetError("JWKS contains an ambiguous key identifier")
+        return matching_keys[0]
+
+    @staticmethod
+    def _validate_signing_key(signing_key: jwt.PyJWK) -> None:
+        if not isinstance(signing_key.public_key_use, (str, type(None))):
+            raise jwt.PyJWKError("JWKS key use is malformed")
+        if (
+            signing_key.algorithm_name != _ALLOWED_ALGORITHM
+            or signing_key.public_key_use not in {None, "sig"}
+        ):
+            raise jwt.InvalidAlgorithmError(
+                "Signing key is not allowed for RS256 signatures"
+            )
+        if not isinstance(signing_key.key, rsa.RSAPublicKey):
+            raise jwt.InvalidKeyError("Signing key is not an RSA public key")
 
     def _validate_temporal_claims(
         self,
@@ -128,6 +148,10 @@ class IdTokenValidator:
             raise jwt.ExpiredSignatureError("ID token has expired")
         if issued_at > timestamp + leeway:
             raise jwt.ImmatureSignatureError("ID token was issued in the future")
+        if "nbf" in claims:
+            not_before = self._numeric_date(claims["nbf"], claim_name="nbf")
+            if not_before > timestamp + leeway:
+                raise jwt.ImmatureSignatureError("ID token is not yet valid")
 
     @staticmethod
     def _numeric_date(value: object, *, claim_name: str) -> int | float:
