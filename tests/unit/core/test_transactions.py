@@ -1,5 +1,6 @@
 """Tests for protected, expirable, single-use OAuth transactions."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -75,8 +76,10 @@ def test_consuming_same_state_twice_rejects_replay(
     state, _ = store.create(now=clock.now())
     store.consume(state, now=clock.now())
 
-    with pytest.raises(InvalidStateError, match="OAuth state is invalid"):
+    with pytest.raises(InvalidStateError) as error:
         store.consume(state, now=clock.now())
+
+    assert str(error.value) == "OAuth state is invalid"
 
 
 def test_concurrent_consumption_allows_exactly_one_use(
@@ -101,6 +104,7 @@ def test_concurrent_consumption_allows_exactly_one_use(
     assert results == [transaction]
     assert len(errors) == 1
     assert isinstance(errors[0], InvalidStateError)
+    assert str(errors[0]) == "OAuth state is invalid"
 
 
 def test_consuming_tampered_state_rejects_transaction(
@@ -112,8 +116,36 @@ def test_consuming_tampered_state_rejects_transaction(
     replacement = "A" if state[middle] != "A" else "B"
     tampered_state = f"{state[:middle]}{replacement}{state[middle + 1:]}"
 
-    with pytest.raises(InvalidStateError, match="OAuth state is invalid"):
+    with pytest.raises(InvalidStateError) as error:
         store.consume(tampered_state, now=clock.now())
+
+    assert str(error.value) == "OAuth state is invalid"
+
+
+def test_invalid_payload_error_does_not_retain_sensitive_context(
+    clock: FrozenClock,
+) -> None:
+    key = Fernet.generate_key()
+    store = InMemoryTransactionStore(secret=SecretStr(key.decode("ascii")))
+    payload = {
+        "transaction_id": "transaction-123",
+        "code_verifier": "sensitive-verifier",
+        "nonce": "sensitive-nonce",
+        "issued_at": clock.now().isoformat(),
+        "expires_at": (clock.now() + timedelta(minutes=5)).isoformat(),
+        "state": "sensitive-state",
+    }
+    state = Fernet(key).encrypt(json.dumps(payload).encode("utf-8")).decode("ascii")
+
+    with pytest.raises(InvalidStateError) as error:
+        store.consume(state, now=clock.now())
+
+    assert str(error.value) == "OAuth state is invalid"
+    assert error.value.__cause__ is not None
+    assert "sensitive-state" not in str(error.value.__cause__)
+    assert "sensitive-verifier" not in str(error.value.__cause__)
+    assert "sensitive-nonce" not in str(error.value.__cause__)
+    assert error.value.__context__ is None
 
 
 def test_consuming_state_with_wrong_key_rejects_transaction(clock: FrozenClock) -> None:
@@ -125,8 +157,10 @@ def test_consuming_state_with_wrong_key_rejects_transaction(clock: FrozenClock) 
     )
     state, _ = issuing_store.create(now=clock.now())
 
-    with pytest.raises(InvalidStateError, match="OAuth state is invalid"):
+    with pytest.raises(InvalidStateError) as error:
         consuming_store.consume(state, now=clock.now())
+
+    assert str(error.value) == "OAuth state is invalid"
 
 
 def test_consuming_expired_state_rejects_transaction(
@@ -135,8 +169,43 @@ def test_consuming_expired_state_rejects_transaction(
 ) -> None:
     state, transaction = store.create(now=clock.now())
 
-    with pytest.raises(ExpiredTransactionError, match="OAuth transaction has expired"):
+    with pytest.raises(ExpiredTransactionError) as expired_error:
         store.consume(state, now=transaction.expires_at)
+
+    with pytest.raises(InvalidStateError) as replay_error:
+        store.consume(state, now=transaction.expires_at)
+
+    assert str(expired_error.value) == "OAuth transaction has expired"
+    assert str(replay_error.value) == "OAuth state is invalid"
+
+
+def test_creating_transaction_purges_abandoned_expired_state(
+    store: InMemoryTransactionStore,
+    clock: FrozenClock,
+) -> None:
+    abandoned_state, abandoned = store.create(now=clock.now())
+    store.create(now=abandoned.expires_at)
+
+    with pytest.raises(InvalidStateError) as error:
+        store.consume(abandoned_state, now=abandoned.expires_at)
+
+    assert str(error.value) == "OAuth state is invalid"
+
+
+def test_consuming_valid_transaction_purges_other_abandoned_expired_state(
+    store: InMemoryTransactionStore,
+    clock: FrozenClock,
+) -> None:
+    abandoned_state, abandoned = store.create(now=clock.now())
+    valid_state, valid = store.create(now=clock.now() + timedelta(minutes=1))
+
+    consumed = store.consume(valid_state, now=abandoned.expires_at)
+
+    with pytest.raises(InvalidStateError) as error:
+        store.consume(abandoned_state, now=abandoned.expires_at)
+
+    assert consumed == valid
+    assert str(error.value) == "OAuth state is invalid"
 
 
 def test_outstanding_transactions_can_be_consumed_out_of_order(
@@ -168,12 +237,40 @@ def test_consume_rejects_naive_current_time(
 
 
 def test_store_rejects_blank_encryption_secret() -> None:
-    with pytest.raises(ValueError, match="secret must not be empty"):
+    with pytest.raises(ValueError) as error:
         InMemoryTransactionStore(secret=SecretStr("   "))
+
+    assert str(error.value) == "secret must not be empty"
+
+
+def test_store_sanitizes_invalid_ascii_encryption_secret() -> None:
+    invalid_secret = "invalid-sensitive-key-material"
+
+    with pytest.raises(ValueError) as error:
+        InMemoryTransactionStore(secret=SecretStr(invalid_secret))
+
+    assert str(error.value) == "transaction secret is invalid"
+    assert error.value.__cause__ is not None
+    assert invalid_secret not in str(error.value.__cause__)
+    assert error.value.__context__ is None
+
+
+def test_store_sanitizes_non_ascii_encryption_secret() -> None:
+    invalid_secret = "segredo-sensível-não-ascii"
+
+    with pytest.raises(ValueError) as error:
+        InMemoryTransactionStore(secret=SecretStr(invalid_secret))
+
+    assert str(error.value) == "transaction secret is invalid"
+    assert error.value.__cause__ is not None
+    assert invalid_secret not in str(error.value.__cause__)
+    assert error.value.__context__ is None
 
 
 def test_store_rejects_non_positive_ttl() -> None:
     secret = SecretStr(Fernet.generate_key().decode("ascii"))
 
-    with pytest.raises(ValueError, match="ttl must be positive"):
+    with pytest.raises(ValueError) as error:
         InMemoryTransactionStore(secret=secret, ttl=timedelta(0))
+
+    assert str(error.value) == "ttl must be positive"

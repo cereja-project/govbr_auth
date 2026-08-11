@@ -15,6 +15,7 @@ from govbr_auth.core.models import AuthTransaction
 
 _INVALID_STATE_MESSAGE = "OAuth state is invalid"
 _EXPIRED_TRANSACTION_MESSAGE = "OAuth transaction has expired"
+_INVALID_SECRET_MESSAGE = "transaction secret is invalid"
 
 
 class TransactionStore(Protocol):
@@ -43,9 +44,9 @@ class InMemoryTransactionStore:
         if ttl <= timedelta(0):
             raise ValueError("ttl must be positive")
 
-        self._fernet = Fernet(secret_value.encode("ascii"))
+        self._fernet = self._create_fernet(secret_value)
         self._ttl = ttl
-        self._active_transaction_hashes: set[bytes] = set()
+        self._active_transaction_hashes: dict[bytes, datetime] = {}
         self._lock = Lock()
 
     def create(self, *, now: datetime) -> tuple[str, AuthTransaction]:
@@ -72,27 +73,27 @@ class InMemoryTransactionStore:
         transaction_hash = self._hash_identifier(transaction.transaction_id)
 
         with self._lock:
-            self._active_transaction_hashes.add(transaction_hash)
+            self._purge_expired_locked(now)
+            self._active_transaction_hashes[transaction_hash] = transaction.expires_at
 
         return state, transaction
 
     def consume(self, state: str, *, now: datetime) -> AuthTransaction:
         """Authenticate, remove, and return a transaction exactly once."""
         self._require_timezone_aware(now)
-
-        try:
-            payload = self._fernet.decrypt(state.encode("ascii"))
-            transaction = AuthTransaction.model_validate_json(payload)
-        except (InvalidToken, UnicodeEncodeError, ValidationError):
-            raise InvalidStateError(_INVALID_STATE_MESSAGE) from None
+        transaction = self._decode_transaction(state)
 
         transaction_hash = self._hash_identifier(transaction.transaction_id)
         with self._lock:
-            if transaction_hash not in self._active_transaction_hashes:
-                raise InvalidStateError(_INVALID_STATE_MESSAGE)
-            self._active_transaction_hashes.remove(transaction_hash)
+            registered_expires_at = self._active_transaction_hashes.pop(
+                transaction_hash,
+                None,
+            )
+            self._purge_expired_locked(now)
 
-        if now >= transaction.expires_at:
+        if registered_expires_at is None:
+            raise InvalidStateError(_INVALID_STATE_MESSAGE)
+        if now >= registered_expires_at:
             raise ExpiredTransactionError(_EXPIRED_TRANSACTION_MESSAGE)
 
         return transaction
@@ -100,6 +101,33 @@ class InMemoryTransactionStore:
     @staticmethod
     def _hash_identifier(transaction_id: str) -> bytes:
         return hashlib.sha256(transaction_id.encode("utf-8")).digest()
+
+    @staticmethod
+    def _create_fernet(secret_value: str) -> Fernet:
+        try:
+            return Fernet(secret_value.encode("ascii"))
+        except (UnicodeEncodeError, ValueError) as error:
+            failure_type = type(error).__name__
+
+        safe_cause = ValueError(f"Fernet key validation failed ({failure_type})")
+        raise ValueError(_INVALID_SECRET_MESSAGE) from safe_cause
+
+    def _decode_transaction(self, state: str) -> AuthTransaction:
+        try:
+            payload = self._fernet.decrypt(state.encode("ascii"))
+            return AuthTransaction.model_validate_json(payload)
+        except (InvalidToken, UnicodeEncodeError, ValidationError) as error:
+            failure_type = type(error).__name__
+
+        safe_cause = ValueError(f"OAuth state validation failed ({failure_type})")
+        raise InvalidStateError(_INVALID_STATE_MESSAGE) from safe_cause
+
+    def _purge_expired_locked(self, now: datetime) -> None:
+        self._active_transaction_hashes = {
+            transaction_hash: expires_at
+            for transaction_hash, expires_at in self._active_transaction_hashes.items()
+            if now < expires_at
+        }
 
     @staticmethod
     def _require_timezone_aware(value: datetime) -> None:
