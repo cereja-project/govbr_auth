@@ -16,7 +16,7 @@ dependencies = [
     "pyjwt",
     "cryptography",
     "python-dotenv",
-    "pydantic",
+    "pydantic>=2,<3",
     "cereja",
     "python-multipart"
 ]

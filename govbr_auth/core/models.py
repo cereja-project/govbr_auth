@@ -6,6 +6,18 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, PositiveInt, SecretStr, field_validator, model_validator
 
 
+def _require_nonempty_text(value: str) -> str:
+    if not value.strip():
+        raise ValueError("must not be empty")
+    return value
+
+
+def _require_nonempty_secret(value: SecretStr) -> SecretStr:
+    if not value.get_secret_value().strip():
+        raise ValueError("must not be empty")
+    return value
+
+
 class AuthTransaction(BaseModel):
     """Store the short-lived values created for one OAuth authorization flow."""
 
@@ -16,6 +28,18 @@ class AuthTransaction(BaseModel):
     nonce: SecretStr
     issued_at: datetime
     expires_at: datetime
+
+    @field_validator("transaction_id")
+    @classmethod
+    def validate_transaction_id(cls, value: str) -> str:
+        """Reject blank identifiers that cannot safely bind an OAuth transaction."""
+        return _require_nonempty_text(value)
+
+    @field_validator("code_verifier", "nonce")
+    @classmethod
+    def validate_transaction_secrets(cls, value: SecretStr) -> SecretStr:
+        """Reject blank PKCE and nonce secrets without exposing their contents."""
+        return _require_nonempty_secret(value)
 
     @field_validator("issued_at", "expires_at")
     @classmethod
@@ -43,6 +67,18 @@ class TokenSet(BaseModel):
     token_type: Literal["Bearer"]
     expires_in: PositiveInt
     scope: str
+
+    @field_validator("access_token", "id_token")
+    @classmethod
+    def validate_tokens(cls, value: SecretStr) -> SecretStr:
+        """Reject blank OAuth tokens without exposing their contents."""
+        return _require_nonempty_secret(value)
+
+    @field_validator("scope")
+    @classmethod
+    def validate_scope(cls, value: str) -> str:
+        """Reject blank scope values that cannot represent an OAuth request."""
+        return _require_nonempty_text(value)
 
 
 class GovBrAddress(BaseModel):
@@ -83,3 +119,9 @@ class GovBrUser(BaseModel):
     phone_number_verified: bool | None = None
     address: GovBrAddress | None = None
     updated_at: int | None = None
+
+    @field_validator("sub")
+    @classmethod
+    def validate_subject(cls, value: str) -> str:
+        """Reject blank OpenID Connect subject identifiers."""
+        return _require_nonempty_text(value)
