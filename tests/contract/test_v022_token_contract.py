@@ -28,9 +28,11 @@ async def test_async_exchange_code_for_token_envia_o_wire_contract_v022():
         jwt_secret="sanitized-test-jwt-signing-secret-0123456789",
     )
     authorization = GovBrAuthorize(config).build_authorize_url()
-    state = parse_qs(urlparse(authorization["url"]).query, strict_parsing=True)[
-        "state"
-    ][0]
+    state = parse_qs(
+        urlparse(authorization["url"]).query,
+        keep_blank_values=True,
+        strict_parsing=True,
+    )["state"][0]
     expected_code_verifier = (
         Fernet(config.cript_verifier_secret.encode("utf-8"))
         .decrypt(state.encode("utf-8"))
@@ -50,7 +52,11 @@ async def test_async_exchange_code_for_token_envia_o_wire_contract_v022():
     assert len(route.calls) == 1
 
     request = route.calls[0].request
-    request_form = parse_qs(request.content.decode("utf-8"), strict_parsing=True)
+    request_form = parse_qs(
+        request.content.decode("utf-8"),
+        keep_blank_values=True,
+        strict_parsing=True,
+    )
     request_code_verifier = request_form.pop("code_verifier")
 
     assert token_data["token"] == token_response

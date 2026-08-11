@@ -1,6 +1,11 @@
 """Caracteriza o contrato de autorização HTTP da versão 0.2.2."""
 
+import base64
+import hashlib
+import hmac
 from urllib.parse import parse_qs, urlparse
+
+from cryptography.fernet import Fernet
 
 from govbr_auth.core.config import GovBrConfig
 from govbr_auth.core.govbr import GovBrAuthorize
@@ -19,7 +24,21 @@ def test_build_authorize_url_preserva_os_parametros_oauth_e_pkce_v022():
     authorization = GovBrAuthorize(config).build_authorize_url()
 
     parsed_url = urlparse(authorization["url"])
-    parameters = parse_qs(parsed_url.query, strict_parsing=True)
+    parameters = parse_qs(
+        parsed_url.query,
+        keep_blank_values=True,
+        strict_parsing=True,
+    )
+    code_verifier = (
+        Fernet(config.cript_verifier_secret.encode("utf-8"))
+        .decrypt(parameters["state"][0].encode("utf-8"))
+        .decode("utf-8")
+    )
+    expected_code_challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode("utf-8")).digest())
+        .decode("utf-8")
+        .replace("=", "")
+    )
 
     assert parsed_url.scheme == "https"
     assert parsed_url.netloc == "sso.example.test"
@@ -42,5 +61,5 @@ def test_build_authorize_url_preserva_os_parametros_oauth_e_pkce_v022():
     ]
     assert len(parameters["nonce"][0]) >= 32
     assert len(parameters["state"][0]) > 0
-    assert len(parameters["code_challenge"][0]) == 43
+    assert hmac.compare_digest(parameters["code_challenge"][0], expected_code_challenge)
     assert parameters["code_challenge_method"] == ["S256"]
