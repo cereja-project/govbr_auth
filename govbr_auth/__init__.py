@@ -1,26 +1,18 @@
-from cereja.utils import get_version_pep440_compliant
+"""FastAPI-only public interface for asynchronous Gov.br authentication."""
 
-try:
-    from .core.config import GovBrConfig
-    from .core.govbr import (
-        GovBrAuthorize,
-        GovBrIntegration,
-        GovBrException,
-        GovBrAuthenticationError,
-    )
-    from .fastapi import AuthContext, AuthSuccessHandler, GovBrAuth, create_govbr_router
-    from .controller import GovBrConnector
-    from .utils import generate_cript_verifier_secret
-    from .fake_govbr import (
-        FakeUserData,
-        FakeGovBrService,
-        AuthorizationRequest,
-        render_fake_login_page,
-        process_fake_login,
-        create_default_fake_users,
-    )
-except ImportError:
-    pass  # noqa: E402
+from govbr_auth.fastapi import (
+    AuthContext,
+    AuthSuccessHandler,
+    GovBrAuth,
+    create_govbr_router,
+)
+
+__all__ = (
+    "AuthContext",
+    "AuthSuccessHandler",
+    "GovBrAuth",
+    "create_govbr_router",
+)
 
 VERSION = "0.2.2.final.0"
-__version__ = get_version_pep440_compliant(VERSION)
+__version__ = "0.2.2"

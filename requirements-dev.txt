@@ -1,2 +1,2 @@
--e .[full,dev]
+-e .[fake,dev]
 respx>=0.22,<1

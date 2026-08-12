@@ -174,22 +174,16 @@ async def test_core_rejects_userinfo_request_with_invalid_bearer_token(
         )
 
 
-def test_core_exports_experimental_and_legacy_public_api() -> None:
-    assert set(core.__all__) == {
+def test_core_exports_exact_async_v1_public_api() -> None:
+    assert tuple(core.__all__) == (
         "AuthenticationResult",
-        "AuthContext",
-        "AuthSuccessHandler",
         "AuthTransaction",
         "AuthorizationBuilder",
         "AuthorizationRequest",
         "ExpiredTransactionError",
         "GovBrAddress",
         "GovBrAuthError",
-        "GovBrAuthorize",
-        "GovBrAuth",
         "GovBrClient",
-        "GovBrConfig",
-        "GovBrIntegration",
         "GovBrSettings",
         "GovBrUser",
         "IdTokenValidator",
@@ -199,5 +193,4 @@ def test_core_exports_experimental_and_legacy_public_api() -> None:
         "ProviderEnvironment",
         "TokenSet",
         "TransactionStore",
-        "create_govbr_router",
-    }
+    )

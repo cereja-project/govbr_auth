@@ -1,36 +1,34 @@
 [project]
 name = "govbr-auth"
-dynamic = ["version"]
-description = "Biblioteca de autenticação com o Gov.br para FastAPI, Flask e Django."
+version = "0.2.2"
+description = "Biblioteca assíncrona de autenticação com o Gov.br para FastAPI."
 authors = [
     { name="Joab Leite", email="leitejoab@gmail.com" }
 ]
 readme = "README.md"
-license = { text = "MIT" }
-keywords = ["gov.br", "autenticação", "fastapi", "flask", "django"]
+license = "MIT"
+keywords = ["gov.br", "autenticação", "fastapi", "oauth2", "openid-connect"]
 requires-python = ">=3.11"
 
-# Dependências essenciais (núcleo)
 dependencies = [
     "httpx",
     "PyJWT>=2.13,<3",
     "cryptography",
     "python-dotenv",
     "pydantic>=2,<3",
-    "cereja",
-    "python-multipart"
+    "fastapi"
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "govbr_auth.__version__"}
-
-# Extras opcionais por framework
 [project.optional-dependencies]
-fastapi = ["fastapi"]
-flask = ["flask"]
-django = ["django"]
-full = ["fastapi", "flask", "django"]
-dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black"]
+fake = ["python-multipart"]
+dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "flake8", "pytest-cov"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["govbr_auth*"]
+exclude = ["govbr_auth.__pycache__*", "govbr_auth.*.__pycache__*"]
 
 [project.urls]
 Homepage = "https://github.com/cereja-project/govbr_auth"
@@ -39,5 +37,5 @@ Documentation = "https://govbr-auth.readthedocs.io/"
 Issues = "https://github.com/cereja-project/govbr_auth/issues"
 
 [build-system]
-requires = ["setuptools", "wheel", "cereja"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"

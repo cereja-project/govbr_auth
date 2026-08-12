@@ -25,16 +25,22 @@ def valid_settings_data() -> dict[str, object]:
     }
 
 
-def test_production_rejects_non_https_provider_url(valid_settings_data: dict[str, object]) -> None:
+def test_production_rejects_non_https_provider_url(
+    valid_settings_data: dict[str, object],
+) -> None:
     valid_settings_data["authorization_url"] = "http://sso.acesso.gov.br/authorize"
 
     with pytest.raises(ValidationError, match="https"):
         GovBrSettings(**valid_settings_data)
 
 
-def test_local_environment_accepts_loopback_http(valid_settings_data: dict[str, object]) -> None:
+def test_local_environment_accepts_loopback_http(
+    valid_settings_data: dict[str, object],
+) -> None:
     valid_settings_data["environment"] = ProviderEnvironment.LOCAL
-    valid_settings_data["authorization_url"] = "http://127.0.0.1:8000/fake-govbr/authorize"
+    valid_settings_data["authorization_url"] = (
+        "http://127.0.0.1:8000/fake-govbr/authorize"
+    )
 
     settings = GovBrSettings(**valid_settings_data)
 
@@ -50,7 +56,9 @@ def test_local_environment_rejects_http_for_non_loopback_provider_url(
         GovBrSettings(**valid_settings_data, environment=ProviderEnvironment.LOCAL)
 
 
-def test_local_environment_accepts_ipv6_loopback_http(valid_settings_data: dict[str, object]) -> None:
+def test_local_environment_accepts_ipv6_loopback_http(
+    valid_settings_data: dict[str, object],
+) -> None:
     valid_settings_data["environment"] = ProviderEnvironment.LOCAL
     valid_settings_data["authorization_url"] = "http://[::1]:8000/fake-govbr/authorize"
 
@@ -77,6 +85,8 @@ def test_settings_rejects_blank_security_critical_values(
         GovBrSettings(**valid_settings_data)
 
 
-def test_settings_rejects_unknown_configuration(valid_settings_data: dict[str, object]) -> None:
+def test_settings_rejects_unknown_configuration(
+    valid_settings_data: dict[str, object],
+) -> None:
     with pytest.raises(ValidationError, match="unexpected"):
         GovBrSettings(**valid_settings_data, unexpected="value")

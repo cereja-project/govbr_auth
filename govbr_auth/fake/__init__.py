@@ -27,28 +27,28 @@ from govbr_auth.fake.stores import (
     InMemoryFakeUserStore,
 )
 
-__all__ = [
+__all__ = (
     "AccessTokenArtifact",
-    "AuthorizationCodeReplayStore",
     "AuthorizationCodeArtifact",
+    "AuthorizationCodeReplayStore",
     "AuthorizationRequestArtifact",
-    "FakeClient",
-    "FakeClientCredentials",
     "FakeArtifactCodec",
     "FakeAuthorizationRedirect",
     "FakeAuthorizationRequest",
     "FakeAuthorizationSession",
-    "FakeGovBrSettings",
+    "FakeClient",
+    "FakeClientCredentials",
     "FakeGovBrProvider",
+    "FakeGovBrSettings",
     "FakeOAuthError",
     "FakeSigningKey",
     "FakeTokenIssuer",
-    "FakeUser",
-    "FakeUserStore",
     "FakeTokenRequest",
     "FakeTokenResponse",
+    "FakeUser",
+    "FakeUserStore",
     "InMemoryAuthorizationCodeReplayStore",
     "InMemoryFakeUserStore",
     "create_fake_govbr_app",
     "create_fake_govbr_router",
-]
+)

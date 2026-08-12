@@ -65,7 +65,9 @@ class GovBrSettings(BaseModel):
             if url.scheme == "https":
                 continue
             if self.environment is not ProviderEnvironment.LOCAL:
-                raise ValueError("provider URLs must use https outside the local environment")
+                raise ValueError(
+                    "provider URLs must use https outside the local environment"
+                )
             host = (url.host or "").strip("[]")
             if host not in {"localhost", "127.0.0.1", "::1"}:
                 raise ValueError("local HTTP provider URLs must use a loopback host")

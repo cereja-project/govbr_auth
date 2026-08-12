@@ -484,10 +484,6 @@ def test_supported_public_api_exports_fastapi_without_fake_factories() -> None:
     assert govbr_auth.AuthSuccessHandler is AuthSuccessHandler
     assert govbr_auth.GovBrAuth is GovBrAuth
     assert govbr_auth.create_govbr_router is create_govbr_router
-    assert core.AuthContext is AuthContext
-    assert core.AuthSuccessHandler is AuthSuccessHandler
-    assert core.GovBrAuth is GovBrAuth
-    assert core.create_govbr_router is create_govbr_router
     assert not hasattr(govbr_auth, "create_fake_govbr_app")
     assert not hasattr(govbr_auth, "create_fake_govbr_router")
 

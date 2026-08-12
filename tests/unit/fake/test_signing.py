@@ -88,6 +88,21 @@ def test_signing_key_rejects_rsa_key_smaller_than_2048_bits() -> None:
         FakeSigningKey(kid="weak-rsa-key", _private_key=weak_private_key)
 
 
+@pytest.mark.parametrize(
+    "invalid_issuer",
+    [
+        pytest.param("", id="empty"),
+        pytest.param("   ", id="whitespace"),
+    ],
+)
+def test_token_issuer_rejects_blank_issuer(
+    signing_key: FakeSigningKey,
+    invalid_issuer: str,
+) -> None:
+    with pytest.raises(ValueError, match="issuer must not be blank"):
+        FakeTokenIssuer(signing_key=signing_key, issuer=invalid_issuer)
+
+
 def test_issue_id_token_is_accepted_by_real_validator(
     issuer: FakeTokenIssuer,
     signing_key: FakeSigningKey,

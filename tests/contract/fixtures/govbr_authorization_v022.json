@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "url": "https://sso.example.test/authorize",
+  "query": {
+    "client_id": "contract-client",
+    "code_challenge": "sanitized-base64url-sha256-challenge",
+    "code_challenge_method": "S256",
+    "nonce": "sanitized-nonce",
+    "redirect_uri": "https://consumer.example.test/oauth/callback",
+    "response_type": "code",
+    "scope": "openid profile email",
+    "state": "sanitized-encrypted-state"
+  }
+}
