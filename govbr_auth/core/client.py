@@ -91,7 +91,7 @@ class GovBrClient:
             "code_verifier": transaction.code_verifier.get_secret_value(),
         }
         response = await self._post_token(form)
-        if response.status_code == httpx.codes.BAD_REQUEST:
+        if response.is_client_error:
             self._raise_http_error(
                 ProviderRejectedError,
                 _OAUTH_REJECTION_MESSAGE,

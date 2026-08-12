@@ -462,12 +462,21 @@ async def test_exchange_code_sanitizes_transport_failures(
 
 
 @pytest.mark.asyncio
-async def test_exchange_code_sanitizes_oauth_error_response(
+@pytest.mark.parametrize(
+    "status_code",
+    [
+        pytest.param(400, id="bad_request"),
+        pytest.param(401, id="unauthorized"),
+        pytest.param(403, id="forbidden"),
+    ],
+)
+async def test_exchange_code_classifies_client_error_responses_as_provider_rejections(
+    status_code: int,
     settings: GovBrSettings,
 ) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
-            400,
+            status_code,
             json={
                 "error": "invalid_grant",
                 "error_description": (
