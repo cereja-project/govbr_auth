@@ -82,6 +82,7 @@ def _build_fake_govbr_routes(
     clock: Callable[[], datetime],
 ) -> APIRouter:
     router = APIRouter(prefix=prefix)
+    login_route_name = f"fake_govbr_login_{id(router):x}"
 
     @router.get("/authorize")
     async def authorize(request: Request) -> Response:
@@ -110,12 +111,12 @@ def _build_fake_govbr_routes(
         return HTMLResponse(
             _render_login_page(
                 session,
-                login_action=request.url_for("fake_govbr_login").path,
+                login_action=request.url_for(login_route_name).path,
             ),
             headers={"Cache-Control": "no-store"},
         )
 
-    @router.post("/login", name="fake_govbr_login")
+    @router.post("/login", name=login_route_name)
     async def login(request: Request) -> Response:
         form = await _read_form(request)
         values = _required_text_values(form, ("request", "subject"))

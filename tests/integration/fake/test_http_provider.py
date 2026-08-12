@@ -216,6 +216,51 @@ async def test_mounted_router_completes_http_flow_with_prefix_and_root_path() ->
 
 
 @pytest.mark.asyncio
+async def test_second_mounted_router_posts_authorization_to_its_own_provider() -> None:
+    from fastapi import FastAPI
+
+    first_provider = provider_factory()
+    second_provider = provider_factory()
+    application = FastAPI(root_path="/gateway")
+    application.include_router(
+        create_fake_govbr_router(
+            first_provider,
+            prefix="/first-provider",
+            clock=lambda: FIXED_NOW,
+        )
+    )
+    application.include_router(
+        create_fake_govbr_router(
+            second_provider,
+            prefix="/second-provider",
+            clock=lambda: FIXED_NOW,
+        )
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application, root_path="/gateway"),
+        base_url="http://localhost/gateway",
+    ) as http:
+        authorize_response = await http.get(
+            "/second-provider/authorize",
+            params=authorization_params(),
+        )
+        login_form = parse_login_form(authorize_response.text)
+        login_response = await http.post(
+            login_form.action.removeprefix("/gateway"),
+            data={
+                "request": login_form.request_artifact,
+                "subject": "12345678900",
+            },
+        )
+
+    assert authorize_response.status_code == 200
+    assert login_form.action == "/gateway/second-provider/login"
+    assert login_response.status_code == 302
+    assert oauth_values(login_response.headers["location"])["state"] == ["state-123"]
+
+
+@pytest.mark.asyncio
 async def test_interactive_authorize_escapes_user_values_and_never_renders_secret() -> (
     None
 ):
