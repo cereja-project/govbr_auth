@@ -312,6 +312,71 @@ def test_complete_authorization_rejects_unknown_user(
     assert error_info.value.error == "access_denied"
 
 
+def test_begin_authorization_rejects_unicode_redirect_with_sanitized_oauth_error(
+    provider: FakeGovBrProvider,
+) -> None:
+    marker = "https://cliënt.example/callback"
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        provider.begin_authorization(
+            _authorization_request(redirect_uri=marker),
+            now=NOW,
+        )
+
+    assert error_info.value.error == "invalid_request"
+    _assert_sanitized(error_info.value, marker)
+
+
+def test_begin_authorization_rejects_unicode_pkce_challenge_with_sanitized_error(
+    provider: FakeGovBrProvider,
+) -> None:
+    marker = "pkce-challenge-ç"
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        provider.begin_authorization(
+            _authorization_request(code_challenge=marker),
+            now=NOW,
+        )
+
+    assert error_info.value.error == "invalid_request"
+    _assert_sanitized(error_info.value, marker)
+
+
+def test_exchange_code_rejects_unicode_client_secret_with_sanitized_oauth_error(
+    provider: FakeGovBrProvider,
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "client-secret-🔐"
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        provider.exchange_code(
+            credentials=_client_credentials(client_secret=SecretStr(marker)),
+            request=_token_request(_authorization_code(settings)),
+            now=NOW,
+        )
+
+    assert error_info.value.error == "invalid_client"
+    _assert_sanitized(error_info.value, marker)
+
+
+def test_exchange_code_rejects_unicode_pkce_challenge_with_sanitized_oauth_error(
+    provider: FakeGovBrProvider,
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "pkce-challenge-ç"
+    code = _authorization_code(settings, challenge=marker)
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        provider.exchange_code(
+            credentials=_client_credentials(),
+            request=_token_request(code),
+            now=NOW,
+        )
+
+    assert error_info.value.error == "invalid_grant"
+    _assert_sanitized(error_info.value, marker)
+
+
 @pytest.mark.parametrize(
     "credentials,request_factory,error",
     [

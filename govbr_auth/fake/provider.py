@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import re
 import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ _RESPONSE_TYPE_UNSUPPORTED = "The authorization response type is not supported."
 _SCOPE_INVALID = "The requested scope is invalid."
 _TOKEN_INVALID = "The access token is invalid or expired."
 _USER_DENIED = "The requested fake user is unavailable."
+_S256_CHALLENGE_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}", flags=re.ASCII)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -151,6 +153,8 @@ class FakeGovBrProvider:
             raise _oauth_error("invalid_request", _AUTHORIZATION_REQUEST_INVALID)
         if request.code_challenge_method != "S256":
             raise _oauth_error("invalid_request", _AUTHORIZATION_REQUEST_INVALID)
+        if not _is_s256_challenge(request.code_challenge):
+            raise _oauth_error("invalid_request", _AUTHORIZATION_REQUEST_INVALID)
 
         artifact = AuthorizationRequestArtifact(
             jti=self._identifier_factory(),
@@ -261,7 +265,7 @@ class FakeGovBrProvider:
         client = self._clients.get(credentials.client_id)
         if client is None or not isinstance(credentials.client_secret, SecretStr):
             raise _oauth_error("invalid_client", _CLIENT_INVALID)
-        if not secrets.compare_digest(
+        if not _constant_time_equal(
             client.client_secret.get_secret_value(),
             credentials.client_secret.get_secret_value(),
         ):
@@ -285,8 +289,10 @@ class FakeGovBrProvider:
         if not verifier.strip():
             raise _oauth_error("invalid_grant", _CODE_INVALID)
         challenge = _pkce_challenge(verifier)
-        if challenge is None or not secrets.compare_digest(
-            challenge, code.code_challenge
+        if (
+            challenge is None
+            or not _is_s256_challenge(code.code_challenge)
+            or not _constant_time_equal(challenge, code.code_challenge)
         ):
             raise _oauth_error("invalid_grant", _CODE_INVALID)
 
@@ -357,7 +363,7 @@ class FakeGovBrProvider:
     @staticmethod
     def _is_registered_redirect(client: FakeClient, redirect_uri: str) -> bool:
         return any(
-            secrets.compare_digest(str(registered), redirect_uri)
+            _constant_time_equal(str(registered), redirect_uri)
             for registered in client.registered_redirect_uris
         )
 
@@ -372,6 +378,14 @@ def _pkce_challenge(verifier: str) -> str | None:
     except UnicodeEncodeError:
         return None
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def _is_s256_challenge(value: str) -> bool:
+    return _S256_CHALLENGE_PATTERN.fullmatch(value) is not None
+
+
+def _constant_time_equal(left: str, right: str) -> bool:
+    return secrets.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
 
 
 def _append_query(redirect_uri: str, *, code: str, state: str) -> str:
