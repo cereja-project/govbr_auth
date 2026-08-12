@@ -61,9 +61,11 @@ class IdTokenValidator:
                     "verify_iat": False,
                     "verify_nbf": False,
                     "verify_signature": True,
+                    "verify_sub": False,
                 },
                 leeway=self._settings.clock_skew_seconds,
             )
+            self._validate_identity_claims(claims)
             self._validate_temporal_claims(claims, now=now)
         except jwt.PyJWTError as error:
             raise InvalidIdTokenError("ID token validation failed") from error
@@ -77,6 +79,28 @@ class IdTokenValidator:
                 "ID token nonce does not match the authorization transaction"
             )
         return claims
+
+    def _validate_identity_claims(self, claims: Mapping[str, object]) -> None:
+        audience = claims["aud"]
+        expected_audience = self._settings.client_id
+        if audience != expected_audience and audience != [expected_audience]:
+            raise jwt.InvalidAudienceError(
+                "ID token audience is not exclusively bound to the client"
+            )
+
+        if "azp" in claims:
+            authorized_party = claims["azp"]
+            if (
+                not isinstance(authorized_party, str)
+                or authorized_party != expected_audience
+            ):
+                raise jwt.InvalidTokenError(
+                    "ID token authorized party does not match the client"
+                )
+
+        subject = claims["sub"]
+        if not isinstance(subject, str) or not subject.strip():
+            raise jwt.InvalidTokenError("ID token subject is invalid")
 
     def _select_signing_key(self, header: Mapping[str, object]) -> jwt.PyJWK:
         if header.get("alg") != _ALLOWED_ALGORITHM:

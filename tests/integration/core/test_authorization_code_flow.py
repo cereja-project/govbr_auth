@@ -83,7 +83,10 @@ async def test_core_completes_authorization_code_flow_with_rs256_provider(
         state=authorization.state,
         now=FIXED_NOW,
     )
-    user = await core_client.userinfo(result.tokens.access_token)
+    user = await core_client.userinfo(
+        result.tokens.access_token,
+        expected_subject=result.id_token_claims["sub"],
+    )
 
     assert isinstance(result, AuthenticationResult)
     assert result.id_token_claims["nonce"] == provider.last_nonce
@@ -111,13 +114,66 @@ async def test_core_rejects_provider_id_token_with_different_nonce(
 
 
 @pytest.mark.asyncio
+async def test_nonce_override_applies_to_only_the_next_id_token(
+    core_client: GovBrClient,
+    provider: GovBrAsgiProvider,
+) -> None:
+    provider.override_nonce("attacker-nonce")
+    attacked_authorization = core_client.authorization_url(now=FIXED_NOW)
+    attacked_code = provider.authorize(attacked_authorization.url)
+    with pytest.raises(InvalidIdTokenError):
+        await core_client.exchange_code(
+            code=attacked_code,
+            state=attacked_authorization.state,
+            now=FIXED_NOW,
+        )
+    next_authorization = core_client.authorization_url(now=FIXED_NOW)
+    next_code = provider.authorize(next_authorization.url)
+
+    result = await core_client.exchange_code(
+        code=next_code,
+        state=next_authorization.state,
+        now=FIXED_NOW,
+    )
+
+    assert result.id_token_claims["nonce"] == provider.last_nonce
+
+
+@pytest.mark.asyncio
+async def test_core_rejects_userinfo_token_substitution_for_different_subject(
+    core_client: GovBrClient,
+    provider: GovBrAsgiProvider,
+) -> None:
+    authorization = core_client.authorization_url(now=FIXED_NOW)
+    code = provider.authorize(authorization.url)
+    result = await core_client.exchange_code(
+        code=code,
+        state=authorization.state,
+        now=FIXED_NOW,
+    )
+    provider.substitute_userinfo_subject("98765432100")
+
+    with pytest.raises(
+        GovBrAuthError,
+        match="Gov.br userinfo response is invalid",
+    ):
+        await core_client.userinfo(
+            result.tokens.access_token,
+            expected_subject=result.id_token_claims["sub"],
+        )
+
+
+@pytest.mark.asyncio
 async def test_core_rejects_userinfo_request_with_invalid_bearer_token(
     core_client: GovBrClient,
 ) -> None:
     invalid_access_token = SecretStr("invalid-access-token")
 
     with pytest.raises(GovBrAuthError, match="Gov.br rejected the access token"):
-        await core_client.userinfo(invalid_access_token)
+        await core_client.userinfo(
+            invalid_access_token,
+            expected_subject="12345678900",
+        )
 
 
 def test_core_exports_experimental_and_legacy_public_api() -> None:

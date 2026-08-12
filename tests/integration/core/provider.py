@@ -51,6 +51,7 @@ class GovBrAsgiProvider:
         self._grants: dict[str, _AuthorizationGrant] = {}
         self._last_nonce: str | None = None
         self._nonce_override: str | None = None
+        self._userinfo_subject = "12345678900"
         self._app = Starlette(
             routes=[
                 Route("/token", self._token, methods=["POST"]),
@@ -106,6 +107,10 @@ class GovBrAsgiProvider:
         """Replace the nonce emitted in the next ID token."""
         self._nonce_override = nonce
 
+    def substitute_userinfo_subject(self, subject: str) -> None:
+        """Return a different subject from userinfo to simulate token substitution."""
+        self._userinfo_subject = subject
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Dispatch one ASGI request to the local provider application."""
         await self._app(scope, receive, send)
@@ -141,7 +146,9 @@ class GovBrAsgiProvider:
             return JSONResponse({"error": "invalid_grant"}, status_code=400)
 
         self._grants.pop(code)
-        nonce = grant.nonce if self._nonce_override is None else self._nonce_override
+        nonce_override = self._nonce_override
+        self._nonce_override = None
+        nonce = grant.nonce if nonce_override is None else nonce_override
         claims = {
             "iss": self.issuer,
             "aud": self.client_id,
@@ -184,7 +191,7 @@ class GovBrAsgiProvider:
             return JSONResponse({"error": "invalid_token"}, status_code=401)
         return JSONResponse(
             {
-                "sub": "12345678900",
+                "sub": self._userinfo_subject,
                 "name": "Integration User",
                 "email": "integration@example.test",
                 "email_verified": True,

@@ -100,8 +100,13 @@ class GovBrClient:
         )
         return AuthenticationResult(tokens=tokens, id_token_claims=claims)
 
-    async def userinfo(self, access_token: SecretStr) -> GovBrUser:
-        """Fetch and strictly validate OpenID Connect user information."""
+    async def userinfo(
+        self,
+        access_token: SecretStr,
+        *,
+        expected_subject: str,
+    ) -> GovBrUser:
+        """Fetch user information bound to the validated ID-token subject."""
         response = await self._get_userinfo(access_token)
         if response.status_code in {
             httpx.codes.BAD_REQUEST,
@@ -115,7 +120,13 @@ class GovBrClient:
         if response.is_error:
             self._raise_http_error(_PROVIDER_FAILURE_MESSAGE, response.status_code)
 
-        return self._parse_userinfo(response)
+        user = self._parse_userinfo(response)
+        if user.sub != expected_subject:
+            self._raise_invalid_response(
+                _USERINFO_RESPONSE_MESSAGE,
+                "SubjectMismatch",
+            )
+        return user
 
     async def _post_token(self, form: Mapping[str, str]) -> httpx.Response:
         try:

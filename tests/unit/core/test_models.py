@@ -5,7 +5,12 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pydantic import ValidationError
 
-from govbr_auth.core.errors import ExpiredTransactionError, GovBrAuthError, InvalidIdTokenError, InvalidStateError
+from govbr_auth.core.errors import (
+    ExpiredTransactionError,
+    GovBrAuthError,
+    InvalidIdTokenError,
+    InvalidStateError,
+)
 from govbr_auth.core.models import AuthTransaction, GovBrAddress, GovBrUser, TokenSet
 
 
@@ -115,6 +120,20 @@ def test_govbr_user_rejects_blank_subject() -> None:
         GovBrUser(sub="   ")
 
 
+def test_govbr_user_models_official_social_name_and_subject_property() -> None:
+    user = GovBrUser.model_validate(
+        {
+            "sub": "12345678900",
+            "name": "Maria da Silva",
+            "social_name": "Maria Social",
+        }
+    )
+
+    assert user.social_name == "Maria Social"
+    assert user.subject == "12345678900"
+    assert user.model_dump()["sub"] == "12345678900"
+
+
 def test_govbr_user_address_is_immutable() -> None:
     user = GovBrUser(sub="subject-123", address={"country": "BR"})
     address = user.address
@@ -129,11 +148,15 @@ def test_govbr_user_address_is_immutable() -> None:
     ("error_type", "expected_code"),
     [
         pytest.param(InvalidStateError, "invalid_state", id="invalid_state"),
-        pytest.param(ExpiredTransactionError, "expired_transaction", id="expired_transaction"),
+        pytest.param(
+            ExpiredTransactionError, "expired_transaction", id="expired_transaction"
+        ),
         pytest.param(InvalidIdTokenError, "invalid_id_token", id="invalid_id_token"),
     ],
 )
-def test_auth_errors_expose_stable_code(error_type: type[GovBrAuthError], expected_code: str) -> None:
+def test_auth_errors_expose_stable_code(
+    error_type: type[GovBrAuthError], expected_code: str
+) -> None:
     error = error_type("test failure")
 
     assert error.code == expected_code

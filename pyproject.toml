@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 # Dependências essenciais (núcleo)
 dependencies = [
     "httpx",
-    "pyjwt",
+    "PyJWT>=2.13,<3",
     "cryptography",
     "python-dotenv",
     "pydantic>=2,<3",

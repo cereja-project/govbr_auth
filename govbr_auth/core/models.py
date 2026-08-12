@@ -3,7 +3,14 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, PositiveInt, SecretStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    PositiveInt,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 
 
 def _require_nonempty_text(value: str) -> str:
@@ -101,6 +108,7 @@ class GovBrUser(BaseModel):
 
     sub: str
     name: str | None = None
+    social_name: str | None = None
     given_name: str | None = None
     family_name: str | None = None
     middle_name: str | None = None
@@ -125,3 +133,8 @@ class GovBrUser(BaseModel):
     def validate_subject(cls, value: str) -> str:
         """Reject blank OpenID Connect subject identifiers."""
         return _require_nonempty_text(value)
+
+    @property
+    def subject(self) -> str:
+        """Return the stable subject while preserving ``sub`` on the wire."""
+        return self.sub

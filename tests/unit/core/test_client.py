@@ -18,6 +18,8 @@ SENSITIVE_STATE = "sensitive-oauth-state"
 SENSITIVE_ACCESS_TOKEN = "sensitive-access-token"
 SENSITIVE_ID_TOKEN = "sensitive-id-token"
 SENSITIVE_CLIENT_SECRET = "sensitive-client-secret"
+VALIDATED_SUBJECT = "12345678900"
+SUBSTITUTED_SUBJECT = "98765432100"
 
 
 class RecordingTransactionStore:
@@ -112,6 +114,19 @@ def _assert_error_is_sanitized(error: BaseException) -> None:
     assert SENSITIVE_ACCESS_TOKEN not in rendered
     assert SENSITIVE_ID_TOKEN not in rendered
     assert SENSITIVE_CLIENT_SECRET not in rendered
+    assert VALIDATED_SUBJECT not in rendered
+    assert SUBSTITUTED_SUBJECT not in rendered
+
+
+def _assert_safe_cause(
+    error: GovBrAuthError,
+    *,
+    cause_type: type[BaseException],
+    cause_message: str,
+) -> None:
+    assert isinstance(error.__cause__, cause_type)
+    assert str(error.__cause__) == cause_message
+    _assert_error_is_sanitized(error)
 
 
 @pytest.mark.asyncio
@@ -185,7 +200,10 @@ async def test_userinfo_uses_bearer_token_and_returns_strict_user(
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
         client = GovBrClient(settings, transactions, validator, http)
 
-        user = await client.userinfo(SecretStr(SENSITIVE_ACCESS_TOKEN))
+        user = await client.userinfo(
+            SecretStr(SENSITIVE_ACCESS_TOKEN),
+            expected_subject=VALIDATED_SUBJECT,
+        )
 
     request = requests[0]
     assert user.sub == "12345678900"
@@ -193,6 +211,183 @@ async def test_userinfo_uses_bearer_token_and_returns_strict_user(
     assert request.method == "GET"
     assert request.url == httpx.URL("https://sso.example.test/userinfo")
     assert request.headers["authorization"] == f"Bearer {SENSITIVE_ACCESS_TOKEN}"
+
+
+@pytest.mark.asyncio
+async def test_userinfo_rejects_subject_not_bound_to_validated_id_token(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"sub": SUBSTITUTED_SUBJECT})
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br userinfo response is invalid",
+        ) as error:
+            await client.userinfo(
+                SecretStr(SENSITIVE_ACCESS_TOKEN),
+                expected_subject=VALIDATED_SUBJECT,
+            )
+
+    _assert_safe_cause(
+        error.value,
+        cause_type=ValueError,
+        cause_message="Gov.br response validation failed (SubjectMismatch)",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("transport_error", "expected_message", "expected_cause"),
+    [
+        pytest.param(
+            httpx.ReadTimeout,
+            "Gov.br provider request timed out",
+            "Gov.br HTTP transport failed (ReadTimeout)",
+            id="timeout",
+        ),
+        pytest.param(
+            httpx.ConnectError,
+            "Gov.br provider request failed",
+            "Gov.br HTTP transport failed (ConnectError)",
+            id="transport",
+        ),
+    ],
+)
+async def test_userinfo_sanitizes_transport_failures(
+    transport_error: type[httpx.TransportError],
+    expected_message: str,
+    expected_cause: str,
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        raise transport_error(
+            f"{SENSITIVE_ACCESS_TOKEN} {SUBSTITUTED_SUBJECT}",
+            request=request,
+        )
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(GovBrAuthError, match=expected_message) as error:
+            await client.userinfo(
+                SecretStr(SENSITIVE_ACCESS_TOKEN),
+                expected_subject=VALIDATED_SUBJECT,
+            )
+
+    _assert_safe_cause(
+        error.value,
+        cause_type=RuntimeError,
+        cause_message=expected_cause,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "expected_message"),
+    [
+        pytest.param(400, "Gov.br rejected the access token", id="bad_request"),
+        pytest.param(401, "Gov.br rejected the access token", id="unauthorized"),
+        pytest.param(403, "Gov.br rejected the access token", id="forbidden"),
+        pytest.param(500, "Gov.br provider request failed", id="server_error"),
+    ],
+)
+async def test_userinfo_sanitizes_provider_error_statuses(
+    status_code: int,
+    expected_message: str,
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code,
+            text=f"{SENSITIVE_ACCESS_TOKEN} {SUBSTITUTED_SUBJECT}",
+        )
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(GovBrAuthError, match=expected_message) as error:
+            await client.userinfo(
+                SecretStr(SENSITIVE_ACCESS_TOKEN),
+                expected_subject=VALIDATED_SUBJECT,
+            )
+
+    _assert_safe_cause(
+        error.value,
+        cause_type=RuntimeError,
+        cause_message=f"Gov.br provider returned HTTP status {status_code}",
+    )
+
+
+@pytest.mark.asyncio
+async def test_userinfo_rejects_invalid_json_with_safe_causal_chain(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text=f"not-json {SENSITIVE_ACCESS_TOKEN} {SUBSTITUTED_SUBJECT}",
+        )
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br userinfo response is invalid",
+        ) as error:
+            await client.userinfo(
+                SecretStr(SENSITIVE_ACCESS_TOKEN),
+                expected_subject=VALIDATED_SUBJECT,
+            )
+
+    _assert_safe_cause(
+        error.value,
+        cause_type=ValueError,
+        cause_message="Gov.br response validation failed (JSONDecodeError)",
+    )
+
+
+@pytest.mark.asyncio
+async def test_userinfo_rejects_invalid_schema_with_safe_causal_chain(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"name": SUBSTITUTED_SUBJECT},
+        )
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br userinfo response is invalid",
+        ) as error:
+            await client.userinfo(
+                SecretStr(SENSITIVE_ACCESS_TOKEN),
+                expected_subject=VALIDATED_SUBJECT,
+            )
+
+    _assert_safe_cause(
+        error.value,
+        cause_type=ValueError,
+        cause_message="Gov.br response validation failed (ValidationError)",
+    )
 
 
 @pytest.mark.asyncio

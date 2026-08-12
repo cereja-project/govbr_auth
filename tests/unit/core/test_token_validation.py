@@ -91,7 +91,7 @@ def signed_id_token(
     return SecretStr(encoded)
 
 
-def test_valid_rs256_token_returns_claims(
+def test_valid_rs256_token_without_azp_returns_claims(
     validator: IdTokenValidator,
     signed_id_token: SecretStr,
     expected_nonce: SecretStr,
@@ -319,6 +319,132 @@ def test_wrong_audience_rejects_id_token(
     expected_nonce: SecretStr,
 ) -> None:
     valid_claims["aud"] = "other-client"
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+
+
+def test_singleton_audience_list_returns_claims(
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+    expected_nonce: SecretStr,
+    settings: GovBrSettings,
+) -> None:
+    valid_claims["aud"] = [settings.client_id]
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    claims = validator.validate(
+        SecretStr(encoded),
+        expected_nonce,
+        now=FIXED_NOW,
+    )
+
+    assert claims["aud"] == [settings.client_id]
+
+
+def test_additional_audience_rejects_id_token(
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+    expected_nonce: SecretStr,
+    settings: GovBrSettings,
+) -> None:
+    valid_claims["aud"] = [settings.client_id, "attacker-client"]
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+
+
+def test_matching_authorized_party_returns_claims(
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+    expected_nonce: SecretStr,
+    settings: GovBrSettings,
+) -> None:
+    valid_claims["azp"] = settings.client_id
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    claims = validator.validate(
+        SecretStr(encoded),
+        expected_nonce,
+        now=FIXED_NOW,
+    )
+
+    assert claims["azp"] == settings.client_id
+
+
+@pytest.mark.parametrize(
+    "authorized_party",
+    [
+        pytest.param("attacker-client", id="different_client"),
+        pytest.param(["test-client"], id="non_string"),
+    ],
+)
+def test_invalid_authorized_party_rejects_id_token(
+    authorized_party: object,
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+    expected_nonce: SecretStr,
+) -> None:
+    valid_claims["azp"] = authorized_party
+    encoded = jwt.encode(
+        valid_claims,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+
+
+@pytest.mark.parametrize(
+    "subject",
+    [
+        pytest.param(12345678900, id="non_string"),
+        pytest.param("", id="empty"),
+        pytest.param("   ", id="blank"),
+    ],
+)
+def test_invalid_subject_rejects_id_token(
+    subject: object,
+    validator: IdTokenValidator,
+    rsa_signing_key: rsa.RSAPrivateKey,
+    valid_claims: dict[str, object],
+    expected_nonce: SecretStr,
+) -> None:
+    valid_claims["sub"] = subject
     encoded = jwt.encode(
         valid_claims,
         rsa_signing_key,
