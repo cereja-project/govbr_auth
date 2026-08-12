@@ -505,6 +505,39 @@ async def test_exchange_code_classifies_client_error_responses_as_provider_rejec
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status_code",
+    [
+        pytest.param(408, id="request_timeout"),
+        pytest.param(429, id="too_many_requests"),
+    ],
+)
+async def test_exchange_code_classifies_temporary_client_errors_as_provider_unavailable(
+    status_code: int,
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, text=SENSITIVE_ACCESS_TOKEN)
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            ProviderUnavailableError,
+            match="Gov.br provider request failed",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    _assert_error_is_sanitized(error.value)
+
+
+@pytest.mark.asyncio
 async def test_exchange_code_sanitizes_provider_server_error(
     settings: GovBrSettings,
 ) -> None:
