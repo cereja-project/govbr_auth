@@ -14,9 +14,17 @@ from govbr_auth.core.models import AuthTransaction, GovBrAddress, GovBrUser, Tok
 from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
 from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import InMemoryTransactionStore, TransactionStore
+from govbr_auth.fastapi import (
+    AuthContext,
+    AuthSuccessHandler,
+    GovBrAuth,
+    create_govbr_router,
+)
 
 __all__ = [
     "AuthenticationResult",
+    "AuthContext",
+    "AuthSuccessHandler",
     "AuthTransaction",
     "AuthorizationBuilder",
     "AuthorizationRequest",
@@ -24,6 +32,7 @@ __all__ = [
     "GovBrAddress",
     "GovBrAuthError",
     "GovBrAuthorize",
+    "GovBrAuth",
     "GovBrClient",
     "GovBrConfig",
     "GovBrIntegration",
@@ -36,4 +45,5 @@ __all__ = [
     "ProviderEnvironment",
     "TokenSet",
     "TransactionStore",
+    "create_govbr_router",
 ]

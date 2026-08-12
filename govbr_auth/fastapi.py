@@ -19,6 +19,13 @@ from govbr_auth.core.errors import (
 )
 from govbr_auth.core.models import GovBrUser, TokenSet
 
+__all__ = [
+    "AuthContext",
+    "AuthSuccessHandler",
+    "GovBrAuth",
+    "create_govbr_router",
+]
+
 
 def utc_now() -> datetime:
     """Return the current timezone-aware UTC time for core operations."""

@@ -2,7 +2,13 @@ from cereja.utils import get_version_pep440_compliant
 
 try:
     from .core.config import GovBrConfig
-    from .core.govbr import GovBrAuthorize, GovBrIntegration, GovBrException, GovBrAuthenticationError
+    from .core.govbr import (
+        GovBrAuthorize,
+        GovBrIntegration,
+        GovBrException,
+        GovBrAuthenticationError,
+    )
+    from .fastapi import AuthContext, AuthSuccessHandler, GovBrAuth, create_govbr_router
     from .controller import GovBrConnector
     from .utils import generate_cript_verifier_secret
     from .fake_govbr import (
@@ -11,7 +17,7 @@ try:
         AuthorizationRequest,
         render_fake_login_page,
         process_fake_login,
-        create_default_fake_users
+        create_default_fake_users,
     )
 except ImportError:
     pass  # noqa: E402
