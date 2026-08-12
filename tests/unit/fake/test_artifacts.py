@@ -34,9 +34,23 @@ def _encrypt_payload(key: str, payload: object) -> SecretStr:
 
 
 def _assert_sanitized(error: ValueError, marker: str) -> None:
-    details = f"{error!s} {error!r} {error.__cause__!s} {error.__cause__!r}"
+    pending = [error]
+    visited: set[int] = set()
 
-    assert marker not in details
+    while pending:
+        current = pending.pop()
+        if id(current) in visited:
+            continue
+        visited.add(id(current))
+
+        details = f"{current!s} {current!r} {current.args!r} {current.__dict__!r}"
+
+        assert marker not in details
+
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
 
 
 def test_authorization_request_round_trips_between_independent_codecs() -> None:
@@ -201,6 +215,27 @@ def test_artifact_models_reject_incorrect_kind() -> None:
             scope="openid profile",
             code_challenge="challenge-123",
         )
+
+
+def test_artifact_models_hide_invalid_input_from_validation_error() -> None:
+    now = datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc)
+    marker = "sensitive-code-challenge-method"
+
+    with pytest.raises(ValidationError) as error:
+        AuthorizationRequestArtifact(
+            jti="request-123",
+            issued_at=now,
+            expires_at=now + timedelta(minutes=5),
+            client_id="client-123",
+            redirect_uri="https://client.example/callback",
+            state="state-123",
+            nonce="nonce-123",
+            scope="openid profile",
+            code_challenge="challenge-123",
+            code_challenge_method=marker,
+        )
+
+    _assert_sanitized(error.value, marker)
 
 
 def test_codec_rejects_invalid_fernet_secret_without_leaking_it() -> None:

@@ -24,7 +24,7 @@ _NOT_YET_VALID_ARTIFACT_MESSAGE = "fake artifact is not yet valid"
 class _Artifact(BaseModel):
     """Provide shared immutable validation for encrypted fake artifacts."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, hide_input_in_errors=True)
 
     jti: str
     issued_at: datetime
@@ -143,9 +143,9 @@ class FakeArtifactCodec:
         try:
             return Fernet(secret_value.encode("ascii"))
         except (UnicodeEncodeError, ValueError) as error:
-            raise ValueError(_INVALID_SECRET_MESSAGE) from _safe_cause(
-                "Fernet key validation", error
-            )
+            safe_cause = _safe_cause("Fernet key validation", error)
+
+        raise ValueError(_INVALID_SECRET_MESSAGE) from safe_cause
 
     def _encode(
         self, artifact: _Artifact, artifact_type: type[ArtifactType]
@@ -168,9 +168,20 @@ class FakeArtifactCodec:
             raise ValueError(_INVALID_ARTIFACT_MESSAGE) from _safe_type_cause(
                 "fake artifact validation"
             )
+        artifact = self._decode_payload(value, artifact_type)
+
+        if now >= artifact.expires_at:
+            raise ValueError(_EXPIRED_ARTIFACT_MESSAGE)
+        if now < artifact.issued_at:
+            raise ValueError(_NOT_YET_VALID_ARTIFACT_MESSAGE)
+        return artifact
+
+    def _decode_payload(
+        self, value: SecretStr, artifact_type: type[ArtifactType]
+    ) -> ArtifactType:
         try:
             payload = self._fernet.decrypt(value.get_secret_value().encode("ascii"))
-            artifact = artifact_type.model_validate(json.loads(payload.decode("utf-8")))
+            return artifact_type.model_validate(json.loads(payload.decode("utf-8")))
         except (
             InvalidToken,
             UnicodeDecodeError,
@@ -178,15 +189,9 @@ class FakeArtifactCodec:
             json.JSONDecodeError,
             ValidationError,
         ) as error:
-            raise ValueError(_INVALID_ARTIFACT_MESSAGE) from _safe_cause(
-                "fake artifact validation", error
-            )
+            safe_cause = _safe_cause("fake artifact validation", error)
 
-        if now >= artifact.expires_at:
-            raise ValueError(_EXPIRED_ARTIFACT_MESSAGE)
-        if now < artifact.issued_at:
-            raise ValueError(_NOT_YET_VALID_ARTIFACT_MESSAGE)
-        return artifact
+        raise ValueError(_INVALID_ARTIFACT_MESSAGE) from safe_cause
 
 
 def _require_timezone_aware(value: datetime) -> None:
