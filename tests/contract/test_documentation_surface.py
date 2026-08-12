@@ -2,9 +2,17 @@
 
 import importlib
 import re
+from io import StringIO
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from dotenv import dotenv_values
+
+from examples.example_fastapi import settings_from_environment
+from govbr_auth.core import ProviderEnvironment
 
 DOCS_ROOT = Path(__file__).parents[2] / "docs"
+PROJECT_ROOT = DOCS_ROOT.parent
 TOCTREE_ENTRY = re.compile(r"^\s{3}([\w./-]+)\s*$", re.MULTILINE)
 INCLUDE_DIRECTIVE = re.compile(r"^\.\. include::\s+(.+?)\s*$", re.MULTILINE)
 AUTODOC_DIRECTIVE = re.compile(
@@ -52,3 +60,43 @@ def test_published_autodoc_references_are_importable() -> None:
         except ModuleNotFoundError:
             module = importlib.import_module(module_name)
             assert hasattr(module, attribute_name), reference
+
+
+def test_local_environment_example_configures_every_consumer_url_on_loopback(
+    monkeypatch,
+) -> None:
+    example_source = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+    local_assignments = "\n".join(
+        line.removeprefix("# ")
+        for line in example_source.splitlines()
+        if line.startswith("# GOVBR_")
+    )
+    local_config = dotenv_values(stream=StringIO(local_assignments))
+    assert set(local_config) == {
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_CLIENT_ID",
+        "GOVBR_CLIENT_SECRET",
+        "GOVBR_ENVIRONMENT",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+        "GOVBR_REDIRECT_URI",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_TRANSACTION_SECRET",
+        "GOVBR_USERINFO_URL",
+    }
+    for name, value in local_config.items():
+        assert value is not None
+        monkeypatch.setenv(name, value)
+
+    settings = settings_from_environment()
+
+    assert settings.environment is ProviderEnvironment.LOCAL
+    assert str(settings.redirect_uri) == "http://localhost/auth/govbr/callback"
+    for url in (
+        settings.authorization_url,
+        settings.token_url,
+        settings.userinfo_url,
+        settings.issuer,
+        settings.jwks_url,
+    ):
+        assert urlsplit(str(url)).hostname == "localhost"
