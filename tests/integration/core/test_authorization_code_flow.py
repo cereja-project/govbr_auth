@@ -63,9 +63,7 @@ async def core_client(
         transport=transport,
         base_url=provider.base_url,
     ) as http:
-        jwks_response = await http.get(str(settings.jwks_url))
-        jwks_response.raise_for_status()
-        validator = IdTokenValidator(settings=settings, jwks=jwks_response.json())
+        validator = IdTokenValidator(settings=settings)
         transactions = InMemoryTransactionStore(settings.transaction_secret)
         yield GovBrClient(settings, transactions, validator, http)
 
@@ -176,8 +174,8 @@ async def test_core_rejects_userinfo_request_with_invalid_bearer_token(
         )
 
 
-def test_core_exports_experimental_and_legacy_public_api() -> None:
-    assert set(core.__all__) == {
+def test_core_exports_exact_async_v1_public_api() -> None:
+    assert tuple(core.__all__) == (
         "AuthenticationResult",
         "AuthTransaction",
         "AuthorizationBuilder",
@@ -185,10 +183,7 @@ def test_core_exports_experimental_and_legacy_public_api() -> None:
         "ExpiredTransactionError",
         "GovBrAddress",
         "GovBrAuthError",
-        "GovBrAuthorize",
         "GovBrClient",
-        "GovBrConfig",
-        "GovBrIntegration",
         "GovBrSettings",
         "GovBrUser",
         "IdTokenValidator",
@@ -198,4 +193,4 @@ def test_core_exports_experimental_and_legacy_public_api() -> None:
         "ProviderEnvironment",
         "TokenSet",
         "TransactionStore",
-    }
+    )

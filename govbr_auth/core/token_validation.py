@@ -19,15 +19,15 @@ _REQUIRED_CLAIMS = ("exp", "iat", "iss", "aud", "sub", "nonce")
 class IdTokenValidator:
     """Validate signed ID tokens against configured identity and JWKS data."""
 
-    def __init__(self, *, settings: GovBrSettings, jwks: Mapping[str, object]) -> None:
+    def __init__(self, *, settings: GovBrSettings) -> None:
         self._settings = settings
-        self._jwks = jwks
 
     def validate(
         self,
         id_token: SecretStr,
         expected_nonce: SecretStr,
         *,
+        jwks: Mapping[str, object],
         now: datetime,
     ) -> Mapping[str, object]:
         """Return verified claims or raise a stable domain error.
@@ -35,6 +35,7 @@ class IdTokenValidator:
         Args:
             id_token: Compact JWT received from the token endpoint.
             expected_nonce: Nonce bound to the originating authorization transaction.
+            jwks: Provider JSON Web Key Set used for this validation call.
             now: Trusted current time used for deterministic temporal validation.
 
         Returns:
@@ -48,7 +49,7 @@ class IdTokenValidator:
         raw_token = id_token.get_secret_value()
         try:
             header = jwt.get_unverified_header(raw_token)
-            signing_key = self._select_signing_key(header)
+            signing_key = self._select_signing_key(header, jwks=jwks)
             claims: dict[str, object] = jwt.decode(
                 raw_token,
                 key=signing_key.key,
@@ -102,7 +103,12 @@ class IdTokenValidator:
         if not isinstance(subject, str) or not subject.strip():
             raise jwt.InvalidTokenError("ID token subject is invalid")
 
-    def _select_signing_key(self, header: Mapping[str, object]) -> jwt.PyJWK:
+    def _select_signing_key(
+        self,
+        header: Mapping[str, object],
+        *,
+        jwks: Mapping[str, object],
+    ) -> jwt.PyJWK:
         if header.get("alg") != _ALLOWED_ALGORITHM:
             raise jwt.InvalidAlgorithmError("ID token algorithm is not allowed")
 
@@ -110,9 +116,9 @@ class IdTokenValidator:
         if not isinstance(key_id, str) or not key_id:
             raise jwt.InvalidTokenError("ID token does not identify a signing key")
 
-        if not isinstance(self._jwks, Mapping):
+        if not isinstance(jwks, Mapping):
             raise jwt.PyJWKSetError("JWKS must be a JSON object")
-        keys = self._jwks.get("keys")
+        keys = jwks.get("keys")
         if not isinstance(keys, list) or not keys:
             raise jwt.PyJWKSetError("JWKS does not contain valid key objects")
 

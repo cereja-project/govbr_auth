@@ -1,76 +1,37 @@
-⚡ Quick Start
-===============
+Quick start FastAPI
+===================
 
 Instalação
 ----------
 
-Instalação mínima (somente núcleo de serviços)::
+Instale o cliente e o adaptador FastAPI::
 
     pip install govbr-auth
 
-Instalação com framework específico::
+Para executar também o provedor local explícito::
 
-    pip install govbr-auth[fastapi]
-    # ou
-    pip install govbr-auth[flask]
-    # ou
-    pip install govbr-auth[django]
+    pip install "govbr-auth[fake]"
 
-Instalação completa (todos os frameworks)::
+Exemplo executável
+------------------
 
-    pip install govbr-auth[full]
+Defina as variáveis descritas em :doc:`configuration` e inicie o consumidor::
 
-Exemplo Básico com FastAPI
----------------------------
+    uvicorn examples.example_fastapi:create_app --factory
 
-.. code-block:: python
+A factory cria ``GovBrSettings``, ``GovBrClient`` e ``GovBrAuth``. O endpoint
+``/auth/govbr/login`` inicia o fluxo e ``/auth/govbr/callback`` entrega ao
+handler apenas usuário e claims validados. Tokens brutos continuam ocultos por
+padrão.
 
-    from fastapi import FastAPI
-    from govbr_auth import GovBrConfig, GovBrConnector, create_default_fake_users
+Desenvolvimento local
+---------------------
 
-    # Configuração para modo fake (desenvolvimento)
-    config = GovBrConfig(
-        client_id="fake-client-id",
-        client_secret="fake-client-secret",
-        redirect_uri="http://localhost:8000/auth/govbr/callback",
-        cript_verifier_secret="Vvd9H5VC2Aqk-dwFOJX6MvQTuZZARmb37y7un9wkj0c=",
-        govbr_auth_url="http://localhost:8000/fake-govbr/authorize",
-        govbr_token_url="http://localhost:8000/fake-govbr/token",
-        use_fake=True,
-    )
+O fake não é ativado por flag nem por detecção de URL. Configure os endpoints
+de loopback e execute explicitamente::
 
-    app = FastAPI()
+    uvicorn examples.example_fastapi:create_development_app --factory
 
-    # Callback de sucesso
-    def handle_success(data, request):
-        user = data["id_token_decoded"]
-        return {"mensagem": f"Bem-vindo, {user['name']}!", "cpf": user["sub"]}
-
-    # Inicializa o connector (endpoints fake criados automaticamente!)
-    connector = GovBrConnector(
-        config=config,
-        on_auth_success=handle_success,
-        fake_users=create_default_fake_users()
-    )
-    connector.init_fastapi(app)
-
-    # Executar: uvicorn seu_arquivo:app --reload
-    # Acessar: http://localhost:8000/auth/govbr/authorize
-
-Próximos Passos
----------------
-
-1. Leia :doc:`configuration` para entender todas as opções
-2. Escolha seu framework: :doc:`frameworks`
-3. Para desenvolvimento, use :doc:`../guide/fake-mode` (modo fake)
-4. Quando pronto para produção, confira :doc:`../guide/security-practices`
-
-Exemplos
---------
-
-Exemplos funcionais estão disponíveis em `examples/ <https://github.com/cereja-project/govbr_auth/tree/main/examples>`_ no repositório.
-
-Executar exemplo com modo fake::
-
-    USE_FAKE_GOVBR=true uvicorn examples.example_simple_app:app --reload
-
+Essa factory preserva o mesmo consumidor e handler, monta separadamente as
+rotas do provedor fake e muda somente a configuração dos endpoints e
+credenciais.
