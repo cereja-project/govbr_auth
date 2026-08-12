@@ -6,6 +6,7 @@ from govbr_auth.fake.artifacts import (
     AuthorizationRequestArtifact,
     FakeArtifactCodec,
 )
+from govbr_auth.fake.fastapi import create_fake_govbr_app, create_fake_govbr_router
 from govbr_auth.fake.models import FakeClient, FakeUser
 from govbr_auth.fake.provider import (
     FakeAuthorizationRedirect,
@@ -48,4 +49,6 @@ __all__ = [
     "FakeTokenResponse",
     "InMemoryAuthorizationCodeReplayStore",
     "InMemoryFakeUserStore",
+    "create_fake_govbr_app",
+    "create_fake_govbr_router",
 ]
