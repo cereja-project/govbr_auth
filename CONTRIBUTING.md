@@ -8,7 +8,7 @@ Ao participar do projeto, siga o [Código de Conduta](CODE_OF_CONDUCT.md).
 
 ## Preparação do ambiente
 
-O projeto requer Python 3.8 ou mais recente.
+O projeto requer Python 3.11 ou mais recente.
 
 ```bash
 python -m venv .venv
