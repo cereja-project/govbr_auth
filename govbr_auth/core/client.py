@@ -11,7 +11,11 @@ import httpx
 from pydantic import SecretStr, ValidationError
 
 from govbr_auth.core.authorization import AuthorizationBuilder, AuthorizationRequest
-from govbr_auth.core.errors import GovBrAuthError
+from govbr_auth.core.errors import (
+    GovBrAuthError,
+    ProviderRejectedError,
+    ProviderUnavailableError,
+)
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.core.token_validation import IdTokenValidator
@@ -88,9 +92,17 @@ class GovBrClient:
         }
         response = await self._post_token(form)
         if response.status_code == httpx.codes.BAD_REQUEST:
-            self._raise_http_error(_OAUTH_REJECTION_MESSAGE, response.status_code)
+            self._raise_http_error(
+                ProviderRejectedError,
+                _OAUTH_REJECTION_MESSAGE,
+                response.status_code,
+            )
         if response.is_error:
-            self._raise_http_error(_PROVIDER_FAILURE_MESSAGE, response.status_code)
+            self._raise_http_error(
+                ProviderUnavailableError,
+                _PROVIDER_FAILURE_MESSAGE,
+                response.status_code,
+            )
 
         tokens = self._parse_tokens(response)
         claims = self._validator.validate(
@@ -114,11 +126,16 @@ class GovBrClient:
             httpx.codes.FORBIDDEN,
         }:
             self._raise_http_error(
+                ProviderRejectedError,
                 _USERINFO_REJECTION_MESSAGE,
                 response.status_code,
             )
         if response.is_error:
-            self._raise_http_error(_PROVIDER_FAILURE_MESSAGE, response.status_code)
+            self._raise_http_error(
+                ProviderUnavailableError,
+                _PROVIDER_FAILURE_MESSAGE,
+                response.status_code,
+            )
 
         user = self._parse_userinfo(response)
         if user.sub != expected_subject:
@@ -146,7 +163,11 @@ class GovBrClient:
             failure_message = _PROVIDER_FAILURE_MESSAGE
             failure_type = type(error).__name__
 
-        self._raise_transport_error(failure_message, failure_type)
+        self._raise_transport_error(
+            ProviderUnavailableError,
+            failure_message,
+            failure_type,
+        )
 
     async def _get_userinfo(self, access_token: SecretStr) -> httpx.Response:
         try:
@@ -162,7 +183,11 @@ class GovBrClient:
             failure_message = _PROVIDER_FAILURE_MESSAGE
             failure_type = type(error).__name__
 
-        self._raise_transport_error(failure_message, failure_type)
+        self._raise_transport_error(
+            ProviderUnavailableError,
+            failure_message,
+            failure_type,
+        )
 
     @staticmethod
     def _parse_tokens(response: httpx.Response) -> TokenSet:
@@ -186,16 +211,21 @@ class GovBrClient:
 
     @staticmethod
     def _raise_transport_error(
+        error_type: type[GovBrAuthError],
         message: str,
         failure_type: str,
     ) -> NoReturn:
         safe_cause = RuntimeError(f"Gov.br HTTP transport failed ({failure_type})")
-        raise GovBrAuthError(message) from safe_cause
+        raise error_type(message) from safe_cause
 
     @staticmethod
-    def _raise_http_error(message: str, status_code: int) -> NoReturn:
+    def _raise_http_error(
+        error_type: type[GovBrAuthError],
+        message: str,
+        status_code: int,
+    ) -> NoReturn:
         safe_cause = RuntimeError(f"Gov.br provider returned HTTP status {status_code}")
-        raise GovBrAuthError(message) from safe_cause
+        raise error_type(message) from safe_cause
 
     @staticmethod
     def _raise_invalid_response(message: str, failure_type: str) -> NoReturn:

@@ -23,3 +23,15 @@ class InvalidIdTokenError(GovBrAuthError):
     """Represent a rejected OpenID Connect ID token."""
 
     code: str = "invalid_id_token"
+
+
+class ProviderRejectedError(GovBrAuthError):
+    """Represent an OAuth request rejected by the Gov.br provider."""
+
+    code: str = "provider_rejected"
+
+
+class ProviderUnavailableError(GovBrAuthError):
+    """Represent an unavailable or timed-out Gov.br provider."""
+
+    code: str = "provider_unavailable"

@@ -8,7 +8,12 @@ import pytest
 from pydantic import SecretStr
 
 from govbr_auth.core.client import AuthenticationResult, GovBrClient
-from govbr_auth.core.errors import GovBrAuthError, InvalidIdTokenError
+from govbr_auth.core.errors import (
+    GovBrAuthError,
+    InvalidIdTokenError,
+    ProviderRejectedError,
+    ProviderUnavailableError,
+)
 from govbr_auth.core.models import AuthTransaction
 from govbr_auth.core.settings import GovBrSettings
 
@@ -243,18 +248,20 @@ async def test_userinfo_rejects_subject_not_bound_to_validated_id_token(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("transport_error", "expected_message", "expected_cause"),
+    ("transport_error", "expected_message", "expected_cause", "expected_error_type"),
     [
         pytest.param(
             httpx.ReadTimeout,
             "Gov.br provider request timed out",
             "Gov.br HTTP transport failed (ReadTimeout)",
+            ProviderUnavailableError,
             id="timeout",
         ),
         pytest.param(
             httpx.ConnectError,
             "Gov.br provider request failed",
             "Gov.br HTTP transport failed (ConnectError)",
+            ProviderUnavailableError,
             id="transport",
         ),
     ],
@@ -263,6 +270,7 @@ async def test_userinfo_sanitizes_transport_failures(
     transport_error: type[httpx.TransportError],
     expected_message: str,
     expected_cause: str,
+    expected_error_type: type[GovBrAuthError],
     settings: GovBrSettings,
 ) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
@@ -276,7 +284,7 @@ async def test_userinfo_sanitizes_transport_failures(
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
         client = GovBrClient(settings, transactions, validator, http)
 
-        with pytest.raises(GovBrAuthError, match=expected_message) as error:
+        with pytest.raises(expected_error_type, match=expected_message) as error:
             await client.userinfo(
                 SecretStr(SENSITIVE_ACCESS_TOKEN),
                 expected_subject=VALIDATED_SUBJECT,
@@ -291,17 +299,38 @@ async def test_userinfo_sanitizes_transport_failures(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("status_code", "expected_message"),
+    ("status_code", "expected_message", "expected_error_type"),
     [
-        pytest.param(400, "Gov.br rejected the access token", id="bad_request"),
-        pytest.param(401, "Gov.br rejected the access token", id="unauthorized"),
-        pytest.param(403, "Gov.br rejected the access token", id="forbidden"),
-        pytest.param(500, "Gov.br provider request failed", id="server_error"),
+        pytest.param(
+            400,
+            "Gov.br rejected the access token",
+            ProviderRejectedError,
+            id="bad_request",
+        ),
+        pytest.param(
+            401,
+            "Gov.br rejected the access token",
+            ProviderRejectedError,
+            id="unauthorized",
+        ),
+        pytest.param(
+            403,
+            "Gov.br rejected the access token",
+            ProviderRejectedError,
+            id="forbidden",
+        ),
+        pytest.param(
+            500,
+            "Gov.br provider request failed",
+            ProviderUnavailableError,
+            id="server_error",
+        ),
     ],
 )
 async def test_userinfo_sanitizes_provider_error_statuses(
     status_code: int,
     expected_message: str,
+    expected_error_type: type[GovBrAuthError],
     settings: GovBrSettings,
 ) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
@@ -315,7 +344,7 @@ async def test_userinfo_sanitizes_provider_error_statuses(
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
         client = GovBrClient(settings, transactions, validator, http)
 
-        with pytest.raises(GovBrAuthError, match=expected_message) as error:
+        with pytest.raises(expected_error_type, match=expected_message) as error:
             await client.userinfo(
                 SecretStr(SENSITIVE_ACCESS_TOKEN),
                 expected_subject=VALIDATED_SUBJECT,
@@ -392,19 +421,26 @@ async def test_userinfo_rejects_invalid_schema_with_safe_causal_chain(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("transport_error", "expected_message"),
+    ("transport_error", "expected_message", "expected_error_type"),
     [
         pytest.param(
-            httpx.ReadTimeout, "Gov.br provider request timed out", id="timeout"
+            httpx.ReadTimeout,
+            "Gov.br provider request timed out",
+            ProviderUnavailableError,
+            id="timeout",
         ),
         pytest.param(
-            httpx.ConnectError, "Gov.br provider request failed", id="transport"
+            httpx.ConnectError,
+            "Gov.br provider request failed",
+            ProviderUnavailableError,
+            id="transport",
         ),
     ],
 )
 async def test_exchange_code_sanitizes_transport_failures(
     transport_error: type[httpx.TransportError],
     expected_message: str,
+    expected_error_type: type[GovBrAuthError],
     settings: GovBrSettings,
 ) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
@@ -415,7 +451,7 @@ async def test_exchange_code_sanitizes_transport_failures(
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
         client = GovBrClient(settings, transactions, validator, http)
 
-        with pytest.raises(GovBrAuthError, match=expected_message) as error:
+        with pytest.raises(expected_error_type, match=expected_message) as error:
             await client.exchange_code(
                 code=SENSITIVE_CODE,
                 state=SENSITIVE_STATE,
@@ -447,7 +483,7 @@ async def test_exchange_code_sanitizes_oauth_error_response(
         client = GovBrClient(settings, transactions, validator, http)
 
         with pytest.raises(
-            GovBrAuthError,
+            ProviderRejectedError,
             match="Gov.br rejected the authorization code",
         ) as error:
             await client.exchange_code(
@@ -475,7 +511,7 @@ async def test_exchange_code_sanitizes_provider_server_error(
         client = GovBrClient(settings, transactions, validator, http)
 
         with pytest.raises(
-            GovBrAuthError,
+            ProviderUnavailableError,
             match="Gov.br provider request failed",
         ) as error:
             await client.exchange_code(
