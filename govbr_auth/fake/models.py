@@ -32,17 +32,19 @@ class FakeClient(BaseModel):
 
     @field_validator("registered_redirect_uris", mode="before")
     @classmethod
-    def validate_redirect_uri_input(cls, value: object) -> object:
+    def validate_redirect_uri_input(cls, value: object) -> tuple[object, ...]:
         """Reject blank or absent registered redirect URIs."""
         if not value:
             raise ValueError("must not be empty")
-        if isinstance(value, str):
-            if not value.strip():
-                raise ValueError("must not be empty")
-            return value
-        if any(isinstance(uri, str) and not uri.strip() for uri in value):
+        try:
+            redirect_uris = tuple(value)
+        except TypeError as error:
+            raise ValueError("registered redirect URIs must be iterable") from error
+        if not redirect_uris:
             raise ValueError("must not be empty")
-        return value
+        if any(isinstance(uri, str) and not uri.strip() for uri in redirect_uris):
+            raise ValueError("must not be empty")
+        return redirect_uris
 
 
 class FakeUser(GovBrUser):

@@ -136,6 +136,31 @@ def test_fake_client_uses_immutable_redirect_uris_and_secret(
     assert client.client_secret.get_secret_value() == "example-client-secret"
 
 
+def test_fake_client_preserves_redirect_uri_from_one_shot_iterator(
+    valid_client_data: dict[str, object],
+) -> None:
+    valid_client_data["registered_redirect_uris"] = iter(
+        ("https://consumer.example.test/oauth/callback",)
+    )
+
+    client = FakeClient(**valid_client_data)
+
+    assert tuple(str(uri) for uri in client.registered_redirect_uris) == (
+        "https://consumer.example.test/oauth/callback",
+    )
+
+
+def test_fake_client_rejects_truthy_non_iterable_redirect_uris(
+    valid_client_data: dict[str, object],
+) -> None:
+    valid_client_data["registered_redirect_uris"] = 1
+
+    with pytest.raises(
+        ValidationError, match="registered redirect URIs must be iterable"
+    ):
+        FakeClient(**valid_client_data)
+
+
 def test_fake_client_is_frozen(valid_client_data: dict[str, object]) -> None:
     client = FakeClient(**valid_client_data)
 
