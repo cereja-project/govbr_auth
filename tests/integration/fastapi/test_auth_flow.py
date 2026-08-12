@@ -82,9 +82,11 @@ def build_consumer(
 ) -> FastAPI:
     """Build one consumer application independent of provider implementation."""
     app = FastAPI()
+    app.state.received_contexts = []
     client = build_client(settings, transport)
 
     async def on_success(context: AuthContext) -> Response:
+        app.state.received_contexts.append(context)
         return JSONResponse({"sub": context.user.subject})
 
     GovBrAuth(client=client, on_success=on_success, clock=fixed_clock).install(app)
@@ -225,9 +227,11 @@ class OAuthBrowser:
         *,
         consumer_http: httpx.AsyncClient,
         provider_http: httpx.AsyncClient,
+        received_contexts: list[AuthContext],
     ) -> None:
         self._consumer_http = consumer_http
         self._provider_http = provider_http
+        self.received_contexts = received_contexts
 
     async def authorize(self) -> tuple[str, str]:
         """Follow login to the provider and return both redirect locations."""
@@ -471,6 +475,7 @@ async def browser(provider_variant: ProviderVariant):
         yield OAuthBrowser(
             consumer_http=consumer_http,
             provider_http=provider_http,
+            received_contexts=consumer.state.received_contexts,
         )
 
 
@@ -497,6 +502,7 @@ async def test_successful_callback_returns_the_same_validated_subject(
     callback_values = parse_qs(urlsplit(result.callback_location).query)
     assert result.response.status_code == 200
     assert result.response.json() == {"sub": SUBJECT}
+    assert browser.received_contexts[0].tokens is None
     assert len(authorization_values["state"][0]) >= 43
     assert len(callback_values["code"][0]) >= 43
 
