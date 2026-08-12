@@ -203,6 +203,19 @@ def test_issue_id_token_rejects_non_positive_validity_window(
         )
 
 
+def test_issue_id_token_rejects_validity_window_with_equal_numeric_dates(
+    issuer: FakeTokenIssuer,
+) -> None:
+    with pytest.raises(ValueError, match="expires_at must be after issued_at"):
+        issuer.issue_id_token(
+            subject="12345678900",
+            audience="fake-client",
+            nonce="authorization-nonce",
+            issued_at=FIXED_NOW,
+            expires_at=FIXED_NOW + timedelta(microseconds=1),
+        )
+
+
 @pytest.mark.parametrize(
     "protected_name",
     [

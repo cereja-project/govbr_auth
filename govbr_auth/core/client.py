@@ -122,7 +122,7 @@ class GovBrClient:
                 _JWKS_REJECTION_MESSAGE,
                 jwks_response.status_code,
             )
-        if jwks_response.is_error:
+        if not jwks_response.is_success:
             self._raise_http_error(
                 ProviderUnavailableError,
                 _PROVIDER_FAILURE_MESSAGE,

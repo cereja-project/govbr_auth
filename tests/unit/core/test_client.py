@@ -258,6 +258,12 @@ async def test_exchange_code_sanitizes_jwks_transport_failures(
             ProviderUnavailableError,
             id="unavailable",
         ),
+        pytest.param(
+            302,
+            "Gov.br provider request failed",
+            ProviderUnavailableError,
+            id="redirect",
+        ),
     ],
 )
 async def test_exchange_code_sanitizes_jwks_error_statuses(
@@ -269,7 +275,7 @@ async def test_exchange_code_sanitizes_jwks_error_statuses(
     def handle(request: httpx.Request) -> httpx.Response:
         if str(request.url) == str(settings.token_url):
             return httpx.Response(200, json=_token_response())
-        return httpx.Response(status_code, text=SENSITIVE_JWK)
+        return httpx.Response(status_code, json=_jwks_response())
 
     transactions = RecordingTransactionStore()
     validator = RecordingIdTokenValidator()

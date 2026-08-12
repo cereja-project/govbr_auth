@@ -82,7 +82,9 @@ class FakeTokenIssuer:
         self._require_nonblank(nonce, name="nonce")
         self._require_timezone_aware(issued_at, name="issued_at")
         self._require_timezone_aware(expires_at, name="expires_at")
-        if expires_at <= issued_at:
+        issued_at_numeric_date = int(issued_at.timestamp())
+        expires_at_numeric_date = int(expires_at.timestamp())
+        if expires_at_numeric_date <= issued_at_numeric_date:
             raise ValueError("expires_at must be after issued_at")
 
         additional_claims = {} if claims is None else dict(claims)
@@ -94,8 +96,8 @@ class FakeTokenIssuer:
             "aud": audience,
             "sub": subject,
             "nonce": nonce,
-            "iat": int(issued_at.timestamp()),
-            "exp": int(expires_at.timestamp()),
+            "iat": issued_at_numeric_date,
+            "exp": expires_at_numeric_date,
         }
         return SecretStr(self.signing_key._sign(token_claims))
 
