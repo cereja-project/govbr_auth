@@ -23,6 +23,52 @@ from govbr_auth.fake import (
 FIXED_NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 
 
+@pytest.mark.asyncio
+async def test_recommended_development_bootstrap_completes_mounted_fake_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider_base_url = "http://localhost/fake-govbr"
+    callback_url = "http://localhost/auth/govbr/callback"
+    monkeypatch.setenv("GOVBR_ENVIRONMENT", "local")
+    monkeypatch.setenv("GOVBR_AUTHORIZATION_URL", f"{provider_base_url}/authorize")
+    monkeypatch.setenv("GOVBR_TOKEN_URL", f"{provider_base_url}/token")
+    monkeypatch.setenv("GOVBR_USERINFO_URL", f"{provider_base_url}/userinfo")
+    monkeypatch.setenv("GOVBR_CLIENT_ID", "local-example-client")
+    monkeypatch.setenv("GOVBR_CLIENT_SECRET", "local-example-secret")
+    monkeypatch.setenv("GOVBR_REDIRECT_URI", callback_url)
+    monkeypatch.setenv(
+        "GOVBR_TRANSACTION_SECRET", Fernet.generate_key().decode("ascii")
+    )
+    monkeypatch.setenv("GOVBR_ISSUER", f"{provider_base_url}/")
+    monkeypatch.setenv("GOVBR_JWKS_URL", f"{provider_base_url}/jwk")
+    example = importlib.import_module("examples.example_fastapi")
+
+    application = example.create_development_app(clock=lambda: FIXED_NOW)
+
+    async with application.router.lifespan_context(application):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=application),
+            base_url="http://localhost",
+            follow_redirects=True,
+        ) as client:
+            response = await client.get("/auth/govbr/login")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "authenticated": True,
+        "subject": "local-example-subject",
+    }
+    assert {
+        "/auth/govbr/callback",
+        "/auth/govbr/login",
+        "/fake-govbr/authorize",
+        "/fake-govbr/jwk",
+        "/fake-govbr/login",
+        "/fake-govbr/token",
+        "/fake-govbr/userinfo",
+    }.issubset(application.openapi()["paths"])
+
+
 @pytest.mark.parametrize(
     "provider_base_url,client_id,client_secret",
     (

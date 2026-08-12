@@ -81,7 +81,10 @@ def create_app(
     return application
 
 
-def create_development_app() -> FastAPI:
+def create_development_app(
+    *,
+    clock: Callable[[], datetime] = utc_now,
+) -> FastAPI:
     """Explicitly mount the optional fake provider for local development."""
     from govbr_auth.fake import (
         FakeClient,
@@ -129,8 +132,17 @@ def create_development_app() -> FastAPI:
         replay_store=InMemoryAuthorizationCodeReplayStore(),
         signing_key=FakeSigningKey.generate(kid="local-example-key"),
     )
-    application = create_app()
-    application.include_router(
-        create_fake_govbr_router(provider, prefix=provider_prefix)
+    fake_router = create_fake_govbr_router(
+        provider,
+        prefix=provider_prefix,
+        automatic_subject="local-example-subject",
+        clock=clock,
     )
+    provider_application = FastAPI()
+    provider_application.include_router(fake_router)
+    application = create_app(
+        provider_transport=httpx.ASGITransport(app=provider_application),
+        clock=clock,
+    )
+    application.include_router(fake_router)
     return application

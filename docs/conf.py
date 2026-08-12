@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 project = 'GovBR Auth'
 author = 'Joab Leite'
 copyright = f'{datetime.now().year}, {author}'
-version = '1.0'  # short version
-release = '1.0.0'  # full version
+version = '0.2'  # short version
+release = '0.2.2'  # full version
 
 # General configuration
 extensions = [

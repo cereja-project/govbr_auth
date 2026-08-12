@@ -28,7 +28,8 @@ python -m pytest --tb=short --disable-warnings -q
 
 ## Exemplo FastAPI
 
-Configure somente endpoints, credenciais e o segredo das transações do provedor:
+Configure endpoints e credenciais do provedor, além do segredo local usado pelo
+consumidor para proteger suas transações:
 
 ```text
 GOVBR_ENVIRONMENT=production
@@ -42,6 +43,9 @@ GOVBR_TRANSACTION_SECRET=uma-chave-fernet
 GOVBR_ISSUER=https://sso.acesso.gov.br/
 GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
 ```
+
+`GOVBR_TRANSACTION_SECRET` protege o `state`, nonce e PKCE mantidos pelo
+consumidor. Ele não é uma credencial fornecida pelo Gov.br.
 
 Execute o consumidor:
 

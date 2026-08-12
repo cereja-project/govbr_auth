@@ -1,40 +1,43 @@
-📚 Core - Lógica Principal
-===========================
+Core assíncrono
+===============
 
-GovBrConfig
------------
+Configuração
+------------
 
-.. autoclass:: govbr_auth.core.config.GovBrConfig
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: govbr_auth.core.GovBrSettings
 
-GovBrAuthorize
+.. autoclass:: govbr_auth.core.ProviderEnvironment
+
+Cliente e autorização
+---------------------
+
+.. autoclass:: govbr_auth.core.GovBrClient
+
+.. autoclass:: govbr_auth.core.AuthorizationBuilder
+
+.. autoclass:: govbr_auth.core.AuthenticationResult
+
+Transações e validação
+---------------------
+
+.. autoclass:: govbr_auth.core.InMemoryTransactionStore
+
+.. autoclass:: govbr_auth.core.IdTokenValidator
+
+Modelos
+-------
+
+.. autoclass:: govbr_auth.core.AuthTransaction
+
+.. autoclass:: govbr_auth.core.GovBrUser
+
+.. autoclass:: govbr_auth.core.TokenSet
+
+Erros públicos
 --------------
 
-.. autoclass:: govbr_auth.core.govbr.GovBrAuthorize
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: govbr_auth.core.GovBrAuthError
 
-GovBrIntegration
-----------------
+.. autoclass:: govbr_auth.core.InvalidStateError
 
-.. autoclass:: govbr_auth.core.govbr.GovBrIntegration
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Exceções
---------
-
-.. autoclass:: govbr_auth.core.govbr.GovBrException
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autoclass:: govbr_auth.core.govbr.GovBrAuthenticationError
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
+.. autoclass:: govbr_auth.core.InvalidIdTokenError

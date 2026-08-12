@@ -1,28 +1,22 @@
-🧪 Fake GovBr - Modo Desenvolvimento
-=====================================
+Provedor fake explícito
+=======================
 
-FakeGovBrService
-----------------
+O provedor local é opcional e nunca é ativado pelo cliente oficial. Instale o
+extra ``govbr-auth[fake]`` e monte uma factory de ``govbr_auth.fake`` somente
+no bootstrap de desenvolvimento.
 
-.. autoclass:: govbr_auth.fake_govbr.FakeGovBrService
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: govbr_auth.fake.FakeGovBrSettings
 
-FakeUserData
------------
+.. autoclass:: govbr_auth.fake.FakeGovBrProvider
 
-.. autoclass:: govbr_auth.fake_govbr.FakeUserData
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: govbr_auth.fake.FakeClient
 
-Funções Auxiliares
-------------------
+.. autoclass:: govbr_auth.fake.FakeUser
 
-.. autofunction:: govbr_auth.fake_govbr.create_default_fake_users
+.. autoclass:: govbr_auth.fake.InMemoryAuthorizationCodeReplayStore
 
-.. autofunction:: govbr_auth.fake_govbr.render_fake_login_page
+.. autoclass:: govbr_auth.fake.InMemoryFakeUserStore
 
-.. autofunction:: govbr_auth.fake_govbr.process_fake_login
+.. autofunction:: govbr_auth.fake.create_fake_govbr_router
 
+.. autofunction:: govbr_auth.fake.create_fake_govbr_app

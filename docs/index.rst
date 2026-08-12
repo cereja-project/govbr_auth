@@ -1,65 +1,34 @@
-GovBR Auth - Documentação
-=========================
+GovBR Auth
+==========
 
-.. image:: https://img.shields.io/badge/python-3.11%2B-blue
-   :target: https://www.python.org/downloads/
-   :alt: Python Version
-
-.. image:: https://img.shields.io/badge/License-MIT-yellow.svg
-   :target: https://opensource.org/licenses/MIT
-   :alt: License: MIT
-
-.. image:: https://img.shields.io/badge/FastAPI-compatible-green
-   :target: https://fastapi.tiangolo.com/
-   :alt: FastAPI compatible
-
-.. image:: https://img.shields.io/badge/Flask-compatible-green
-   :target: https://flask.palletsprojects.com/
-   :alt: Flask compatible
-
-.. image:: https://img.shields.io/badge/Django-compatible-green
-   :target: https://www.djangoproject.com/
-   :alt: Django compatible
-
-Autentique usuários com o Gov.br usando FastAPI, Flask, Django ou sua própria stack personalizada.
-
-🧪 **Novo!** Modo fake integrado para desenvolvimento sem necessidade de cadastro no Gov.br!
+Biblioteca assíncrona FastAPI para autenticação Gov.br com OAuth 2.0, PKCE e
+OpenID Connect. O cliente valida ``state``, tokens RS256 por JWKS, ``issuer``,
+``audience``, ``nonce`` e o vínculo do ``subject``.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 📖 Guia de Início Rápido
+   :caption: Guia
 
    guide/quick-start
    guide/configuration
-   guide/frameworks
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 🔒 Segurança e Boas Práticas
-
-   guide/security-practices
    guide/fake-mode
 
 .. toctree::
    :maxdepth: 2
-   :caption: 📚 Referência API
+   :caption: Referência da API
 
    api/core
-   api/controller
+   api/fastapi
    api/fake-govbr
-   api/utils
 
 .. toctree::
    :maxdepth: 1
-   :caption: 📝 Adicional
+   :caption: Versões
 
-   guide/troubleshooting
-   guide/faq
    CHANGELOG
 
-Índice e Busca
+Índice e busca
 ==============
 
 * :ref:`genindex`
 * :ref:`search`
-
