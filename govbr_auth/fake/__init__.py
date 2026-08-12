@@ -7,6 +7,16 @@ from govbr_auth.fake.artifacts import (
     FakeArtifactCodec,
 )
 from govbr_auth.fake.models import FakeClient, FakeUser
+from govbr_auth.fake.provider import (
+    FakeAuthorizationRedirect,
+    FakeAuthorizationRequest,
+    FakeAuthorizationSession,
+    FakeClientCredentials,
+    FakeGovBrProvider,
+    FakeOAuthError,
+    FakeTokenRequest,
+    FakeTokenResponse,
+)
 from govbr_auth.fake.signing import FakeSigningKey, FakeTokenIssuer
 from govbr_auth.fake.settings import FakeGovBrSettings
 from govbr_auth.fake.stores import (
@@ -22,12 +32,20 @@ __all__ = [
     "AuthorizationCodeArtifact",
     "AuthorizationRequestArtifact",
     "FakeClient",
+    "FakeClientCredentials",
     "FakeArtifactCodec",
+    "FakeAuthorizationRedirect",
+    "FakeAuthorizationRequest",
+    "FakeAuthorizationSession",
     "FakeGovBrSettings",
+    "FakeGovBrProvider",
+    "FakeOAuthError",
     "FakeSigningKey",
     "FakeTokenIssuer",
     "FakeUser",
     "FakeUserStore",
+    "FakeTokenRequest",
+    "FakeTokenResponse",
     "InMemoryAuthorizationCodeReplayStore",
     "InMemoryFakeUserStore",
 ]
