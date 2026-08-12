@@ -212,16 +212,14 @@ Para customizar usuários fake::
 Qual versão do Python é suportada?
 ---------------------------------
 
-Python 3.8+ é obrigatório.
+Python 3.11+ é obrigatório.
 
 Testado em:
 
-- Python 3.8
-- Python 3.9
-- Python 3.10
 - Python 3.11
 - Python 3.12
 - Python 3.13
+- Python 3.14
 
 Como reportar bugs?
 ------------------

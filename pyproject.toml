@@ -8,15 +8,15 @@ authors = [
 readme = "README.md"
 license = { text = "MIT" }
 keywords = ["gov.br", "autenticação", "fastapi", "flask", "django"]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 
 # Dependências essenciais (núcleo)
 dependencies = [
     "httpx",
-    "pyjwt",
+    "PyJWT>=2.13,<3",
     "cryptography",
     "python-dotenv",
-    "pydantic",
+    "pydantic>=2,<3",
     "cereja",
     "python-multipart"
 ]

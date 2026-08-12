@@ -1,7 +1,7 @@
 GovBR Auth - Documentação
 =========================
 
-.. image:: https://img.shields.io/badge/python-3.8%2B-blue
+.. image:: https://img.shields.io/badge/python-3.11%2B-blue
    :target: https://www.python.org/downloads/
    :alt: Python Version
 
