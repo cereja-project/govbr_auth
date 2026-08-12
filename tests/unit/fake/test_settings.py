@@ -38,6 +38,15 @@ def test_fake_settings_reject_non_loopback_by_default(
         FakeGovBrSettings(**valid_settings_data)
 
 
+def test_fake_settings_rejects_remote_issuer_with_loopback_base_url(
+    valid_settings_data: dict[str, object],
+) -> None:
+    valid_settings_data["issuer"] = "https://remote.example.test"
+
+    with pytest.raises(ValidationError, match="fake provider must use a loopback host"):
+        FakeGovBrSettings(**valid_settings_data)
+
+
 @pytest.mark.parametrize(
     "base_url",
     [
