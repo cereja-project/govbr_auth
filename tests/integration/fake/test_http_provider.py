@@ -39,6 +39,7 @@ class LoginFormParser(HTMLParser):
 
     def __init__(self) -> None:
         super().__init__()
+        self.action: str | None = None
         self.request_artifact: str | None = None
         self.subjects: list[str] = []
 
@@ -48,6 +49,8 @@ class LoginFormParser(HTMLParser):
         attrs: list[tuple[str, str | None]],
     ) -> None:
         attributes = dict(attrs)
+        if tag == "form":
+            self.action = attributes.get("action")
         if tag == "input" and attributes.get("name") == "request":
             self.request_artifact = attributes.get("value")
         if tag == "button" and attributes.get("name") == "subject":
@@ -160,6 +163,56 @@ def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> N
         "/jwk",
         "/userinfo",
     }
+
+
+@pytest.mark.asyncio
+async def test_mounted_router_completes_http_flow_with_prefix_and_root_path() -> None:
+    from fastapi import FastAPI
+
+    provider = provider_factory()
+    application = FastAPI(root_path="/gateway")
+    application.include_router(
+        create_fake_govbr_router(
+            provider,
+            prefix="/local-provider",
+            clock=lambda: FIXED_NOW,
+        )
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application, root_path="/gateway"),
+        base_url="http://localhost/gateway",
+    ) as http:
+        authorize_response = await http.get(
+            "/local-provider/authorize",
+            params=authorization_params(),
+        )
+        login_form = parse_login_form(authorize_response.text)
+        login_response = await http.post(
+            login_form.action.removeprefix("/gateway"),
+            data={
+                "request": login_form.request_artifact,
+                "subject": "12345678900",
+            },
+        )
+        redirect_values = oauth_values(login_response.headers["location"])
+        token_response = await http.post(
+            "/local-provider/token",
+            auth=("client-123", "client-secret-marker"),
+            data={
+                "grant_type": "authorization_code",
+                "code": redirect_values["code"][0],
+                "redirect_uri": "http://localhost/callback",
+                "code_verifier": VERIFIER,
+            },
+        )
+
+    assert authorize_response.status_code == 200
+    assert login_form.action == "/gateway/local-provider/login"
+    assert login_response.status_code == 302
+    assert redirect_values["state"] == ["state-123"]
+    assert token_response.status_code == 200
+    assert token_response.json()["token_type"] == "Bearer"
 
 
 @pytest.mark.asyncio

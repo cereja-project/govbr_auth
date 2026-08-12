@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 
 from fastapi import APIRouter, FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import SecretStr
 from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException
@@ -84,7 +84,7 @@ def _build_fake_govbr_routes(
     router = APIRouter(prefix=prefix)
 
     @router.get("/authorize")
-    async def authorize(request: Request):
+    async def authorize(request: Request) -> Response:
         values = _required_text_values(request.query_params, _AUTHORIZATION_FIELDS)
         if values is None:
             return _boundary_error_response(
@@ -108,12 +108,15 @@ def _build_fake_govbr_routes(
             return _oauth_error_response(error)
 
         return HTMLResponse(
-            _render_login_page(session),
+            _render_login_page(
+                session,
+                login_action=request.url_for("fake_govbr_login").path,
+            ),
             headers={"Cache-Control": "no-store"},
         )
 
-    @router.post("/login")
-    async def login(request: Request):
+    @router.post("/login", name="fake_govbr_login")
+    async def login(request: Request) -> Response:
         form = await _read_form(request)
         values = _required_text_values(form, ("request", "subject"))
         if values is None:
@@ -136,7 +139,7 @@ def _build_fake_govbr_routes(
         return RedirectResponse(redirect.redirect_uri, status_code=302)
 
     @router.post("/token")
-    async def token(request: Request):
+    async def token(request: Request) -> Response:
         credentials = _parse_basic_authorization(request.headers.get("authorization"))
         if credentials is None:
             return _boundary_error_response("invalid_client", _CLIENT_INVALID)
@@ -172,11 +175,11 @@ def _build_fake_govbr_routes(
         )
 
     @router.get("/jwk")
-    async def jwk():
+    async def jwk() -> JSONResponse:
         return JSONResponse(dict(provider.jwks()))
 
     @router.get("/userinfo")
-    async def userinfo(request: Request):
+    async def userinfo(request: Request) -> Response:
         access_token = _parse_bearer_authorization(request.headers.get("authorization"))
         if access_token is None:
             return _boundary_error_response("invalid_token", _TOKEN_INVALID)
@@ -189,8 +192,13 @@ def _build_fake_govbr_routes(
     return router
 
 
-def _render_login_page(session: FakeAuthorizationSession) -> str:
+def _render_login_page(
+    session: FakeAuthorizationSession,
+    *,
+    login_action: str,
+) -> str:
     request_value = html.escape(session.request.get_secret_value(), quote=True)
+    action_value = html.escape(login_action, quote=True)
     choices = "".join(_render_user_choice(user) for user in session.users)
     return (
         "<!doctype html>"
@@ -198,7 +206,7 @@ def _render_login_page(session: FakeAuthorizationSession) -> str:
         "<title>FAKE / SIMULAÇÃO</title></head><body>"
         "<h1>FAKE / SIMULAÇÃO</h1>"
         "<p>Provedor local de teste. Não é o portal oficial.</p>"
-        '<form method="post" action="login">'
+        f'<form method="post" action="{action_value}">'
         f'<input type="hidden" name="request" value="{request_value}">'
         f"{choices}</form></body></html>"
     )
