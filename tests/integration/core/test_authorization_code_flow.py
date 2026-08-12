@@ -63,9 +63,7 @@ async def core_client(
         transport=transport,
         base_url=provider.base_url,
     ) as http:
-        jwks_response = await http.get(str(settings.jwks_url))
-        jwks_response.raise_for_status()
-        validator = IdTokenValidator(settings=settings, jwks=jwks_response.json())
+        validator = IdTokenValidator(settings=settings)
         transactions = InMemoryTransactionStore(settings.transaction_secret)
         yield GovBrClient(settings, transactions, validator, http)
 

@@ -43,6 +43,7 @@ class ContractIdTokenValidator:
         id_token: SecretStr,
         expected_nonce: SecretStr,
         *,
+        jwks: Mapping[str, object],
         now: datetime,
     ) -> Mapping[str, object]:
         return {"sub": "12345678900", "nonce": expected_nonce.get_secret_value()}
@@ -54,6 +55,8 @@ async def test_exchange_code_preserves_token_wire_contract() -> None:
 
     def handle(request: httpx.Request) -> httpx.Response:
         requests.append(request)
+        if request.method == "GET":
+            return httpx.Response(200, json={"keys": [{"kid": "contract-key"}]})
         return httpx.Response(
             200,
             json={

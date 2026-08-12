@@ -59,8 +59,8 @@ def jwks(rsa_signing_key: rsa.RSAPrivateKey) -> dict[str, object]:
 
 
 @pytest.fixture
-def validator(settings: GovBrSettings, jwks: dict[str, object]) -> IdTokenValidator:
-    return IdTokenValidator(settings=settings, jwks=jwks)
+def validator(settings: GovBrSettings) -> IdTokenValidator:
+    return IdTokenValidator(settings=settings)
 
 
 @pytest.fixture
@@ -93,10 +93,13 @@ def signed_id_token(
 
 def test_valid_rs256_token_without_azp_returns_claims(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     signed_id_token: SecretStr,
     expected_nonce: SecretStr,
 ) -> None:
-    claims = validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+    claims = validator.validate(
+        signed_id_token, expected_nonce, jwks=jwks, now=FIXED_NOW
+    )
 
     assert claims["sub"] == "12345678900"
     assert claims["nonce"] == expected_nonce.get_secret_value()
@@ -104,17 +107,19 @@ def test_valid_rs256_token_without_azp_returns_claims(
 
 def test_naive_now_rejects_validation_call(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     signed_id_token: SecretStr,
     expected_nonce: SecretStr,
 ) -> None:
     naive_now = FIXED_NOW.replace(tzinfo=None)
 
     with pytest.raises(ValueError, match="now must be timezone-aware"):
-        validator.validate(signed_id_token, expected_nonce, now=naive_now)
+        validator.validate(signed_id_token, expected_nonce, jwks=jwks, now=naive_now)
 
 
 def test_invalid_signature_rejects_id_token_without_leaking_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     other_rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -130,7 +135,7 @@ def test_invalid_signature_rejects_id_token_without_leaking_token(
     with pytest.raises(
         InvalidIdTokenError, match="ID token validation failed"
     ) as error:
-        validator.validate(id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(id_token, expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.InvalidSignatureError)
@@ -139,6 +144,7 @@ def test_invalid_signature_rejects_id_token_without_leaking_token(
 
 def test_hs256_algorithm_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
 ) -> None:
@@ -150,13 +156,14 @@ def test_hs256_algorithm_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_none_algorithm_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
 ) -> None:
@@ -168,13 +175,14 @@ def test_none_algorithm_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_missing_kid_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -182,13 +190,14 @@ def test_missing_kid_rejects_id_token(
     encoded = jwt.encode(valid_claims, rsa_signing_key, algorithm="RS256")
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_unknown_kid_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -201,7 +210,7 @@ def test_unknown_kid_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
@@ -223,13 +232,13 @@ def test_duplicate_kid_rejects_ambiguous_jwks(
         as_dict=True,
     )
     second_public_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
-    validator = IdTokenValidator(
-        settings=settings,
-        jwks={"keys": [first_public_jwk, second_public_jwk]},
-    )
+    ambiguous_jwks = {"keys": [first_public_jwk, second_public_jwk]}
+    validator = IdTokenValidator(settings=settings)
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(
+            signed_id_token, expected_nonce, jwks=ambiguous_jwks, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.PyJWKSetError)
@@ -256,10 +265,13 @@ def test_non_signing_rs256_jwk_rejects_id_token(
     )
     public_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
     public_jwk[jwk_field] = jwk_value
-    validator = IdTokenValidator(settings=settings, jwks={"keys": [public_jwk]})
+    invalid_jwks = {"keys": [public_jwk]}
+    validator = IdTokenValidator(settings=settings)
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(
+            signed_id_token, expected_nonce, jwks=invalid_jwks, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
 
@@ -275,10 +287,13 @@ def test_private_rsa_jwk_rejects_id_token_before_decode(
         as_dict=True,
     )
     private_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
-    validator = IdTokenValidator(settings=settings, jwks={"keys": [private_jwk]})
+    private_jwks = {"keys": [private_jwk]}
+    validator = IdTokenValidator(settings=settings)
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(
+            signed_id_token, expected_nonce, jwks=private_jwks, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.InvalidKeyError)
@@ -294,6 +309,7 @@ def test_private_rsa_jwk_rejects_id_token_before_decode(
 def test_non_exact_issuer_rejects_id_token(
     issuer: str,
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -307,13 +323,14 @@ def test_non_exact_issuer_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_wrong_audience_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -327,13 +344,14 @@ def test_wrong_audience_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_singleton_audience_list_returns_claims(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -350,6 +368,7 @@ def test_singleton_audience_list_returns_claims(
     claims = validator.validate(
         SecretStr(encoded),
         expected_nonce,
+        jwks=jwks,
         now=FIXED_NOW,
     )
 
@@ -358,6 +377,7 @@ def test_singleton_audience_list_returns_claims(
 
 def test_additional_audience_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -372,13 +392,14 @@ def test_additional_audience_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_matching_authorized_party_returns_claims(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -395,6 +416,7 @@ def test_matching_authorized_party_returns_claims(
     claims = validator.validate(
         SecretStr(encoded),
         expected_nonce,
+        jwks=jwks,
         now=FIXED_NOW,
     )
 
@@ -411,6 +433,7 @@ def test_matching_authorized_party_returns_claims(
 def test_invalid_authorized_party_rejects_id_token(
     authorized_party: object,
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -424,7 +447,7 @@ def test_invalid_authorized_party_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
@@ -440,6 +463,7 @@ def test_invalid_authorized_party_rejects_id_token(
 def test_invalid_subject_rejects_id_token(
     subject: object,
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -453,13 +477,14 @@ def test_invalid_subject_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_expired_token_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -473,13 +498,14 @@ def test_expired_token_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_future_iat_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -493,13 +519,14 @@ def test_future_iat_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_future_nbf_rejects_id_token_using_injected_now(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -513,13 +540,14 @@ def test_future_nbf_rejects_id_token_using_injected_now(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_valid_nbf_returns_claims_using_injected_now(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -532,7 +560,9 @@ def test_valid_nbf_returns_claims_using_injected_now(
         headers={"kid": KNOWN_KEY_ID},
     )
 
-    claims = validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+    claims = validator.validate(
+        SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW
+    )
 
     assert claims["nbf"] == valid_claims["nbf"]
 
@@ -551,6 +581,7 @@ def test_valid_nbf_returns_claims_using_injected_now(
 def test_missing_required_claim_rejects_id_token(
     claim_name: str,
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -564,7 +595,7 @@ def test_missing_required_claim_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
@@ -579,6 +610,7 @@ def test_missing_required_claim_rejects_id_token(
 def test_non_numeric_temporal_claim_rejects_id_token(
     claim_name: str,
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -592,7 +624,7 @@ def test_non_numeric_temporal_claim_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
 
@@ -608,6 +640,7 @@ def test_non_numeric_temporal_claim_rejects_id_token(
 def test_non_json_numeric_date_rejects_id_token(
     temporal_value: object,
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -621,7 +654,7 @@ def test_non_json_numeric_date_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.DecodeError)
@@ -629,6 +662,7 @@ def test_non_json_numeric_date_rejects_id_token(
 
 def test_numeric_nonce_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
 ) -> None:
@@ -641,13 +675,16 @@ def test_numeric_nonce_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), SecretStr("123"), now=FIXED_NOW)
+        validator.validate(
+            SecretStr(encoded), SecretStr("123"), jwks=jwks, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
 
 
 def test_unicode_nonce_match_returns_claims(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
 ) -> None:
@@ -662,6 +699,7 @@ def test_unicode_nonce_match_returns_claims(
     claims = validator.validate(
         SecretStr(encoded),
         SecretStr("transação-segura-🔐"),
+        jwks=jwks,
         now=FIXED_NOW,
     )
 
@@ -670,6 +708,7 @@ def test_unicode_nonce_match_returns_claims(
 
 def test_unicode_nonce_mismatch_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
 ) -> None:
@@ -685,6 +724,7 @@ def test_unicode_nonce_mismatch_rejects_id_token(
         validator.validate(
             SecretStr(encoded),
             SecretStr("transação-diferente-🔐"),
+            jwks=jwks,
             now=FIXED_NOW,
         )
 
@@ -693,6 +733,7 @@ def test_unicode_nonce_mismatch_rejects_id_token(
 
 def test_nonce_mismatch_rejects_id_token(
     validator: IdTokenValidator,
+    jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
     valid_claims: dict[str, object],
     expected_nonce: SecretStr,
@@ -706,7 +747,7 @@ def test_nonce_mismatch_rejects_id_token(
     )
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(SecretStr(encoded), expected_nonce, now=FIXED_NOW)
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
 
     assert error.value.code == "invalid_id_token"
     assert error.value.__cause__ is None
@@ -725,10 +766,12 @@ def test_malformed_jwks_rejects_id_token(
     signed_id_token: SecretStr,
     expected_nonce: SecretStr,
 ) -> None:
-    validator = IdTokenValidator(settings=settings, jwks=jwks_payload)
+    validator = IdTokenValidator(settings=settings)
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(
+            signed_id_token, expected_nonce, jwks=jwks_payload, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.PyJWKSetError)
@@ -751,10 +794,12 @@ def test_non_mapping_jwks_rejects_id_token(
 ) -> None:
     # Deliberately cross the static boundary to verify hostile JSON input at runtime.
     invalid_jwks = cast(Mapping[str, object], jwks_payload)
-    validator = IdTokenValidator(settings=settings, jwks=invalid_jwks)
+    validator = IdTokenValidator(settings=settings)
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(
+            signed_id_token, expected_nonce, jwks=invalid_jwks, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.PyJWKSetError)
@@ -777,13 +822,13 @@ def test_mixed_jwks_with_malformed_member_rejects_entire_set(
         "kty": "RSA",
         "use": "sig",
     }
-    validator = IdTokenValidator(
-        settings=settings,
-        jwks={"keys": [public_jwk, malformed_jwk]},
-    )
+    mixed_jwks = {"keys": [public_jwk, malformed_jwk]}
+    validator = IdTokenValidator(settings=settings)
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(
+            signed_id_token, expected_nonce, jwks=mixed_jwks, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.PyJWKError)
@@ -811,10 +856,13 @@ def test_malformed_jwk_field_rejects_id_token(
     )
     public_jwk.update({"alg": "RS256", "kid": KNOWN_KEY_ID, "use": "sig"})
     public_jwk[jwk_field] = jwk_value
-    validator = IdTokenValidator(settings=settings, jwks={"keys": [public_jwk]})
+    invalid_jwks = {"keys": [public_jwk]}
+    validator = IdTokenValidator(settings=settings)
 
     with pytest.raises(InvalidIdTokenError) as error:
-        validator.validate(signed_id_token, expected_nonce, now=FIXED_NOW)
+        validator.validate(
+            signed_id_token, expected_nonce, jwks=invalid_jwks, now=FIXED_NOW
+        )
 
     assert error.value.code == "invalid_id_token"
     assert isinstance(error.value.__cause__, jwt.PyJWKError)

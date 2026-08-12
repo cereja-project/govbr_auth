@@ -22,6 +22,7 @@ SENSITIVE_CODE = "sensitive-authorization-code"
 SENSITIVE_STATE = "sensitive-oauth-state"
 SENSITIVE_ACCESS_TOKEN = "sensitive-access-token"
 SENSITIVE_ID_TOKEN = "sensitive-id-token"
+SENSITIVE_JWK = "sensitive-jwk-material"
 SENSITIVE_CLIENT_SECRET = "sensitive-client-secret"
 VALIDATED_SUBJECT = "12345678900"
 SUBSTITUTED_SUBJECT = "98765432100"
@@ -53,16 +54,19 @@ class RecordingIdTokenValidator:
 
     def __init__(self, *, error: InvalidIdTokenError | None = None) -> None:
         self.error = error
-        self.calls: list[tuple[SecretStr, SecretStr, datetime]] = []
+        self.calls: list[
+            tuple[SecretStr, SecretStr, Mapping[str, object], datetime]
+        ] = []
 
     def validate(
         self,
         id_token: SecretStr,
         expected_nonce: SecretStr,
         *,
+        jwks: Mapping[str, object],
         now: datetime,
     ) -> Mapping[str, object]:
-        self.calls.append((id_token, expected_nonce, now))
+        self.calls.append((id_token, expected_nonce, jwks, now))
         if self.error is not None:
             raise self.error
         return {
@@ -98,6 +102,10 @@ def _token_response() -> dict[str, object]:
     }
 
 
+def _jwks_response() -> dict[str, object]:
+    return {"keys": [{"kid": "provider-rsa-key"}]}
+
+
 def _assert_error_is_sanitized(error: BaseException) -> None:
     messages: list[str] = []
     pending = [error]
@@ -118,6 +126,7 @@ def _assert_error_is_sanitized(error: BaseException) -> None:
     assert SENSITIVE_STATE not in rendered
     assert SENSITIVE_ACCESS_TOKEN not in rendered
     assert SENSITIVE_ID_TOKEN not in rendered
+    assert SENSITIVE_JWK not in rendered
     assert SENSITIVE_CLIENT_SECRET not in rendered
     assert VALIDATED_SUBJECT not in rendered
     assert SUBSTITUTED_SUBJECT not in rendered
@@ -142,7 +151,9 @@ async def test_exchange_code_returns_tokens_and_claims_after_single_state_consum
 
     def handle(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        return httpx.Response(200, json=_token_response())
+        if str(request.url) == str(settings.token_url):
+            return httpx.Response(200, json=_token_response())
+        return httpx.Response(200, json=_jwks_response())
 
     transactions = RecordingTransactionStore()
     validator = RecordingIdTokenValidator()
@@ -162,11 +173,246 @@ async def test_exchange_code_returns_tokens_and_claims_after_single_state_consum
         "nonce": "sensitive-expected-nonce",
     }
     assert transactions.consume_calls == [(SENSITIVE_STATE, FIXED_NOW)]
-    validated_token, validated_nonce, validated_now = validator.calls[0]
+    validated_token, validated_nonce, validated_jwks, validated_now = validator.calls[0]
     assert validated_token.get_secret_value() == SENSITIVE_ID_TOKEN
     assert validated_nonce.get_secret_value() == "sensitive-expected-nonce"
+    assert validated_jwks == _jwks_response()
     assert validated_now == FIXED_NOW
-    assert len(requests) == 1
+    assert [(request.method, request.url) for request in requests] == [
+        ("POST", httpx.URL("https://sso.example.test/token")),
+        ("GET", httpx.URL("https://sso.example.test/jwk")),
+    ]
+    assert requests[1].extensions["timeout"] == {
+        "connect": 2.0,
+        "read": 3.0,
+        "write": 3.0,
+        "pool": 2.0,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("transport_error", "expected_message", "expected_cause"),
+    [
+        pytest.param(
+            httpx.ReadTimeout,
+            "Gov.br provider request timed out",
+            "Gov.br HTTP transport failed (ReadTimeout)",
+            id="timeout",
+        ),
+        pytest.param(
+            httpx.ConnectError,
+            "Gov.br provider request failed",
+            "Gov.br HTTP transport failed (ConnectError)",
+            id="transport",
+        ),
+    ],
+)
+async def test_exchange_code_sanitizes_jwks_transport_failures(
+    transport_error: type[httpx.TransportError],
+    expected_message: str,
+    expected_cause: str,
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == str(settings.token_url):
+            return httpx.Response(200, json=_token_response())
+        raise transport_error(SENSITIVE_JWK, request=request)
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            ProviderUnavailableError,
+            match=expected_message,
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    assert validator.calls == []
+    _assert_safe_cause(
+        error.value,
+        cause_type=RuntimeError,
+        cause_message=expected_cause,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "expected_message", "expected_error_type"),
+    [
+        pytest.param(
+            400,
+            "Gov.br rejected the JWKS request",
+            ProviderRejectedError,
+            id="rejected",
+        ),
+        pytest.param(
+            500,
+            "Gov.br provider request failed",
+            ProviderUnavailableError,
+            id="unavailable",
+        ),
+    ],
+)
+async def test_exchange_code_sanitizes_jwks_error_statuses(
+    status_code: int,
+    expected_message: str,
+    expected_error_type: type[GovBrAuthError],
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == str(settings.token_url):
+            return httpx.Response(200, json=_token_response())
+        return httpx.Response(status_code, text=SENSITIVE_JWK)
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(expected_error_type, match=expected_message) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    assert validator.calls == []
+    _assert_safe_cause(
+        error.value,
+        cause_type=RuntimeError,
+        cause_message=f"Gov.br provider returned HTTP status {status_code}",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("content", "failure_type"),
+    [
+        pytest.param(
+            f"not-json {SENSITIVE_JWK}".encode(),
+            "JSONDecodeError",
+            id="invalid_json",
+        ),
+        pytest.param(
+            b"\xff" + SENSITIVE_JWK.encode(),
+            "UnicodeDecodeError",
+            id="invalid_unicode",
+        ),
+    ],
+)
+async def test_exchange_code_rejects_invalid_jwks_encoding_without_exposure(
+    content: bytes,
+    failure_type: str,
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == str(settings.token_url):
+            return httpx.Response(200, json=_token_response())
+        return httpx.Response(200, content=content)
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br JWKS response is invalid",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    assert validator.calls == []
+    _assert_safe_cause(
+        error.value,
+        cause_type=ValueError,
+        cause_message=f"Gov.br response validation failed ({failure_type})",
+    )
+
+
+@pytest.mark.asyncio
+async def test_exchange_code_rejects_non_mapping_jwks_response(
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == str(settings.token_url):
+            return httpx.Response(200, json=_token_response())
+        return httpx.Response(200, json=[{"keys": [SENSITIVE_JWK]}])
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br JWKS response is invalid",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    assert validator.calls == []
+    _assert_safe_cause(
+        error.value,
+        cause_type=ValueError,
+        cause_message="Gov.br response validation failed (InvalidJwks)",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param({}, id="missing_keys"),
+        pytest.param({"keys": []}, id="empty_keys"),
+        pytest.param({"keys": SENSITIVE_JWK}, id="non_list_keys"),
+        pytest.param({"keys": [SENSITIVE_JWK]}, id="non_mapping_key"),
+        pytest.param({"keys": [{}]}, id="empty_key"),
+    ],
+)
+async def test_exchange_code_rejects_empty_or_malformed_jwks_keys(
+    payload: object,
+    settings: GovBrSettings,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == str(settings.token_url):
+            return httpx.Response(200, json=_token_response())
+        return httpx.Response(200, json=payload)
+
+    transactions = RecordingTransactionStore()
+    validator = RecordingIdTokenValidator()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = GovBrClient(settings, transactions, validator, http)
+
+        with pytest.raises(
+            GovBrAuthError,
+            match="Gov.br JWKS response is invalid",
+        ) as error:
+            await client.exchange_code(
+                code=SENSITIVE_CODE,
+                state=SENSITIVE_STATE,
+                now=FIXED_NOW,
+            )
+
+    assert validator.calls == []
+    _assert_safe_cause(
+        error.value,
+        cause_type=ValueError,
+        cause_message="Gov.br response validation failed (InvalidJwks)",
+    )
 
 
 @pytest.mark.asyncio
@@ -620,7 +866,9 @@ async def test_exchange_code_propagates_invalid_id_token_after_consuming_state_o
     settings: GovBrSettings,
 ) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=_token_response())
+        if str(request.url) == str(settings.token_url):
+            return httpx.Response(200, json=_token_response())
+        return httpx.Response(200, json=_jwks_response())
 
     transactions = RecordingTransactionStore()
     validator = RecordingIdTokenValidator(

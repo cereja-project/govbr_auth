@@ -7,6 +7,7 @@ from govbr_auth.fake.artifacts import (
     FakeArtifactCodec,
 )
 from govbr_auth.fake.models import FakeClient, FakeUser
+from govbr_auth.fake.signing import FakeSigningKey, FakeTokenIssuer
 from govbr_auth.fake.settings import FakeGovBrSettings
 from govbr_auth.fake.stores import (
     AuthorizationCodeReplayStore,
@@ -23,6 +24,8 @@ __all__ = [
     "FakeClient",
     "FakeArtifactCodec",
     "FakeGovBrSettings",
+    "FakeSigningKey",
+    "FakeTokenIssuer",
     "FakeUser",
     "FakeUserStore",
     "InMemoryAuthorizationCodeReplayStore",
