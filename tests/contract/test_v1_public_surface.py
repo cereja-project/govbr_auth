@@ -9,6 +9,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 from packaging.requirements import Requirement
 
 import govbr_auth
@@ -28,7 +29,20 @@ def test_top_level_exports_exact_fastapi_v1_surface() -> None:
         "AuthSuccessHandler",
         "GovBrAuth",
         "create_govbr_router",
+        "generate_transaction_secret",
     )
+
+
+def test_generate_transaction_secret_returns_valid_unique_fernet_keys() -> None:
+    first_secret = govbr_auth.generate_transaction_secret()
+    second_secret = govbr_auth.generate_transaction_secret()
+
+    first_fernet = Fernet(first_secret.encode("ascii"))
+    encrypted = first_fernet.encrypt(b"transaction-state")
+
+    assert first_fernet.decrypt(encrypted) == b"transaction-state"
+    assert len(first_secret) == 44
+    assert first_secret != second_secret
 
 
 def test_core_exports_exact_async_v1_surface() -> None:

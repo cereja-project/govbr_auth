@@ -100,3 +100,28 @@ def test_local_environment_example_configures_every_consumer_url_on_loopback(
         settings.jwks_url,
     ):
         assert urlsplit(str(url)).hostname == "localhost"
+
+
+def test_transaction_secret_documentation_explains_generation_and_storage() -> None:
+    required_guidance = (
+        "generate_transaction_secret()",
+        "gere uma vez",
+        "mantenha o valor secreto",
+        "mesmo valor em todas as instâncias",
+    )
+    documented_sources = (
+        (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8").lower(),
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8").lower(),
+        (DOCS_ROOT / "guide" / "configuration.rst").read_text(encoding="utf-8").lower(),
+    )
+
+    documented_requirements = tuple(
+        tuple(guidance in source for guidance in required_guidance)
+        for source in documented_sources
+    )
+
+    assert documented_requirements == (
+        (True, True, True, True),
+        (True, True, True, True),
+        (True, True, True, True),
+    )

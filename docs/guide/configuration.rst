@@ -13,13 +13,25 @@ redirect e o segredo local de transações do consumidor:
     GOVBR_CLIENT_ID=seu-client-id
     GOVBR_CLIENT_SECRET=seu-client-secret
     GOVBR_REDIRECT_URI=https://app.example/auth/govbr/callback
-    GOVBR_TRANSACTION_SECRET=uma-chave-fernet-do-consumidor
+    GOVBR_TRANSACTION_SECRET=substitua-pelo-valor-gerado
     GOVBR_ISSUER=https://sso.acesso.gov.br/
     GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
 
 ``GOVBR_TRANSACTION_SECRET`` protege ``state``, nonce e PKCE armazenados pelo
 consumidor. Não é uma credencial fornecida pelo provedor e deve permanecer
 secreto e estável entre processos do mesmo deployment.
+
+Gere uma vez e copie a saída para o ``.env``:
+
+.. code-block:: python
+
+    from govbr_auth import generate_transaction_secret
+
+    print(generate_transaction_secret())
+
+Mantenha o valor secreto e use o mesmo valor em todas as instâncias do
+deployment. Não gere uma chave nova a cada inicialização: o valor estável é
+necessário para validar transações iniciadas por outra instância.
 
 Configuração explícita
 ----------------------
@@ -36,7 +48,7 @@ Configuração explícita
         client_id="seu-client-id",
         client_secret=SecretStr("seu-client-secret"),
         redirect_uri="https://app.example/auth/govbr/callback",
-        transaction_secret=SecretStr("uma-chave-fernet-do-consumidor"),
+        transaction_secret=SecretStr("substitua-pelo-valor-gerado"),
         issuer="https://sso.acesso.gov.br/",
         jwks_url="https://sso.acesso.gov.br/jwk",
     )
