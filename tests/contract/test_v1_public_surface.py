@@ -165,7 +165,7 @@ def test_base_dependencies_are_exactly_fastapi_consumer_dependencies() -> None:
 def test_project_version_is_static_without_importing_runtime_dependencies() -> None:
     metadata = _project_metadata()
 
-    assert metadata["version"] == "0.2.2"
+    assert metadata["version"] == "1.0.0rc1"
     assert "dynamic" not in metadata
 
 
@@ -186,6 +186,7 @@ def test_optional_dependencies_split_fake_demo_and_development_tools() -> None:
         "build",
         "flake8",
         "pytest-cov",
+        "PyYAML",
     ]
 
 

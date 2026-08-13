@@ -7,6 +7,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+## [1.0.0-rc1] - 2026-08-13
+
+### Added
+- Adicionada demonstração local instalável com ``pip install "govbr-auth[demo]"`` e executável por ``python -m govbr_auth.demo``.
+- Adicionadas documentação de início rápido e publicação estática no GitHub Pages, com validação HTML e de links no CI.
+- Adicionado handler de erro opcional ``on_error`` para consumidores que escolherem tratar falhas de autenticação no adaptador FastAPI.
+
 ## [0.2.2] - 2026-06-19
 
 ### Added

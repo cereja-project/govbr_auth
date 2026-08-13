@@ -1,6 +1,6 @@
 [project]
 name = "govbr-auth"
-version = "0.2.2"
+version = "1.0.0rc1"
 description = "Biblioteca assíncrona de autenticação com o Gov.br para FastAPI."
 authors = [
     { name="Joab Leite", email="leitejoab@gmail.com" }
@@ -22,7 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 fake = ["python-multipart"]
 demo = ["python-multipart", "uvicorn"]
-dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "flake8", "pytest-cov"]
+dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "flake8", "pytest-cov", "PyYAML"]
 
 [tool.setuptools]
 include-package-data = false

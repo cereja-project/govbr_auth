@@ -16,5 +16,5 @@ __all__ = (
     "generate_transaction_secret",
 )
 
-VERSION = "0.2.2.final.0"
-__version__ = "0.2.2"
+VERSION = "1.0.0rc1"
+__version__ = "1.0.0rc1"
