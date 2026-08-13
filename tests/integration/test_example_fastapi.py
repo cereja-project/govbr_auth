@@ -2,6 +2,7 @@
 
 import importlib
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -21,6 +22,51 @@ from govbr_auth.fake import (
 )
 
 FIXED_NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
+
+
+def test_settings_from_environment_loads_dotenv_without_overriding_process(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    dotenv = tmp_path / ".env"
+    dotenv.write_text(
+        "\n".join(
+            (
+                "GOVBR_ENVIRONMENT=local",
+                "GOVBR_AUTHORIZATION_URL=http://localhost/fake-govbr/authorize",
+                "GOVBR_TOKEN_URL=http://localhost/fake-govbr/token",
+                "GOVBR_USERINFO_URL=http://localhost/fake-govbr/userinfo",
+                "GOVBR_CLIENT_ID=dotenv-client",
+                "GOVBR_CLIENT_SECRET=dotenv-secret",
+                "GOVBR_REDIRECT_URI=http://localhost/auth/govbr/callback",
+                f"GOVBR_TRANSACTION_SECRET={Fernet.generate_key().decode('ascii')}",
+                "GOVBR_ISSUER=http://localhost/fake-govbr/",
+                "GOVBR_JWKS_URL=http://localhost/fake-govbr/jwk",
+            )
+        ),
+        encoding="utf-8",
+    )
+    for variable in (
+        "GOVBR_ENVIRONMENT",
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_USERINFO_URL",
+        "GOVBR_CLIENT_ID",
+        "GOVBR_CLIENT_SECRET",
+        "GOVBR_REDIRECT_URI",
+        "GOVBR_TRANSACTION_SECRET",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv("GOVBR_CLIENT_ID", "process-client")
+    monkeypatch.chdir(tmp_path)
+    example = importlib.import_module("examples.example_fastapi")
+
+    settings = example.settings_from_environment()
+
+    assert settings.client_id == "process-client"
+    assert str(settings.authorization_url) == ("http://localhost/fake-govbr/authorize")
 
 
 @pytest.mark.asyncio
