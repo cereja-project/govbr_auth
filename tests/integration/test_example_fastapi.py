@@ -70,7 +70,7 @@ def test_settings_from_environment_loads_dotenv_without_overriding_process(
 
 
 @pytest.mark.asyncio
-async def test_recommended_development_bootstrap_completes_mounted_fake_flow(
+async def test_development_bootstrap_completes_mounted_fake_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider_base_url = "http://localhost/fake-govbr"

@@ -169,13 +169,14 @@ def test_project_version_is_static_without_importing_runtime_dependencies() -> N
     assert "dynamic" not in metadata
 
 
-def test_optional_dependencies_split_fake_transport_from_development_tools() -> None:
+def test_optional_dependencies_split_fake_demo_and_development_tools() -> None:
     metadata = _project_metadata()
 
     optional_dependencies = metadata["optional-dependencies"]
 
-    assert set(optional_dependencies) == {"dev", "fake"}
+    assert set(optional_dependencies) == {"demo", "dev", "fake"}
     assert optional_dependencies["fake"] == ["python-multipart"]
+    assert optional_dependencies["demo"] == ["python-multipart", "uvicorn"]
     assert optional_dependencies["dev"] == [
         "uvicorn",
         "pytest",

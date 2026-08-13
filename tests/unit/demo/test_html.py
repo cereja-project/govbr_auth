@@ -1,3 +1,5 @@
+import pytest
+
 from govbr_auth.core import GovBrUser
 from govbr_auth.demo._html import render_error, render_home, render_success
 
@@ -30,7 +32,7 @@ def test_success_escapes_user_derived_values() -> None:
     user = GovBrUser(
         sub='<script>alert("subject")</script>',
         name='<img src=x onerror=alert("name")>',
-        email='ana&demo@example.test',
+        email="ana&demo@example.test",
     )
 
     page = render_success(user)
@@ -57,3 +59,18 @@ def test_error_replaces_unknown_code_that_could_contain_a_secret() -> None:
 
     assert "govbr_auth_error" in page
     assert secret not in page
+
+
+@pytest.mark.parametrize(
+    "code,status_code",
+    (("invalid_callback", 400), ("internal_error", 500)),
+    ids=("invalid-callback", "internal-error"),
+)
+def test_error_preserves_demo_boundary_error_codes(
+    code: str,
+    status_code: int,
+) -> None:
+    page = render_error(code=code, status_code=status_code)
+
+    assert code in page
+    assert "govbr_auth_error" not in page

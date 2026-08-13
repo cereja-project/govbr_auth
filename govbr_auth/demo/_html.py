@@ -4,7 +4,6 @@ from html import escape
 
 from govbr_auth.core import GovBrUser
 
-
 _ERROR_GUIDANCE = {
     "govbr_auth_error": "Não foi possível concluir a autenticação. Tente novamente mais tarde.",
     "invalid_state": "Tente iniciar novamente o fluxo de autenticação.",
@@ -12,6 +11,8 @@ _ERROR_GUIDANCE = {
     "invalid_id_token": "Não foi possível validar a autenticação. Tente iniciar novamente.",
     "provider_rejected": "O Gov.br recusou a solicitação. Tente novamente mais tarde.",
     "provider_unavailable": "O Gov.br está indisponível no momento. Tente novamente mais tarde.",
+    "invalid_callback": "O retorno da autenticação é inválido. Inicie novamente o fluxo.",
+    "internal_error": "Ocorreu uma falha interna. Tente novamente mais tarde.",
 }
 
 
@@ -20,7 +21,7 @@ def render_home() -> str:
     return _page(
         title="Showcase de autenticação Gov.br",
         body=(
-            "<p class=\"badge\">FAKE / SIMULAÇÃO</p>"
+            '<p class="badge">FAKE / SIMULAÇÃO</p>'
             "<h1>Teste o fluxo de autenticação Gov.br localmente</h1>"
             "<p>Execute o fluxo sem credenciais Gov.br nem serviços externos.</p>"
             "<ol><li>Redirecionar</li><li>Escolher usuário</li><li>Validar callback</li></ol>"
