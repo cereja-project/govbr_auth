@@ -4,10 +4,12 @@ import os
 from contextlib import asynccontextmanager
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
 from cryptography.fernet import Fernet
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, Response
 from pydantic import SecretStr
@@ -29,6 +31,7 @@ def utc_now() -> datetime:
 
 def settings_from_environment() -> GovBrSettings:
     """Load only provider endpoints, credentials, and transaction configuration."""
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     return GovBrSettings(
         environment=ProviderEnvironment(
             os.environ.get("GOVBR_ENVIRONMENT", "production")
