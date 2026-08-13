@@ -21,6 +21,7 @@ from govbr_auth.core.models import GovBrUser, TokenSet
 
 __all__ = [
     "AuthContext",
+    "AuthErrorHandler",
     "AuthSuccessHandler",
     "GovBrAuth",
     "create_govbr_router",
@@ -45,12 +46,14 @@ class AuthContext:
 
 
 AuthSuccessHandler = Callable[[AuthContext], Awaitable[Response]]
+AuthErrorHandler = Callable[[GovBrAuthError], Awaitable[Response]]
 
 
 def create_govbr_router(
     *,
     client: GovBrClient,
     on_success: AuthSuccessHandler,
+    on_error: AuthErrorHandler | None = None,
     expose_tokens: bool = False,
     prefix: str = "/auth/govbr",
     clock: Callable[[], datetime] = utc_now,
@@ -75,6 +78,8 @@ def create_govbr_router(
                 expected_subject=expected_subject,
             )
         except GovBrAuthError as error:
+            if on_error is not None:
+                return await on_error(error)
             return _auth_error_response(error)
 
         context = AuthContext(
@@ -95,6 +100,7 @@ class GovBrAuth:
         *,
         client: GovBrClient,
         on_success: AuthSuccessHandler,
+        on_error: AuthErrorHandler | None = None,
         expose_tokens: bool = False,
         prefix: str = "/auth/govbr",
         clock: Callable[[], datetime] = utc_now,
@@ -102,6 +108,7 @@ class GovBrAuth:
         self.router = create_govbr_router(
             client=client,
             on_success=on_success,
+            on_error=on_error,
             expose_tokens=expose_tokens,
             prefix=prefix,
             clock=clock,

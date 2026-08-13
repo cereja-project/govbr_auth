@@ -241,6 +241,42 @@ async def test_callback_maps_upstream_failures_to_safe_responses(
 
 
 @pytest.mark.asyncio
+async def test_callback_delegates_authentication_failures_to_opted_in_handler() -> None:
+    from govbr_auth.core.errors import InvalidStateError
+    from govbr_auth.fastapi import create_govbr_router
+
+    client = RecordingClient(exchange_error=InvalidStateError("sensitive state"))
+    received_errors = []
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    async def error_handler(error) -> Response:
+        received_errors.append(error)
+        return Response(
+            "<h1>Authentication failed</h1>",
+            status_code=400,
+            media_type="text/html",
+        )
+
+    app = FastAPI()
+    app.include_router(
+        create_govbr_router(
+            client=client,
+            on_success=success_handler,
+            on_error=error_handler,
+            clock=lambda: FIXED_NOW,
+        )
+    )
+
+    response = await request(app, "/auth/govbr/callback?code=code&state=state")
+
+    assert response.status_code == 400
+    assert response.text == "<h1>Authentication failed</h1>"
+    assert received_errors == [client.exchange_error]
+
+
+@pytest.mark.asyncio
 async def test_callback_propagates_handler_exceptions_unchanged() -> None:
     from govbr_auth.fastapi import create_govbr_router
 
