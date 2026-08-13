@@ -1,9 +1,22 @@
-Provedor fake local
-===================
+Demo, fake e provedor oficial
+==============================
 
-O fake é um provedor OAuth/OpenID Connect explícito para desenvolvimento. Seus
-símbolos existem somente em ``govbr_auth.fake`` e exigem o extra ``[fake]``.
-Ele não é fallback do cliente oficial e não é ativado por configuração.
+================  ===============================  ==============================
+Modo              Uso                              Entrada
+================  ===============================  ==============================
+``demo``          Avaliar a biblioteca sem código  ``python -m govbr_auth.demo``
+``fake``          Integrar o provedor em uma app   ``govbr_auth.fake``
+oficial           Homologação e produção           ``GovBrSettings`` + credenciais
+================  ===============================  ==============================
+
+A ``demo`` é uma demonstração empacotada: instale ``[demo]`` e execute o
+comando da tabela para conhecer o fluxo em loopback. Ela não usa credenciais
+Gov.br e não substitui a integração da sua aplicação.
+
+O ``fake`` é um provedor OAuth/OpenID Connect explícito para desenvolvimento.
+Seus símbolos existem somente em ``govbr_auth.fake`` e exigem o extra
+``[fake]``. Ele não é fallback do cliente oficial e não é ativado por
+configuração.
 
 Use a factory pronta::
 

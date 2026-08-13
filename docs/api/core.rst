@@ -18,7 +18,7 @@ Cliente e autorização
 .. autoclass:: govbr_auth.core.AuthenticationResult
 
 Transações e validação
----------------------
+----------------------
 
 .. autoclass:: govbr_auth.core.InMemoryTransactionStore
 

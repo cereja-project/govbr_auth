@@ -1,37 +1,38 @@
-Quick start FastAPI
-===================
+Teste local em dois comandos
+=============================
 
 Instalação
 ----------
 
-Instale o cliente e o adaptador FastAPI::
+Instale a demonstração empacotada::
 
-    pip install govbr-auth
+    python -m pip install "govbr-auth[demo]"
 
-Para executar também o provedor local explícito::
+Execução
+--------
 
-    pip install "govbr-auth[fake]"
+Inicie a demonstração local::
 
-Exemplo executável
-------------------
+    python -m govbr_auth.demo
 
-Defina as variáveis descritas em :doc:`configuration` e inicie o consumidor::
+Abra ``http://localhost:8000``. A demonstração escuta somente no loopback e não
+usa credenciais Gov.br.
 
-    uvicorn examples.example_fastapi:create_app --factory
+Fluxo guiado
+------------
 
-A factory cria ``GovBrSettings``, ``GovBrClient`` e ``GovBrAuth``. O endpoint
-``/auth/govbr/login`` inicia o fluxo e ``/auth/govbr/callback`` entrega ao
-handler apenas usuário e claims validados. Tokens brutos continuam ocultos por
-padrão.
+1. Clique em **Entrar com Gov.br**.
+2. Escolha um usuário fictício na tela do provedor local.
+3. Acompanhe o retorno para o callback: a página mostra o usuário e as claims
+   validadas, sem expor tokens brutos.
 
-Desenvolvimento local
----------------------
+O que usar depois da demonstração
+---------------------------------
 
-O fake não é ativado por flag nem por detecção de URL. Configure os endpoints
-de loopback e execute explicitamente::
+Para integrar a sua aplicação com o Gov.br, siga a :doc:`configuration` e
+execute o seu consumidor FastAPI. Para testar essa integração sem credenciais
+oficiais, monte explicitamente o provedor de desenvolvimento em
+:doc:`fake-mode`; ele não é ativado por uma flag nem por detecção de URL.
 
-    uvicorn examples.example_fastapi:create_development_app --factory
-
-Essa factory preserva o mesmo consumidor e handler, monta separadamente as
-rotas do provedor fake e muda somente a configuração dos endpoints e
-credenciais.
+O projeto é comunitário e não é mantido, homologado nem endossado pelo Governo
+Federal.

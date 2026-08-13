@@ -4,6 +4,20 @@ Biblioteca assíncrona para integrar autenticação Gov.br a aplicações FastAP
 O cliente oficial valida state/PKCE, tokens RS256 por JWKS, issuer, audience,
 nonce e vínculo de subject antes de entregar o usuário ao handler da aplicação.
 
+Este é um projeto comunitário: não é mantido, homologado nem endossado pelo
+Governo Federal.
+
+## Teste local em dois comandos
+
+```bash
+python -m pip install "govbr-auth[demo]"
+python -m govbr_auth.demo
+```
+
+Abra `http://localhost:8000`, clique em **Entrar com Gov.br**, escolha um
+usuário fictício e acompanhe o callback validado. A simulação roda somente em
+loopback e não usa credenciais Gov.br.
+
 ## Requisitos e instalação
 
 - Python 3.11+
@@ -13,7 +27,8 @@ nonce e vínculo de subject antes de entregar o usuário ao handler da aplicaç�
 python -m pip install govbr-auth
 ```
 
-O provedor local explícito é opcional:
+Para integrar um provedor local explícito na sua própria aplicação, instale o
+extra opcional `[fake]`:
 
 ```bash
 python -m pip install "govbr-auth[fake]"
@@ -26,7 +41,7 @@ python -m pip install -r requirements-dev.txt
 python -m pytest --tb=short --disable-warnings -q
 ```
 
-## Exemplo FastAPI
+## Integração com o provedor oficial
 
 Configure endpoints e credenciais do provedor, além do segredo local usado pelo
 consumidor para proteger suas transações:
@@ -57,7 +72,7 @@ print(generate_transaction_secret())
 Mantenha o valor secreto e use o mesmo valor em todas as instâncias do
 deployment. Não gere uma chave nova a cada inicialização.
 
-Execute o consumidor:
+Execute o consumidor configurado para o provedor oficial:
 
 ```bash
 uvicorn examples.example_fastapi:create_app --factory
@@ -68,11 +83,11 @@ seleção do provedor ocorre exclusivamente pela configuração. O handler receb
 `AuthContext` com usuário e claims validados; tokens brutos só são incluídos
 quando a aplicação opta explicitamente por `expose_tokens=True`.
 
-## Fake Gov.br local
+## Provedor fake local para integração
 
-O fake nunca é ativado por flag nem por detecção de URL. Instale o extra
-`[fake]`, configure URLs locais e inicie explicitamente o bootstrap de
-desenvolvimento:
+O fake nunca é ativado por flag nem por detecção de URL. Ele existe em
+`govbr_auth.fake`; instale o extra `[fake]`, configure URLs locais e inicie
+explicitamente o bootstrap de desenvolvimento:
 
 ```bash
 uvicorn examples.example_fastapi:create_development_app --factory

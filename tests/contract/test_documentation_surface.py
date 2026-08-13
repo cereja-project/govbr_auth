@@ -125,3 +125,26 @@ def test_transaction_secret_documentation_explains_generation_and_storage() -> N
         (True, True, True, True),
         (True, True, True, True),
     )
+
+
+def test_installable_demo_command_is_consistent_across_entry_documents() -> None:
+    required_commands = (
+        'pip install "govbr-auth[demo]"',
+        "python -m govbr_auth.demo",
+        "http://localhost:8000",
+    )
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+    )
+
+    assert tuple(tuple(command in source for command in required_commands) for source in sources) == (
+        (True, True, True),
+        (True, True, True),
+    )
+
+
+def test_docs_distinguish_demo_fake_and_official_provider() -> None:
+    source = (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8")
+
+    assert all(term in source for term in ("[demo]", "[fake]", "provedor oficial"))

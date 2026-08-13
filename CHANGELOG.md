@@ -109,6 +109,6 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## Links
 
 - [Repositório GitHub](https://github.com/cereja-project/govbr_auth)
-- [Documentação](https://github.com/cereja-project/govbr_auth#readme)
+- [Documentação](https://govbr-auth.readthedocs.io/)
 - [Issues](https://github.com/cereja-project/govbr_auth/issues)
 

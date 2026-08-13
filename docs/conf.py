@@ -53,7 +53,6 @@ html_theme_options = {
     'analytics_id': '',
     'canonical_url': 'https://govbr-auth.readthedocs.io/',
     'logo_only': False,
-    'display_version': True,
     'prev_next_buttons_location': 'bottom',
     'style_external_links': False,
     'vcs_pageview_mode': '',
@@ -77,7 +76,7 @@ intersphinx_mapping = {
 pygments_style = 'sphinx'
 
 # HTML output directory
-html_static_path = ['_static']
+html_static_path = []
 
 # Napoleon extension settings (for Google style docstrings)
 napoleon_google_docstring = True
@@ -90,8 +89,4 @@ napoleon_use_admonition_for_notes = True
 napoleon_use_admonition_for_references = False
 napoleon_use_param_annotations = False
 napoleon_use_rtype_annotations = True
-
-# Add any paths that contain custom static files here
-if os.path.exists('_static'):
-    html_static_path.append('_static')
 

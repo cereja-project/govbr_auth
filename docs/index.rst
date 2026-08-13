@@ -12,6 +12,7 @@ OpenID Connect. O cliente valida ``state``, tokens RS256 por JWKS, ``issuer``,
    guide/quick-start
    guide/configuration
    guide/fake-mode
+   guide/troubleshooting
 
 .. toctree::
    :maxdepth: 2

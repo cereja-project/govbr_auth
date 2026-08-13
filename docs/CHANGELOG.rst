@@ -16,4 +16,5 @@ distribuição. Essa limitação é exclusiva do fake e não se aplica ao proved
 oficial Gov.br.
 
 .. include:: ../CHANGELOG.md
+   :parser: myst_parser.sphinx_
 
