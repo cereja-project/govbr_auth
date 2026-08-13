@@ -6,6 +6,7 @@ from govbr_auth.core import GovBrUser
 
 
 _ERROR_GUIDANCE = {
+    "govbr_auth_error": "Não foi possível concluir a autenticação. Tente novamente mais tarde.",
     "invalid_state": "Tente iniciar novamente o fluxo de autenticação.",
     "expired_transaction": "Tente iniciar novamente o fluxo de autenticação.",
     "invalid_id_token": "Não foi possível validar a autenticação. Tente iniciar novamente.",
@@ -47,9 +48,10 @@ def render_success(user: GovBrUser) -> str:
 
 def render_error(*, code: str, status_code: int) -> str:
     """Render a safe error page from a stable public code only."""
-    safe_code = escape(code)
+    public_code = code if code in _ERROR_GUIDANCE else "govbr_auth_error"
+    safe_code = escape(public_code)
     safe_status = escape(str(status_code))
-    guidance = _ERROR_GUIDANCE.get(code, "Não foi possível concluir a autenticação. Tente novamente mais tarde.")
+    guidance = _ERROR_GUIDANCE[public_code]
     return _page(
         title="Não foi possível autenticar",
         body=(

@@ -8,9 +8,9 @@ def test_home_is_a_guided_local_showcase() -> None:
     assert "FAKE / SIMULAÇÃO" in page
     assert 'href="/auth/govbr/login"' in page
     assert "sem credenciais Gov.br" in page
-    assert ("Redirecionar", "Escolher usuário", "Validar callback") == tuple(
-        label for label in ("Redirecionar", "Escolher usuário", "Validar callback") if label in page
-    )
+    assert "Redirecionar" in page
+    assert "Escolher usuário" in page
+    assert "Validar callback" in page
 
 
 def test_success_exposes_only_sanitized_fake_identity() -> None:
@@ -18,7 +18,9 @@ def test_success_exposes_only_sanitized_fake_identity() -> None:
 
     page = render_success(user)
 
-    assert all(value in page for value in ("Ana Demo", "demo-ana", "ana@example.test"))
+    assert "Ana Demo" in page
+    assert "demo-ana" in page
+    assert "ana@example.test" in page
     assert 'href="/auth/govbr/login"' in page
     assert "access_token" not in page
     assert "id_token" not in page
@@ -46,3 +48,12 @@ def test_error_uses_stable_code_without_internal_detail() -> None:
     assert "invalid_state" in page
     assert "Tente iniciar novamente" in page
     assert "traceback" not in page.casefold()
+
+
+def test_error_replaces_unknown_code_that_could_contain_a_secret() -> None:
+    secret = "access_token=secret-value"
+
+    page = render_error(code=secret, status_code=502)
+
+    assert "govbr_auth_error" in page
+    assert secret not in page
