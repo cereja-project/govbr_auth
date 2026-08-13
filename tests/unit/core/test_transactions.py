@@ -249,7 +249,10 @@ def test_store_sanitizes_invalid_ascii_encryption_secret() -> None:
     with pytest.raises(ValueError) as error:
         InMemoryTransactionStore(secret=SecretStr(invalid_secret))
 
-    assert str(error.value) == "transaction secret is invalid"
+    assert str(error.value) == (
+        "transaction secret must be a URL-safe base64-encoded 32-byte Fernet "
+        "key; generate one with govbr_auth.generate_transaction_secret()"
+    )
     assert error.value.__cause__ is not None
     assert invalid_secret not in str(error.value.__cause__)
     assert error.value.__context__ is None
@@ -261,7 +264,10 @@ def test_store_sanitizes_non_ascii_encryption_secret() -> None:
     with pytest.raises(ValueError) as error:
         InMemoryTransactionStore(secret=SecretStr(invalid_secret))
 
-    assert str(error.value) == "transaction secret is invalid"
+    assert str(error.value) == (
+        "transaction secret must be a URL-safe base64-encoded 32-byte Fernet "
+        "key; generate one with govbr_auth.generate_transaction_secret()"
+    )
     assert error.value.__cause__ is not None
     assert invalid_secret not in str(error.value.__cause__)
     assert error.value.__context__ is None

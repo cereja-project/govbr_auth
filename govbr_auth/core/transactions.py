@@ -15,7 +15,15 @@ from govbr_auth.core.models import AuthTransaction
 
 _INVALID_STATE_MESSAGE = "OAuth state is invalid"
 _EXPIRED_TRANSACTION_MESSAGE = "OAuth transaction has expired"
-_INVALID_SECRET_MESSAGE = "transaction secret is invalid"
+_INVALID_SECRET_MESSAGE = (
+    "transaction secret must be a URL-safe base64-encoded 32-byte Fernet key; "
+    "generate one with govbr_auth.generate_transaction_secret()"
+)
+
+
+def generate_transaction_secret() -> str:
+    """Generate a URL-safe Fernet key for protecting OAuth transactions."""
+    return Fernet.generate_key().decode("ascii")
 
 
 class TransactionStore(Protocol):

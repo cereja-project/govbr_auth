@@ -39,13 +39,23 @@ GOVBR_USERINFO_URL=https://sso.acesso.gov.br/userinfo/
 GOVBR_CLIENT_ID=seu-client-id
 GOVBR_CLIENT_SECRET=seu-client-secret
 GOVBR_REDIRECT_URI=https://app.example/auth/govbr/callback
-GOVBR_TRANSACTION_SECRET=uma-chave-fernet
+GOVBR_TRANSACTION_SECRET=substitua-pelo-valor-gerado
 GOVBR_ISSUER=https://sso.acesso.gov.br/
 GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
 ```
 
 `GOVBR_TRANSACTION_SECRET` protege o `state`, nonce e PKCE mantidos pelo
-consumidor. Ele não é uma credencial fornecida pelo Gov.br.
+consumidor. Ele não é uma credencial fornecida pelo Gov.br. Gere uma vez,
+antes de preencher o `.env`:
+
+```python
+from govbr_auth import generate_transaction_secret
+
+print(generate_transaction_secret())
+```
+
+Mantenha o valor secreto e use o mesmo valor em todas as instâncias do
+deployment. Não gere uma chave nova a cada inicialização.
 
 Execute o consumidor:
 
