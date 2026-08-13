@@ -144,6 +144,23 @@ def test_installable_demo_command_is_consistent_across_entry_documents() -> None
     )
 
 
+def test_installable_demo_command_is_an_exact_line_in_every_instruction() -> None:
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8"),
+    )
+
+    assert tuple(
+        any('pip install "govbr-auth[demo]"' == line.strip() for line in source.splitlines())
+        for source in sources
+    ) == (
+        True,
+        True,
+        True,
+    )
+
+
 def test_docs_distinguish_demo_fake_and_official_provider() -> None:
     source = (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8")
 

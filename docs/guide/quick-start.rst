@@ -6,7 +6,7 @@ Instalação
 
 Instale a demonstração empacotada::
 
-    python -m pip install "govbr-auth[demo]"
+    pip install "govbr-auth[demo]"
 
 Execução
 --------

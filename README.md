@@ -10,7 +10,7 @@ Governo Federal.
 ## Teste local em dois comandos
 
 ```bash
-python -m pip install "govbr-auth[demo]"
+pip install "govbr-auth[demo]"
 python -m govbr_auth.demo
 ```
 

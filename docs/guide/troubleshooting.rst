@@ -7,7 +7,7 @@ Conexão recusada em ``http://localhost:8000``
 O processo da demo não está em execução ou foi iniciado em outro terminal.
 Instale o extra e execute novamente::
 
-    python -m pip install "govbr-auth[demo]"
+    pip install "govbr-auth[demo]"
     python -m govbr_auth.demo
 
 Porta 8000 ocupada
