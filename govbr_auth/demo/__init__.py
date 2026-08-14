@@ -1,8 +1,10 @@
 """Installable loopback-only showcase for the complete local Gov.br flow."""
 
+import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Protocol
 
 import httpx
 from cryptography.fernet import Fernet
@@ -23,15 +25,23 @@ from govbr_auth.core import (
     ProviderEnvironment,
 )
 from govbr_auth.core.errors import ProviderRejectedError, ProviderUnavailableError
-from govbr_auth.demo._html import render_error, render_home, render_success
+from govbr_auth.demo._html import (
+    DemoCredential,
+    render_error,
+    render_home,
+    render_success,
+)
 from govbr_auth.fake import (
     FakeClient,
+    FakeCredentialAuthenticator,
     FakeGovBrProvider,
     FakeGovBrSettings,
     FakeSigningKey,
     FakeUser,
+    FakeUserStore,
     InMemoryAuthorizationCodeReplayStore,
-    InMemoryFakeUserStore,
+    InMemoryFakeUserRepository,
+    JsonFakeUserRepository,
     create_fake_govbr_router,
 )
 from govbr_auth.fastapi import AuthContext, GovBrAuth, utc_now
@@ -44,27 +54,46 @@ _DEMO_CLIENT_SECRET = "local-demo-only"
 _DEMO_CALLBACK_URL = f"{DEMO_BASE_URL}/auth/govbr/callback"
 _DEMO_PROVIDER_URL = f"{DEMO_BASE_URL}{DEMO_PROVIDER_PREFIX}"
 _DEMO_USERS = (
-    FakeUser(
-        sub="demo-ana",
-        name="Ana Demo",
-        email="ana@example.test",
-        email_verified=True,
+    (
+        FakeUser(
+            sub="12345678901",
+            name="Ana Demo",
+            email="ana@example.test",
+            email_verified=True,
+        ),
+        SecretStr("ana-demo"),
     ),
-    FakeUser(
-        sub="demo-bruno",
-        name="Bruno Demo",
-        email="bruno@example.test",
-        email_verified=True,
+    (
+        FakeUser(
+            sub="98765432100",
+            name="Bruno Demo",
+            email="bruno@example.test",
+            email_verified=True,
+        ),
+        SecretStr("bruno-demo"),
     ),
+)
+_DEMO_CREDENTIALS = (
+    DemoCredential(cpf="12345678901", password="ana-demo", name="Ana Demo"),
+    DemoCredential(cpf="98765432100", password="bruno-demo", name="Bruno Demo"),
 )
 
 __all__ = ["DEMO_BASE_URL", "DEMO_PROVIDER_PREFIX", "create_demo_app", "run"]
 
 
-def create_demo_app(*, clock: Callable[[], datetime] = utc_now) -> FastAPI:
+class FakeUserRepository(FakeUserStore, FakeCredentialAuthenticator, Protocol):
+    """Combine fake-user lookup and credential authentication contracts."""
+
+
+def create_demo_app(
+    *,
+    clock: Callable[[], datetime] = utc_now,
+    user_repository: FakeUserRepository | None = None,
+) -> FastAPI:
     """Create the loopback consumer and interactive fake provider showcase."""
     transaction_secret = SecretStr(Fernet.generate_key().decode("ascii"))
-    _, fake_router = _create_provider(clock=clock)
+    repository, credentials = _resolve_user_repository(user_repository)
+    _, fake_router = _create_provider(clock=clock, user_repository=repository)
     provider_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     provider_app.include_router(fake_router)
     provider_http = httpx.AsyncClient(transport=httpx.ASGITransport(app=provider_app))
@@ -87,7 +116,10 @@ def create_demo_app(*, clock: Callable[[], datetime] = utc_now) -> FastAPI:
 
     @application.get("/", include_in_schema=False)
     async def home() -> HTMLResponse:
-        return HTMLResponse(render_home(), headers={"Cache-Control": "no-store"})
+        return HTMLResponse(
+            render_home(credentials=credentials),
+            headers={"Cache-Control": "no-store"},
+        )
 
     async def authenticated(context: AuthContext) -> Response:
         return HTMLResponse(
@@ -135,6 +167,7 @@ def create_demo_app(*, clock: Callable[[], datetime] = utc_now) -> FastAPI:
 def _create_provider(
     *,
     clock: Callable[[], datetime],
+    user_repository: FakeUserRepository,
 ) -> tuple[FakeGovBrProvider, APIRouter]:
     issuer = f"{_DEMO_PROVIDER_URL}/"
     settings = FakeGovBrSettings(
@@ -155,16 +188,28 @@ def _create_provider(
     )
     provider = FakeGovBrProvider(
         settings=settings,
-        user_store=InMemoryFakeUserStore(_DEMO_USERS),
+        user_store=user_repository,
         replay_store=InMemoryAuthorizationCodeReplayStore(),
         signing_key=FakeSigningKey.generate(kid="govbr-auth-demo-key"),
     )
     router = create_fake_govbr_router(
         provider,
         prefix=DEMO_PROVIDER_PREFIX,
+        credential_authenticator=user_repository,
         clock=clock,
     )
     return provider, router
+
+
+def _resolve_user_repository(
+    explicit: FakeUserRepository | None,
+) -> tuple[FakeUserRepository, tuple[DemoCredential, ...]]:
+    if explicit is not None:
+        return explicit, ()
+    json_path = os.environ.get("GOVBR_FAKE_USERS_FILE")
+    if json_path:
+        return JsonFakeUserRepository.from_file(json_path), ()
+    return InMemoryFakeUserRepository(_DEMO_USERS), _DEMO_CREDENTIALS
 
 
 def _create_consumer_settings(*, transaction_secret: SecretStr) -> GovBrSettings:
