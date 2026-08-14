@@ -83,6 +83,38 @@ class HiddenInputParser(HTMLParser):
             self.value = attributes.get("value")
 
 
+class AlertTextParser(HTMLParser):
+    """Extract visible text from elements identified as alerts."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.alerts: list[str] = []
+        self._depth = 0
+        self._text: list[str] = []
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if self._depth:
+            self._depth += 1
+        elif dict(attrs).get("role") == "alert":
+            self._depth = 1
+            self._text = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if not self._depth:
+            return
+        self._depth -= 1
+        if not self._depth:
+            self.alerts.append("".join(self._text).strip())
+
+    def handle_data(self, data: str) -> None:
+        if self._depth:
+            self._text.append(data)
+
+
 def provider_factory(
     *,
     user: FakeUser | None = None,
@@ -169,6 +201,15 @@ def parse_hidden_input(page: str, *, name: str) -> str:
     if parser.value is None:
         raise ValueError("hidden input is missing")
     return parser.value
+
+
+def parse_alert_text(page: str) -> str:
+    """Return the exact visible text from the page's single alert."""
+    parser = AlertTextParser()
+    parser.feed(page)
+    if len(parser.alerts) != 1:
+        raise ValueError("exactly one alert is required")
+    return parser.alerts[0]
 
 
 def oauth_values(location: str) -> dict[str, list[str]]:
@@ -381,8 +422,29 @@ async def test_credential_login_redirects_with_valid_cpf_and_password() -> None:
     assert "12345678901" not in response.headers["location"]
 
 
+@pytest.mark.parametrize(
+    "cpf,password,secret_marker",
+    (
+        pytest.param(
+            "00000000000",
+            "unknown-secret",
+            "unknown-secret",
+            id="unknown-cpf",
+        ),
+        pytest.param(
+            "12345678901",
+            "wrong-secret",
+            "wrong-secret",
+            id="wrong-password",
+        ),
+    ),
+)
 @pytest.mark.asyncio
-async def test_credential_login_returns_uniform_safe_401() -> None:
+async def test_credential_login_returns_uniform_safe_401(
+    cpf: str,
+    password: str,
+    secret_marker: str,
+) -> None:
     repository = credential_repository()
     application = create_fake_govbr_app(
         provider_factory(user_store=repository),
@@ -395,31 +457,19 @@ async def test_credential_login_returns_uniform_safe_401() -> None:
     ) as http:
         authorize = await http.get("/authorize", params=authorization_params())
         request_value = parse_hidden_input(authorize.text, name="request")
-        unknown = await http.post(
+        response = await http.post(
             "/login",
             data={
                 "request": request_value,
-                "cpf": "00000000000",
-                "password": "unknown-secret",
-            },
-        )
-        wrong = await http.post(
-            "/login",
-            data={
-                "request": request_value,
-                "cpf": "12345678901",
-                "password": "wrong-secret",
+                "cpf": cpf,
+                "password": password,
             },
         )
 
-    assert (unknown.status_code, wrong.status_code) == (401, 401)
-    assert "CPF ou senha inválidos" in unknown.text
-    assert "CPF ou senha inválidos" in wrong.text
-    assert (
-        unknown.headers["cache-control"] == wrong.headers["cache-control"] == "no-store"
-    )
-    assert "unknown-secret" not in unknown.text + wrong.text
-    assert "wrong-secret" not in unknown.text + wrong.text
+    assert response.status_code == 401
+    assert parse_alert_text(response.text) == "CPF ou senha inválidos."
+    assert response.headers["cache-control"] == "no-store"
+    assert secret_marker not in response.text
 
 
 @pytest.mark.asyncio
