@@ -437,6 +437,12 @@ async def test_credential_login_redirects_with_valid_cpf_and_password() -> None:
             "wrong-secret",
             id="wrong-password",
         ),
+        pytest.param(
+            "12345678901",
+            "senha-incorreta-ç",
+            "senha-incorreta-ç",
+            id="wrong-unicode-password",
+        ),
     ),
 )
 @pytest.mark.asyncio

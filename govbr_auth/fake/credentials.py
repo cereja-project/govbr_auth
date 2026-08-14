@@ -68,7 +68,8 @@ class InMemoryFakeUserRepository:
             return None
         expected = self._passwords_by_cpf.get(normalized)
         if expected is None or not compare_digest(
-            expected.get_secret_value(), password.get_secret_value()
+            expected.get_secret_value().encode("utf-8"),
+            password.get_secret_value().encode("utf-8"),
         ):
             return None
         return self._users_by_cpf[normalized]
@@ -125,6 +126,8 @@ class JsonFakeUserRepository:
         """
         try:
             source = Path(path).read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            raise ValueError("fake user JSON is invalid") from None
         except OSError as error:
             raise ValueError("fake user JSON file is unavailable") from error
 
@@ -132,8 +135,7 @@ class JsonFakeUserRepository:
             records = _JsonFakeUsers.model_validate_json(source)
         except ValidationError as error:
             if any(
-                issue["loc"] == ("users",)
-                and issue["msg"] == "Value error, users must contain at least one item"
+                issue["loc"] == ("users",) and issue["type"] == "value_error"
                 for issue in error.errors()
             ):
                 raise ValueError("users must contain at least one item") from None

@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
+from govbr_auth.fake import credentials as credentials_module
 from govbr_auth.fake import (
     FakeUser,
     InMemoryFakeUserRepository,
@@ -50,6 +51,28 @@ def test_in_memory_repository_rejects_invalid_password() -> None:
     assert (
         repository.authenticate(cpf="12345678901", password=SecretStr("wrong")) is None
     )
+
+
+def test_in_memory_repository_authenticates_valid_unicode_password() -> None:
+    repository = InMemoryFakeUserRepository(((ANA, SecretStr("maçã-demo")),))
+
+    user = repository.authenticate(
+        cpf="12345678901",
+        password=SecretStr("maçã-demo"),
+    )
+
+    assert user == ANA
+
+
+def test_in_memory_repository_rejects_invalid_unicode_password() -> None:
+    repository = InMemoryFakeUserRepository(((ANA, SecretStr("maçã-demo")),))
+
+    user = repository.authenticate(
+        cpf="12345678901",
+        password=SecretStr("maçã-incorreta"),
+    )
+
+    assert user is None
 
 
 def test_in_memory_repository_gets_user_by_normalized_cpf() -> None:
@@ -135,6 +158,60 @@ def test_json_repository_rejects_unavailable_file(tmp_path: Path) -> None:
         JsonFakeUserRepository.from_file(source)
 
     assert isinstance(error.value.__cause__, OSError)
+
+
+def test_json_repository_rejects_invalid_utf8_without_exposing_content(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "fake-users.json"
+    source.write_bytes(b'\xff"password":"sensitive-marker"')
+
+    with pytest.raises(ValueError, match="^fake user JSON is invalid$") as raised:
+        JsonFakeUserRepository.from_file(source)
+
+    assert raised.value.__cause__ is None
+    assert "sensitive-marker" not in str(raised.value)
+
+
+def test_json_repository_classifies_empty_users_without_human_error_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class TranslatedValidationError(ValidationError):
+        def errors(self, *args: object, **kwargs: object) -> list[dict[str, object]]:
+            issues = super().errors(*args, **kwargs)
+            issues[0]["msg"] = "translated validation text"
+            return issues
+
+    validation_error = TranslatedValidationError.from_exception_data(
+        "_JsonFakeUsers",
+        [
+            {
+                "type": "value_error",
+                "loc": ("users",),
+                "input": [],
+                "ctx": {
+                    "error": ValueError("users must contain at least one item"),
+                },
+            }
+        ],
+    )
+
+    def reject_json(cls: type[object], source: str) -> None:
+        raise validation_error
+
+    monkeypatch.setattr(
+        credentials_module._JsonFakeUsers,
+        "model_validate_json",
+        classmethod(reject_json),
+    )
+    source = tmp_path / "fake-users.json"
+    source.write_text('{"users": []}', encoding="utf-8")
+
+    with pytest.raises(ValueError) as raised:
+        JsonFakeUserRepository.from_file(source)
+
+    assert str(raised.value) == "users must contain at least one item"
 
 
 def test_json_repository_rejects_extra_user_fields(tmp_path: Path) -> None:

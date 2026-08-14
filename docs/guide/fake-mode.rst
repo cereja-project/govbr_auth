@@ -69,6 +69,13 @@ Para integração por código, ``govbr_auth.fake`` exporta
 ``JsonFakeUserRepository``. Passe um autenticador ao argumento
 ``credential_authenticator`` de ``create_fake_govbr_router`` ou
 ``create_fake_govbr_app`` para habilitar o formulário de CPF e senha.
+Em adaptadores persistentes, armazene somente hashes apropriados para senha e
+compare a senha informada com o hash armazenado; nunca recupere nem compare
+senhas em texto puro.
+
+O ``user_store`` passado ao ``FakeGovBrProvider`` precisa resolver por
+``get(subject)`` o mesmo ``sub`` retornado pelo autenticador. Um autenticador e
+um store que discordem sobre esse identificador não conseguem concluir o fluxo.
 
 Replay e estado
 ---------------

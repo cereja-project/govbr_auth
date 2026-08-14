@@ -25,6 +25,7 @@ def test_home_renders_hybrid_showcase_and_default_credentials() -> None:
     assert "Como funciona" in page
     assert "123.456.789-01" in page and "ana-demo" in page
     assert 'href="/auth/govbr/login"' in page
+    assert ">Entrar com Gov.br</a>" in page
     assert ":focus-visible" in page
     assert "@media" in page
 
