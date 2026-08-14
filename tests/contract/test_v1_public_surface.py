@@ -79,6 +79,7 @@ def test_fake_exports_exact_optional_provider_surface() -> None:
         "FakeAuthorizationSession",
         "FakeClient",
         "FakeClientCredentials",
+        "FakeCredentialAuthenticator",
         "FakeGovBrProvider",
         "FakeGovBrSettings",
         "FakeOAuthError",
@@ -90,6 +91,7 @@ def test_fake_exports_exact_optional_provider_surface() -> None:
         "FakeUserStore",
         "InMemoryAuthorizationCodeReplayStore",
         "InMemoryFakeUserStore",
+        "InMemoryFakeUserRepository",
         "create_fake_govbr_app",
         "create_fake_govbr_router",
     )

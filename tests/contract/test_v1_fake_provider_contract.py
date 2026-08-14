@@ -7,8 +7,10 @@ from govbr_auth.fake import (
     FakeAuthorizationRequest,
     FakeAuthorizationSession,
     FakeClientCredentials,
+    FakeCredentialAuthenticator,
     FakeGovBrProvider,
     FakeOAuthError,
+    InMemoryFakeUserRepository,
     FakeTokenRequest,
     FakeTokenResponse,
 )
@@ -66,3 +68,12 @@ def test_fake_package_exports_provider_contract_without_top_level_export() -> No
     assert fake.FakeGovBrProvider is FakeGovBrProvider
     assert fake.FakeOAuthError is FakeOAuthError
     assert not hasattr(govbr_auth, "FakeGovBrProvider")
+
+
+def test_fake_package_exports_credential_contract() -> None:
+    import govbr_auth.fake as fake
+
+    assert fake.FakeCredentialAuthenticator is FakeCredentialAuthenticator
+    assert fake.InMemoryFakeUserRepository is InMemoryFakeUserRepository
+    assert "FakeCredentialAuthenticator" in fake.__all__
+    assert "InMemoryFakeUserRepository" in fake.__all__
