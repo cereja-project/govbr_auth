@@ -2,7 +2,6 @@
 
 import base64
 import binascii
-import html
 from collections.abc import Callable, Mapping
 from datetime import datetime
 
@@ -12,6 +11,8 @@ from pydantic import SecretStr
 from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException
 
+from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
+from govbr_auth.fake.credentials import FakeCredentialAuthenticator
 from govbr_auth.fake.provider import (
     FakeAuthorizationRequest,
     FakeAuthorizationSession,
@@ -20,7 +21,6 @@ from govbr_auth.fake.provider import (
     FakeOAuthError,
     FakeTokenRequest,
 )
-from govbr_auth.fake.models import FakeUser
 from govbr_auth.fastapi import utc_now
 
 _AUTHORIZATION_FIELDS = (
@@ -43,6 +43,7 @@ def create_fake_govbr_router(
     provider: FakeGovBrProvider,
     *,
     prefix: str = "/fake-govbr",
+    credential_authenticator: FakeCredentialAuthenticator | None = None,
     automatic_subject: str | None = None,
     clock: Callable[[], datetime] = utc_now,
 ) -> APIRouter:
@@ -50,6 +51,7 @@ def create_fake_govbr_router(
     return _build_fake_govbr_routes(
         provider,
         prefix=prefix,
+        credential_authenticator=credential_authenticator,
         automatic_subject=automatic_subject,
         clock=clock,
     )
@@ -58,6 +60,7 @@ def create_fake_govbr_router(
 def create_fake_govbr_app(
     provider: FakeGovBrProvider,
     *,
+    credential_authenticator: FakeCredentialAuthenticator | None = None,
     automatic_subject: str | None = None,
     clock: Callable[[], datetime] = utc_now,
 ) -> FastAPI:
@@ -67,6 +70,7 @@ def create_fake_govbr_app(
         _build_fake_govbr_routes(
             provider,
             prefix="",
+            credential_authenticator=credential_authenticator,
             automatic_subject=automatic_subject,
             clock=clock,
         )
@@ -78,6 +82,7 @@ def _build_fake_govbr_routes(
     provider: FakeGovBrProvider,
     *,
     prefix: str,
+    credential_authenticator: FakeCredentialAuthenticator | None,
     automatic_subject: str | None,
     clock: Callable[[], datetime],
 ) -> APIRouter:
@@ -108,23 +113,54 @@ def _build_fake_govbr_routes(
         except FakeOAuthError as error:
             return _oauth_error_response(error)
 
+        login_action = request.url_for(login_route_name).path
+        page = (
+            render_fake_login(session, login_action=login_action)
+            if credential_authenticator is not None
+            else render_fake_user_selection(session, login_action=login_action)
+        )
         return HTMLResponse(
-            _render_login_page(
-                session,
-                login_action=request.url_for(login_route_name).path,
-            ),
+            page,
             headers={"Cache-Control": "no-store"},
         )
 
     @router.post("/login", name=login_route_name)
     async def login(request: Request) -> Response:
         form = await _read_form(request)
-        values = _required_text_values(form, ("request", "subject"))
-        if values is None:
-            return _boundary_error_response(
-                "invalid_request",
-                _AUTHORIZATION_REQUEST_INVALID,
+        if credential_authenticator is None:
+            values = _required_text_values(form, ("request", "subject"))
+            if values is None:
+                return _boundary_error_response(
+                    "invalid_request",
+                    _AUTHORIZATION_REQUEST_INVALID,
+                )
+            subject = values["subject"]
+        else:
+            values = _required_text_values(form, ("request", "cpf", "password"))
+            if values is None:
+                return _boundary_error_response(
+                    "invalid_request",
+                    _AUTHORIZATION_REQUEST_INVALID,
+                )
+            user = credential_authenticator.authenticate(
+                cpf=values["cpf"],
+                password=SecretStr(values["password"]),
             )
+            if user is None:
+                session = FakeAuthorizationSession(
+                    request=SecretStr(values["request"]),
+                    users=(),
+                )
+                return HTMLResponse(
+                    render_fake_login(
+                        session,
+                        login_action=request.url_for(login_route_name).path,
+                        invalid_credentials=True,
+                    ),
+                    status_code=401,
+                    headers={"Cache-Control": "no-store"},
+                )
+            subject = user.sub
         session = FakeAuthorizationSession(
             request=SecretStr(values["request"]),
             users=(),
@@ -132,7 +168,7 @@ def _build_fake_govbr_routes(
         try:
             redirect = provider.complete_authorization(
                 session=session,
-                subject=values["subject"],
+                subject=subject,
                 now=clock(),
             )
         except FakeOAuthError as error:
@@ -191,36 +227,6 @@ def _build_fake_govbr_routes(
         return JSONResponse(user.model_dump(exclude_none=True, mode="json"))
 
     return router
-
-
-def _render_login_page(
-    session: FakeAuthorizationSession,
-    *,
-    login_action: str,
-) -> str:
-    request_value = html.escape(session.request.get_secret_value(), quote=True)
-    action_value = html.escape(login_action, quote=True)
-    choices = "".join(_render_user_choice(user) for user in session.users)
-    return (
-        "<!doctype html>"
-        '<html lang="pt-BR"><head><meta charset="utf-8">'
-        "<title>FAKE / SIMULAÇÃO</title></head><body>"
-        "<h1>FAKE / SIMULAÇÃO</h1>"
-        "<p>Provedor local de teste. Não é o portal oficial.</p>"
-        f'<form method="post" action="{action_value}">'
-        f'<input type="hidden" name="request" value="{request_value}">'
-        f"{choices}</form></body></html>"
-    )
-
-
-def _render_user_choice(user: FakeUser) -> str:
-    subject = html.escape(user.sub, quote=True)
-    label_value = user.name or user.preferred_username or user.sub
-    label = html.escape(label_value, quote=True)
-    return (
-        f'<button type="submit" name="subject" value="{subject}">'
-        f"{label} ({subject})</button>"
-    )
 
 
 async def _read_form(request: Request) -> FormData:

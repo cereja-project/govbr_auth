@@ -20,7 +20,9 @@ from govbr_auth.fake import (
     FakeGovBrSettings,
     FakeSigningKey,
     FakeUser,
+    FakeUserStore,
     InMemoryAuthorizationCodeReplayStore,
+    InMemoryFakeUserRepository,
     InMemoryFakeUserStore,
 )
 from govbr_auth.fake.fastapi import create_fake_govbr_app, create_fake_govbr_router
@@ -59,7 +61,33 @@ class LoginFormParser(HTMLParser):
                 self.subjects.append(subject)
 
 
-def provider_factory(*, user: FakeUser | None = None) -> FakeGovBrProvider:
+class HiddenInputParser(HTMLParser):
+    """Extract one hidden input value from an HTML document."""
+
+    def __init__(self, *, name: str) -> None:
+        super().__init__()
+        self.name = name
+        self.value: str | None = None
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        attributes = dict(attrs)
+        if (
+            tag == "input"
+            and attributes.get("type") == "hidden"
+            and attributes.get("name") == self.name
+        ):
+            self.value = attributes.get("value")
+
+
+def provider_factory(
+    *,
+    user: FakeUser | None = None,
+    user_store: FakeUserStore | None = None,
+) -> FakeGovBrProvider:
     """Build a provider with real Fernet artifacts, RSA signing, and memory stores."""
     configured_user = user or FakeUser(
         sub="12345678900",
@@ -85,9 +113,29 @@ def provider_factory(*, user: FakeUser | None = None) -> FakeGovBrProvider:
     )
     return FakeGovBrProvider(
         settings=settings,
-        user_store=InMemoryFakeUserStore((configured_user,)),
+        user_store=(
+            user_store
+            if user_store is not None
+            else InMemoryFakeUserStore((configured_user,))
+        ),
         replay_store=InMemoryAuthorizationCodeReplayStore(),
         signing_key=FakeSigningKey.generate(kid="fake-provider-key"),
+    )
+
+
+def credential_repository() -> InMemoryFakeUserRepository:
+    """Build a fake-user repository with Ana's local demo credentials."""
+    return InMemoryFakeUserRepository(
+        (
+            (
+                FakeUser(
+                    sub="12345678901",
+                    name="Ana Demo",
+                    email="ana@example.test",
+                ),
+                SecretStr("ana-demo"),
+            ),
+        )
     )
 
 
@@ -112,6 +160,15 @@ def parse_login_form(document: str) -> LoginFormParser:
     parser = LoginFormParser()
     parser.feed(document)
     return parser
+
+
+def parse_hidden_input(page: str, *, name: str) -> str:
+    """Return a hidden input value from rendered HTML."""
+    parser = HiddenInputParser(name=name)
+    parser.feed(page)
+    if parser.value is None:
+        raise ValueError("hidden input is missing")
+    return parser.value
 
 
 def oauth_values(location: str) -> dict[str, list[str]]:
@@ -261,7 +318,7 @@ async def test_second_mounted_router_posts_authorization_to_its_own_provider() -
 
 
 @pytest.mark.asyncio
-async def test_interactive_authorize_escapes_user_values_and_never_renders_secret() -> (
+async def test_omitting_credential_authenticator_renders_escaped_subject_buttons() -> (
     None
 ):
     malicious_subject = 'subject-<svg onload="alert(1)">'
@@ -291,6 +348,78 @@ async def test_interactive_authorize_escapes_user_values_and_never_renders_secre
     assert "client-secret-marker" not in response.text
     assert login_form.request_artifact is not None
     assert login_form.subjects == [user.sub]
+
+
+@pytest.mark.asyncio
+async def test_credential_login_redirects_with_valid_cpf_and_password() -> None:
+    repository = credential_repository()
+    application = create_fake_govbr_app(
+        provider_factory(user_store=repository),
+        credential_authenticator=repository,
+        clock=lambda: FIXED_NOW,
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://localhost",
+        follow_redirects=False,
+    ) as http:
+        authorize = await http.get("/authorize", params=authorization_params())
+        request_value = parse_hidden_input(authorize.text, name="request")
+        response = await http.post(
+            "/login",
+            data={
+                "request": request_value,
+                "cpf": "123.456.789-01",
+                "password": "ana-demo",
+            },
+        )
+
+    assert response.status_code == 302
+    assert "code=" in response.headers["location"]
+    assert "state=state-123" in response.headers["location"]
+    assert "ana-demo" not in response.headers["location"]
+    assert "12345678901" not in response.headers["location"]
+
+
+@pytest.mark.asyncio
+async def test_credential_login_returns_uniform_safe_401() -> None:
+    repository = credential_repository()
+    application = create_fake_govbr_app(
+        provider_factory(user_store=repository),
+        credential_authenticator=repository,
+        clock=lambda: FIXED_NOW,
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://localhost",
+    ) as http:
+        authorize = await http.get("/authorize", params=authorization_params())
+        request_value = parse_hidden_input(authorize.text, name="request")
+        unknown = await http.post(
+            "/login",
+            data={
+                "request": request_value,
+                "cpf": "00000000000",
+                "password": "unknown-secret",
+            },
+        )
+        wrong = await http.post(
+            "/login",
+            data={
+                "request": request_value,
+                "cpf": "12345678901",
+                "password": "wrong-secret",
+            },
+        )
+
+    assert (unknown.status_code, wrong.status_code) == (401, 401)
+    assert "CPF ou senha inválidos" in unknown.text
+    assert "CPF ou senha inválidos" in wrong.text
+    assert (
+        unknown.headers["cache-control"] == wrong.headers["cache-control"] == "no-store"
+    )
+    assert "unknown-secret" not in unknown.text + wrong.text
+    assert "wrong-secret" not in unknown.text + wrong.text
 
 
 @pytest.mark.asyncio
