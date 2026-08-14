@@ -7,6 +7,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Added
+- Adicionados autenticação local por CPF e senha e carregamento opcional de usuários fictícios via ``GOVBR_FAKE_USERS_FILE``.
+- Adicionados os contratos públicos ``FakeCredentialAuthenticator``, ``InMemoryFakeUserRepository`` e ``JsonFakeUserRepository``.
+
+### Changed
+- Atualizada a demonstração instalável com uma interface responsiva e um fluxo de login por credenciais fictícias.
+
+### Security
+- Arquivos externos substituem os usuários padrão sem listar as credenciais na página inicial, e falhas de CPF ou senha usam uma resposta uniforme.
+
 ## [1.0.0-rc1] - 2026-08-13
 
 ### Added

@@ -14,9 +14,21 @@ pip install "govbr-auth[demo]"
 python -m govbr_auth.demo
 ```
 
-Abra `http://localhost:8000`, clique em **Entrar com Gov.br**, escolha um
+Abra `http://localhost:8000`, clique em **Entrar com Gov.br**, entre com um
 usuário fictício e acompanhe o callback validado. A simulação roda somente em
 loopback e não usa credenciais Gov.br.
+
+Por padrão, a página inicial mostra os usuários fictícios incluídos na demo.
+Para substituí-los completamente, defina `GOVBR_FAKE_USERS_FILE` com o caminho
+de um arquivo JSON. O objeto deve conter a lista `"users"`; cada item exige
+`"cpf"`, `"password"`, `"name"` e `"email"`. O formato completo está no
+[guia do provedor fake](docs/guide/fake-mode.rst).
+
+O arquivo é carregado e validado na inicialização. Quando ele é usado, os
+defaults não são mesclados e as credenciais não são listadas na página
+inicial. A fonte JSON funciona inteiramente em memória e não depende de ORM,
+banco ou migrações. Atenção: não use credenciais reais; mantenha o arquivo
+fora do Git.
 
 ## Requisitos e instalação
 
@@ -100,6 +112,10 @@ criptográficas não conseguem rejeitar globalmente um replay sem um store
 compartilhado; esta distribuição não adiciona banco, Redis ou estado remoto.
 Essa limitação pertence exclusivamente ao provedor fake local e não descreve
 nem reduz garantias do provedor oficial Gov.br.
+
+Para autenticação local por CPF e senha, use os contratos públicos
+`FakeCredentialAuthenticator`, `InMemoryFakeUserRepository` e
+`JsonFakeUserRepository`, exportados por `govbr_auth.fake`.
 
 ## Migração para a API v1
 

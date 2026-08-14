@@ -199,6 +199,7 @@ h2 {{ font-size: clamp(1.45rem, 3vw, 2rem); letter-spacing: -.025em; margin: 0 0
   justify-content: center;
 }}
 .steps p {{ color: var(--muted); margin: .35rem 0 0; }}
+.credentials {{ min-width: 0; }}
 .table-scroll {{ overflow-x: auto; }}
 table {{ border-collapse: collapse; min-width: 34rem; width: 100%; }}
 th, td {{ border-bottom: 1px solid var(--line); padding: .85rem; text-align: left; }}

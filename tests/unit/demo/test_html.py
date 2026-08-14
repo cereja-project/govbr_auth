@@ -33,6 +33,20 @@ def test_home_omits_credentials_for_external_repository() -> None:
     assert "Credenciais da demo" not in render_home(credentials=())
 
 
+def test_home_constrains_credential_grid_item_for_narrow_viewports() -> None:
+    page = render_home(
+        credentials=(
+            _html.DemoCredential(
+                cpf="12345678901",
+                password="ana-demo",
+                name="Ana Demo",
+            ),
+        )
+    )
+
+    assert ".credentials { min-width: 0; }" in page
+
+
 def test_home_provides_two_layer_visible_focus_indicator() -> None:
     page = render_home()
 

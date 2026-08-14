@@ -6,6 +6,7 @@ from io import StringIO
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import pytest
 from dotenv import dotenv_values
 
 from examples.example_fastapi import settings_from_environment
@@ -138,7 +139,9 @@ def test_installable_demo_command_is_consistent_across_entry_documents() -> None
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
     )
 
-    assert tuple(tuple(command in source for command in required_commands) for source in sources) == (
+    assert tuple(
+        tuple(command in source for command in required_commands) for source in sources
+    ) == (
         (True, True, True),
         (True, True, True),
     )
@@ -152,7 +155,10 @@ def test_installable_demo_command_is_an_exact_line_in_every_instruction() -> Non
     )
 
     assert tuple(
-        any('pip install "govbr-auth[demo]"' == line.strip() for line in source.splitlines())
+        any(
+            'pip install "govbr-auth[demo]"' == line.strip()
+            for line in source.splitlines()
+        )
         for source in sources
     ) == (
         True,
@@ -165,3 +171,38 @@ def test_docs_distinguish_demo_fake_and_official_provider() -> None:
     source = (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8")
 
     assert all(term in source for term in ("[demo]", "[fake]", "provedor oficial"))
+
+
+@pytest.mark.parametrize(
+    "document",
+    (
+        PROJECT_ROOT / "README.md",
+        DOCS_ROOT / "guide" / "quick-start.rst",
+        DOCS_ROOT / "guide" / "fake-mode.rst",
+    ),
+    ids=("readme", "quick-start", "fake-mode"),
+)
+def test_fake_credentials_journey_is_documented_in_every_entry_guide(
+    document: Path,
+) -> None:
+    required_guidance = (
+        "GOVBR_FAKE_USERS_FILE",
+        '"users"',
+        '"cpf"',
+        '"password"',
+        "não use credenciais reais",
+        'pip install "govbr-auth[demo]"',
+        "python -m govbr_auth.demo",
+    )
+
+    source = document.read_text(encoding="utf-8")
+
+    assert tuple(guidance in source for guidance in required_guidance) == (
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+    )
