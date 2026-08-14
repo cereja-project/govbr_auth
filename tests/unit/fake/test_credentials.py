@@ -135,3 +135,85 @@ def test_json_repository_rejects_unavailable_file(tmp_path: Path) -> None:
         JsonFakeUserRepository.from_file(source)
 
     assert isinstance(error.value.__cause__, OSError)
+
+
+def test_json_repository_rejects_extra_user_fields(tmp_path: Path) -> None:
+    source = tmp_path / "fake-users.json"
+    source.write_text(
+        json.dumps(
+            {
+                "users": [
+                    {
+                        "cpf": "12345678901",
+                        "password": "ana-demo",
+                        "name": "Ana Demo",
+                        "email": "ana@example.test",
+                        "role": "admin",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="fake user JSON is invalid") as raised:
+        JsonFakeUserRepository.from_file(source)
+
+    assert raised.value.__cause__ is None
+
+
+def test_json_repository_gets_loaded_user_by_normalized_cpf(tmp_path: Path) -> None:
+    source = tmp_path / "fake-users.json"
+    source.write_text(
+        json.dumps(
+            {
+                "users": [
+                    {
+                        "cpf": "123.456.789-01",
+                        "password": "ana-demo",
+                        "name": "Ana Demo",
+                        "email": "ana@example.test",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    repository = JsonFakeUserRepository.from_file(source)
+
+    user = repository.get("12345678901")
+
+    assert user == ANA
+
+
+def test_json_repository_lists_loaded_users_in_insertion_order(tmp_path: Path) -> None:
+    source = tmp_path / "fake-users.json"
+    source.write_text(
+        json.dumps(
+            {
+                "users": [
+                    {
+                        "cpf": "12345678901",
+                        "password": "ana-demo",
+                        "name": "Ana Demo",
+                        "email": "ana@example.test",
+                    },
+                    {
+                        "cpf": "987.654.321-00",
+                        "password": "bia-demo",
+                        "name": "Bia Demo",
+                        "email": "bia@example.test",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    repository = JsonFakeUserRepository.from_file(source)
+
+    users = repository.list()
+
+    assert users == (
+        ANA,
+        FakeUser(sub="98765432100", name="Bia Demo", email="bia@example.test"),
+    )
