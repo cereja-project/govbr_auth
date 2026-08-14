@@ -1,7 +1,14 @@
+import json
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr
 
-from govbr_auth.fake import FakeUser, InMemoryFakeUserRepository
+from govbr_auth.fake import (
+    FakeUser,
+    InMemoryFakeUserRepository,
+    JsonFakeUserRepository,
+)
 from govbr_auth.fake.credentials import normalize_fake_cpf
 
 ANA = FakeUser(sub="12345678901", name="Ana Demo", email="ana@example.test")
@@ -70,3 +77,61 @@ def test_in_memory_repository_rejects_duplicate_normalized_cpf() -> None:
         InMemoryFakeUserRepository(
             ((ANA, SecretStr("ana-demo")), (duplicate, SecretStr("other")))
         )
+
+
+def test_json_repository_loads_and_authenticates(tmp_path: Path) -> None:
+    source = tmp_path / "fake-users.json"
+    source.write_text(
+        json.dumps(
+            {
+                "users": [
+                    {
+                        "cpf": "12345678901",
+                        "password": "ana-demo",
+                        "name": "Ana Demo",
+                        "email": "ana@example.test",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    repository = JsonFakeUserRepository.from_file(source)
+
+    assert repository.authenticate(
+        cpf="12345678901", password=SecretStr("ana-demo")
+    ) == FakeUser(sub="12345678901", name="Ana Demo", email="ana@example.test")
+
+
+@pytest.mark.parametrize(
+    "payload,error",
+    (
+        ("not-json", "fake user JSON is invalid"),
+        ('{"users": []}', "users must contain at least one item"),
+        ('{"users": [{"cpf": "123"}]}', "fake user JSON is invalid"),
+        (
+            '{"users": [{"cpf": "123", "password": "ana-demo", "name": "Ana", "email": "ana@example.test"}]}',
+            "fake user JSON is invalid",
+        ),
+    ),
+)
+def test_json_repository_rejects_invalid_content(
+    tmp_path: Path, payload: str, error: str
+) -> None:
+    source = tmp_path / "fake-users.json"
+    source.write_text(payload, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=error) as raised:
+        JsonFakeUserRepository.from_file(source)
+
+    assert raised.value.__cause__ is None
+
+
+def test_json_repository_rejects_unavailable_file(tmp_path: Path) -> None:
+    source = tmp_path / "fake-users.json"
+
+    with pytest.raises(ValueError, match="fake user JSON file is unavailable") as error:
+        JsonFakeUserRepository.from_file(source)
+
+    assert isinstance(error.value.__cause__, OSError)

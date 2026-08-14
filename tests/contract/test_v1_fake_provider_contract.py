@@ -11,6 +11,7 @@ from govbr_auth.fake import (
     FakeGovBrProvider,
     FakeOAuthError,
     InMemoryFakeUserRepository,
+    JsonFakeUserRepository,
     FakeTokenRequest,
     FakeTokenResponse,
 )
@@ -75,5 +76,7 @@ def test_fake_package_exports_credential_contract() -> None:
 
     assert fake.FakeCredentialAuthenticator is FakeCredentialAuthenticator
     assert fake.InMemoryFakeUserRepository is InMemoryFakeUserRepository
+    assert fake.JsonFakeUserRepository is JsonFakeUserRepository
     assert "FakeCredentialAuthenticator" in fake.__all__
     assert "InMemoryFakeUserRepository" in fake.__all__
+    assert "JsonFakeUserRepository" in fake.__all__

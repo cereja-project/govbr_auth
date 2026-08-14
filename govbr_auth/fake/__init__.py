@@ -9,6 +9,7 @@ from govbr_auth.fake.artifacts import (
 from govbr_auth.fake.credentials import (
     FakeCredentialAuthenticator,
     InMemoryFakeUserRepository,
+    JsonFakeUserRepository,
 )
 from govbr_auth.fake.fastapi import create_fake_govbr_app, create_fake_govbr_router
 from govbr_auth.fake.models import FakeClient, FakeUser
@@ -55,6 +56,7 @@ __all__ = (
     "InMemoryAuthorizationCodeReplayStore",
     "InMemoryFakeUserStore",
     "InMemoryFakeUserRepository",
+    "JsonFakeUserRepository",
     "create_fake_govbr_app",
     "create_fake_govbr_router",
 )

@@ -92,6 +92,7 @@ def test_fake_exports_exact_optional_provider_surface() -> None:
         "InMemoryAuthorizationCodeReplayStore",
         "InMemoryFakeUserStore",
         "InMemoryFakeUserRepository",
+        "JsonFakeUserRepository",
         "create_fake_govbr_app",
         "create_fake_govbr_router",
     )
