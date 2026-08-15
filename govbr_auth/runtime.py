@@ -1,9 +1,15 @@
-"""Framework-neutral configuration for selecting a Gov.br runtime provider."""
+"""Framework-neutral configuration and composition for Gov.br runtimes."""
 
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
+from types import TracebackType
+from typing import TYPE_CHECKING, Callable
+
+import httpx
 
 from pydantic import (
     AnyHttpUrl,
@@ -14,7 +20,13 @@ from pydantic import (
     field_validator,
 )
 
+from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.settings import GovBrSettings
+from govbr_auth.core.token_validation import IdTokenValidator
+from govbr_auth.core.transactions import InMemoryTransactionStore
+
+if TYPE_CHECKING:
+    from govbr_auth.fake.runtime import FakeGovBrRuntime
 
 
 class GovBrProvider(StrEnum):
@@ -79,6 +91,90 @@ class GovBrRuntimeSettings(BaseModel):
         """Build validated settings from an explicit environment mapping."""
         values = os.environ if environ is None else environ
         return cls.model_validate(_runtime_values(values))
+
+
+@dataclass(slots=True)
+class GovBrRuntime:
+    """Own the client resources created by the framework-neutral runtime."""
+
+    settings: GovBrRuntimeSettings
+    client: GovBrClient
+    provider: GovBrProvider
+    fake: "FakeGovBrRuntime | None"
+    _owned_http: httpx.AsyncClient | None
+    _closed: bool = False
+
+    @property
+    def is_closed(self) -> bool:
+        """Return whether this runtime has already completed its lifecycle."""
+        return self._closed
+
+    async def __aenter__(self) -> "GovBrRuntime":
+        """Enter the runtime lifecycle context."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Close resources when leaving the runtime lifecycle context."""
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Close the HTTP client created by this runtime exactly once."""
+        if not self._closed and self._owned_http is not None:
+            await self._owned_http.aclose()
+        self._closed = True
+
+
+def utc_now() -> datetime:
+    """Return the current timezone-aware UTC time for runtime collaborators."""
+    return datetime.now(UTC)
+
+
+def create_govbr_runtime(
+    settings: GovBrRuntimeSettings,
+    *,
+    http: httpx.AsyncClient | None = None,
+    fake_transport_factory: object | None = None,
+    clock: Callable[[], datetime] = utc_now,
+    user_repository: object | None = None,
+) -> GovBrRuntime:
+    """Compose the official OAuth runtime without importing a web framework.
+
+    Fake-provider construction is introduced by the following runtime task. The
+    extension arguments are accepted here to keep the public composition API
+    stable while that provider remains unavailable.
+    """
+    if settings.provider is not GovBrProvider.OFFICIAL:
+        raise ValueError("fake runtime composition is not available")
+
+    del fake_transport_factory, clock, user_repository
+    oauth = settings.oauth
+    if oauth is None:
+        raise ValueError("official runtime requires OAuth settings")
+
+    owned_http = None if http is not None else httpx.AsyncClient()
+    client = _create_client(oauth, http=http or owned_http)
+    return GovBrRuntime(
+        settings=settings,
+        client=client,
+        provider=GovBrProvider.OFFICIAL,
+        fake=None,
+        _owned_http=owned_http,
+    )
+
+
+def _create_client(settings: GovBrSettings, *, http: httpx.AsyncClient) -> GovBrClient:
+    """Compose the common OAuth client used by each runtime provider."""
+    return GovBrClient(
+        settings,
+        InMemoryTransactionStore(settings.transaction_secret),
+        IdTokenValidator(settings=settings),
+        http,
+    )
 
 
 def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:

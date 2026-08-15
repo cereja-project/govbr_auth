@@ -1,9 +1,19 @@
-"""Tests for framework-neutral runtime configuration."""
+"""Tests for framework-neutral runtime configuration and lifecycle."""
 
+from pathlib import Path
+
+import httpx
 import pytest
-from pydantic import ValidationError
+from cryptography.fernet import Fernet
+from pydantic import SecretStr, ValidationError
 
-from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+import govbr_auth.runtime as runtime_module
+from govbr_auth.core.settings import GovBrSettings
+from govbr_auth.runtime import (
+    GovBrProvider,
+    GovBrRuntimeSettings,
+    create_govbr_runtime,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -39,6 +49,24 @@ def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GOVBR_FAKE_USERS_FILE",
     ):
         monkeypatch.delenv(variable, raising=False)
+
+
+@pytest.fixture
+def settings() -> GovBrRuntimeSettings:
+    """Provide complete official settings for runtime composition."""
+    return GovBrRuntimeSettings(
+        oauth=GovBrSettings(
+            authorization_url="https://sso.example.test/authorize",
+            token_url="https://sso.example.test/token",
+            userinfo_url="https://sso.example.test/userinfo",
+            client_id="test-client",
+            client_secret=SecretStr("test-client-secret"),
+            redirect_uri="https://consumer.example.test/oauth/callback",
+            transaction_secret=SecretStr(Fernet.generate_key().decode("ascii")),
+            issuer="https://sso.example.test",
+            jwks_url="https://sso.example.test/jwks",
+        )
+    )
 
 
 def test_runtime_settings_default_to_official(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -105,3 +133,78 @@ def test_runtime_settings_reject_invalid_fake_port(port: str) -> None:
         GovBrRuntimeSettings.from_environment(
             {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_PORT": port}
         )
+
+
+@pytest.mark.asyncio
+async def test_official_runtime_owns_and_closes_created_http_client(
+    settings: GovBrRuntimeSettings,
+) -> None:
+    """A runtime-created HTTP client must be closed with its runtime."""
+    runtime = create_govbr_runtime(settings)
+
+    assert runtime.provider is GovBrProvider.OFFICIAL
+    assert runtime.fake is None
+
+    await runtime.aclose()
+
+    assert runtime.is_closed is True
+
+
+@pytest.mark.asyncio
+async def test_runtime_does_not_close_injected_http_client(
+    settings: GovBrRuntimeSettings,
+) -> None:
+    """A caller-owned HTTP client must remain usable after runtime closure."""
+    async with httpx.AsyncClient() as http:
+        runtime = create_govbr_runtime(settings, http=http)
+
+        await runtime.aclose()
+
+        assert http.is_closed is False
+
+
+@pytest.mark.asyncio
+async def test_runtime_context_closes_owned_resources(
+    settings: GovBrRuntimeSettings,
+) -> None:
+    """Leaving a runtime context must complete its owned-resource lifecycle."""
+    async with create_govbr_runtime(settings) as runtime:
+        assert runtime.is_closed is False
+
+    assert runtime.is_closed is True
+
+
+@pytest.mark.asyncio
+async def test_runtime_closes_an_owned_http_client_only_once(
+    settings: GovBrRuntimeSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Repeated closure must not close a runtime-owned client more than once."""
+
+    class CountingAsyncClient(httpx.AsyncClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.close_calls = 0
+
+        async def aclose(self) -> None:
+            self.close_calls += 1
+            await super().aclose()
+
+    monkeypatch.setattr(runtime_module.httpx, "AsyncClient", CountingAsyncClient)
+    runtime = create_govbr_runtime(settings)
+    owned_http = runtime.client._http
+
+    await runtime.aclose()
+    await runtime.aclose()
+
+    assert isinstance(owned_http, CountingAsyncClient)
+    assert owned_http.close_calls == 1
+
+
+def test_runtime_source_has_no_web_framework_imports() -> None:
+    """Runtime composition must remain usable without a web framework."""
+    source = Path("govbr_auth/runtime.py").read_text(encoding="utf-8")
+
+    assert all(
+        name not in source for name in ("fastapi", "starlette", "flask", "django")
+    )
