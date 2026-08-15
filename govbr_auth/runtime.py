@@ -21,7 +21,7 @@ from pydantic import (
 )
 
 from govbr_auth.core.client import GovBrClient
-from govbr_auth.core.settings import GovBrSettings
+from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
 from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import InMemoryTransactionStore
 
@@ -138,20 +138,22 @@ def create_govbr_runtime(
     settings: GovBrRuntimeSettings,
     *,
     http: httpx.AsyncClient | None = None,
-    fake_transport_factory: object | None = None,
+    fake_transport_factory: (
+        Callable[["FakeGovBrRuntime"], httpx.AsyncBaseTransport] | None
+    ) = None,
     clock: Callable[[], datetime] = utc_now,
     user_repository: object | None = None,
 ) -> GovBrRuntime:
-    """Compose the official OAuth runtime without importing a web framework.
+    """Compose an official or local fake runtime without a web framework."""
+    if settings.provider is GovBrProvider.FAKE:
+        return _create_fake_consumer_runtime(
+            settings,
+            http=http,
+            fake_transport_factory=fake_transport_factory,
+            clock=clock,
+            user_repository=user_repository,
+        )
 
-    Fake-provider construction is introduced by the following runtime task. The
-    extension arguments are accepted here to keep the public composition API
-    stable while that provider remains unavailable.
-    """
-    if settings.provider is not GovBrProvider.OFFICIAL:
-        raise ValueError("fake runtime composition is not available")
-
-    del fake_transport_factory, clock, user_repository
     oauth = settings.oauth
     if oauth is None:
         raise ValueError("official runtime requires OAuth settings")
@@ -165,6 +167,66 @@ def create_govbr_runtime(
         provider=GovBrProvider.OFFICIAL,
         fake=None,
         _owned_http=owned_http,
+    )
+
+
+def _create_fake_consumer_runtime(
+    settings: GovBrRuntimeSettings,
+    *,
+    http: httpx.AsyncClient | None,
+    fake_transport_factory: (
+        Callable[["FakeGovBrRuntime"], httpx.AsyncBaseTransport] | None
+    ),
+    clock: Callable[[], datetime],
+    user_repository: object | None,
+) -> GovBrRuntime:
+    """Compose the fake provider before allocating its owned HTTP client."""
+    if http is not None:
+        raise ValueError("fake runtime does not accept an HTTP client")
+    if fake_transport_factory is None:
+        raise ValueError("fake transport factory is required")
+
+    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+
+    effective_settings = settings
+    if not settings.fake_end_to_end:
+        values = settings.model_dump()
+        values["fake_end_to_end"] = True
+        effective_settings = GovBrRuntimeSettings.model_validate(values)
+    fake = create_fake_govbr_runtime(
+        effective_settings,
+        clock=clock,
+        user_repository=user_repository,
+    )
+    oauth = _fake_oauth_settings(fake)
+    create_client = _create_client(oauth)
+    transport = fake_transport_factory(fake)
+    if not isinstance(transport, httpx.AsyncBaseTransport):
+        raise TypeError("fake transport factory must return AsyncBaseTransport")
+    owned_http = httpx.AsyncClient(transport=transport)
+    return GovBrRuntime(
+        settings=effective_settings,
+        client=create_client(owned_http),
+        provider=GovBrProvider.FAKE,
+        fake=fake,
+        _owned_http=owned_http,
+    )
+
+
+def _fake_oauth_settings(fake: "FakeGovBrRuntime") -> GovBrSettings:
+    """Derive consumer settings from the validated fake-provider graph."""
+    client = fake.settings.clients[0]
+    return GovBrSettings(
+        environment=ProviderEnvironment.LOCAL,
+        authorization_url=fake.endpoints.authorize,
+        token_url=fake.endpoints.token,
+        userinfo_url=fake.endpoints.userinfo,
+        client_id=client.client_id,
+        client_secret=client.client_secret,
+        redirect_uri=client.registered_redirect_uris[0],
+        transaction_secret=fake.settings.artifact_secret,
+        issuer=fake.endpoints.issuer,
+        jwks_url=fake.endpoints.jwks,
     )
 
 
@@ -191,6 +253,10 @@ def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
         if oauth_values:
             values["oauth"] = oauth_values
     elif provider == GovBrProvider.FAKE.value:
+        if any(name in environ for name in _OFFICIAL_ENDPOINT_FIELDS):
+            raise ValueError(
+                "official endpoint variables conflict with fake provider selection"
+            )
         values.update(_prefixed_values(environ, _FAKE_FIELDS))
         if (
             values.get("fake_end_to_end") == "true"
@@ -236,6 +302,17 @@ _OFFICIAL_OAUTH_FIELDS = {
     "GOVBR_READ_TIMEOUT_SECONDS": "read_timeout_seconds",
     "GOVBR_CLOCK_SKEW_SECONDS": "clock_skew_seconds",
 }
+
+_OFFICIAL_ENDPOINT_FIELDS = frozenset(
+    {
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_USERINFO_URL",
+        "GOVBR_REDIRECT_URI",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+    }
+)
 
 _FAKE_FIELDS = {
     "GOVBR_FAKE_END_TO_END": "fake_end_to_end",

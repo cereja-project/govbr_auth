@@ -1,6 +1,6 @@
 """Tests for framework-neutral runtime configuration and lifecycle."""
 
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -71,6 +71,16 @@ def settings() -> GovBrRuntimeSettings:
     )
 
 
+@pytest.fixture
+def fake_settings() -> GovBrRuntimeSettings:
+    """Provide complete settings for an embedded fake provider."""
+    return GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_end_to_end=True,
+        fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
+    )
+
+
 def test_runtime_settings_default_to_official(monkeypatch: pytest.MonkeyPatch) -> None:
     """The runtime must not enable the fake provider implicitly."""
     monkeypatch.delenv("GOVBR_PROVIDER", raising=False)
@@ -99,6 +109,29 @@ def test_runtime_settings_reject_unknown_provider(
 
     with pytest.raises(ValidationError):
         GovBrRuntimeSettings.from_environment()
+
+
+@pytest.mark.parametrize(
+    "variable",
+    (
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_USERINFO_URL",
+        "GOVBR_REDIRECT_URI",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+    ),
+    ids=("authorize", "token", "userinfo", "redirect", "issuer", "jwks"),
+)
+def test_fake_environment_rejects_official_endpoint_variables(variable: str) -> None:
+    """Fake selection must not silently ignore an official provider endpoint."""
+    with pytest.raises(ValueError, match="official endpoint"):
+        GovBrRuntimeSettings.from_environment(
+            {
+                "GOVBR_PROVIDER": "fake",
+                variable: "https://sso.example.test/endpoint",
+            }
+        )
 
 
 def test_runtime_configuration_is_available_from_core() -> None:
@@ -227,6 +260,112 @@ def test_official_runtime_validates_dependencies_before_creating_owned_http(
 
     with pytest.raises(ValueError):
         create_govbr_runtime(invalid_settings)
+
+    assert http_created is False
+
+
+def test_fake_runtime_uses_its_exact_endpoint_set(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """Consumer settings must be derived from the composed fake provider."""
+    supplied_fake = None
+
+    def transport_factory(fake):
+        nonlocal supplied_fake
+        supplied_fake = fake
+        return httpx.MockTransport(lambda _: httpx.Response(500))
+
+    runtime = create_govbr_runtime(
+        fake_settings,
+        fake_transport_factory=transport_factory,
+        clock=lambda: datetime(2026, 8, 15, 12, 0, tzinfo=UTC),
+    )
+
+    assert runtime.fake is supplied_fake
+    assert runtime.fake is not None
+    assert (
+        str(runtime.client._settings.authorization_url)
+        == runtime.fake.endpoints.authorize
+    )
+    assert str(runtime.client._settings.token_url) == runtime.fake.endpoints.token
+    assert str(runtime.client._settings.userinfo_url) == runtime.fake.endpoints.userinfo
+    assert str(runtime.client._settings.jwks_url) == runtime.fake.endpoints.jwks
+    assert str(runtime.client._settings.issuer) == runtime.fake.endpoints.issuer
+
+
+def test_fake_consumer_runtime_mounts_provider_below_configured_prefix(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """Embedded consumers must not collide with application root routes."""
+    provider_only_settings = fake_settings.model_copy(update={"fake_end_to_end": False})
+
+    runtime = create_govbr_runtime(
+        provider_only_settings,
+        fake_transport_factory=lambda _: httpx.MockTransport(
+            lambda __: httpx.Response(500)
+        ),
+    )
+
+    assert runtime.fake is not None
+    assert runtime.fake.prefix == provider_only_settings.fake_provider_prefix
+    assert runtime.fake.endpoints.authorize.endswith("/fake-govbr/authorize")
+
+
+def test_fake_runtime_requires_transport_factory_before_allocating_http(
+    fake_settings: GovBrRuntimeSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing ASGI composition must fail without leaking an HTTP client."""
+    http_created = False
+
+    def fail_if_http_created(*args: object, **kwargs: object) -> httpx.AsyncClient:
+        nonlocal http_created
+        http_created = True
+        raise AssertionError("the owned HTTP client must not be created")
+
+    monkeypatch.setattr(runtime_module.httpx, "AsyncClient", fail_if_http_created)
+
+    with pytest.raises(ValueError, match="fake transport factory"):
+        create_govbr_runtime(fake_settings)
+
+    assert http_created is False
+
+
+@pytest.mark.asyncio
+async def test_fake_runtime_rejects_injected_http_instead_of_transport_factory(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """Fake composition must let the adapter receive the composed provider."""
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(ValueError, match="does not accept an HTTP client"):
+            create_govbr_runtime(
+                fake_settings,
+                http=http,
+                fake_transport_factory=lambda _: httpx.MockTransport(
+                    lambda __: httpx.Response(500)
+                ),
+            )
+
+
+def test_fake_runtime_validates_transport_before_allocating_http(
+    fake_settings: GovBrRuntimeSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An invalid adapter result must fail before an HTTP client is owned."""
+    http_created = False
+
+    def fail_if_http_created(*args: object, **kwargs: object) -> httpx.AsyncClient:
+        nonlocal http_created
+        http_created = True
+        raise AssertionError("the owned HTTP client must not be created")
+
+    monkeypatch.setattr(runtime_module.httpx, "AsyncClient", fail_if_http_created)
+
+    with pytest.raises(TypeError, match="AsyncBaseTransport"):
+        create_govbr_runtime(
+            fake_settings,
+            fake_transport_factory=lambda _: object(),
+        )
 
     assert http_created is False
 

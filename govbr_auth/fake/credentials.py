@@ -1,12 +1,22 @@
 """Credential sources for the explicit local Fake Gov.br provider."""
 
-from secrets import compare_digest
+from dataclasses import dataclass, field
 from pathlib import Path
+from secrets import compare_digest
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError, field_validator
 
 from govbr_auth.fake.models import FakeUser
+
+
+@dataclass(frozen=True, slots=True)
+class FakeLoginCredential:
+    """Describe a demonstrative credential without attaching it to a user."""
+
+    cpf: str
+    password: str = field(repr=False)
+    name: str
 
 
 class FakeCredentialAuthenticator(Protocol):

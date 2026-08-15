@@ -8,6 +8,7 @@ from govbr_auth.fake.artifacts import (
 )
 from govbr_auth.fake.credentials import (
     FakeCredentialAuthenticator,
+    FakeLoginCredential,
     InMemoryFakeUserRepository,
     JsonFakeUserRepository,
 )
@@ -22,6 +23,11 @@ from govbr_auth.fake.provider import (
     FakeOAuthError,
     FakeTokenRequest,
     FakeTokenResponse,
+)
+from govbr_auth.fake.runtime import (
+    FakeGovBrEndpoints,
+    FakeGovBrRuntime,
+    create_fake_govbr_runtime,
 )
 from govbr_auth.fake.signing import FakeSigningKey, FakeTokenIssuer
 from govbr_auth.fake.settings import FakeGovBrSettings
@@ -44,8 +50,11 @@ __all__ = (
     "FakeClient",
     "FakeClientCredentials",
     "FakeCredentialAuthenticator",
+    "FakeGovBrEndpoints",
     "FakeGovBrProvider",
+    "FakeGovBrRuntime",
     "FakeGovBrSettings",
+    "FakeLoginCredential",
     "FakeOAuthError",
     "FakeSigningKey",
     "FakeTokenIssuer",
@@ -57,6 +66,7 @@ __all__ = (
     "InMemoryFakeUserStore",
     "InMemoryFakeUserRepository",
     "JsonFakeUserRepository",
+    "create_fake_govbr_runtime",
     "create_fake_govbr_app",
     "create_fake_govbr_router",
 )

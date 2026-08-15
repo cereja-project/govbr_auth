@@ -8,12 +8,16 @@ from govbr_auth.fake import (
     FakeAuthorizationSession,
     FakeClientCredentials,
     FakeCredentialAuthenticator,
+    FakeGovBrEndpoints,
     FakeGovBrProvider,
+    FakeGovBrRuntime,
+    FakeLoginCredential,
     FakeOAuthError,
     InMemoryFakeUserRepository,
     JsonFakeUserRepository,
     FakeTokenRequest,
     FakeTokenResponse,
+    create_fake_govbr_runtime,
 )
 
 
@@ -80,3 +84,33 @@ def test_fake_package_exports_credential_contract() -> None:
     assert "FakeCredentialAuthenticator" in fake.__all__
     assert "InMemoryFakeUserRepository" in fake.__all__
     assert "JsonFakeUserRepository" in fake.__all__
+
+
+def test_fake_package_exports_runtime_contract() -> None:
+    import govbr_auth.fake as fake
+
+    assert tuple(field.name for field in fields(FakeLoginCredential)) == (
+        "cpf",
+        "password",
+        "name",
+    )
+    assert tuple(field.name for field in fields(FakeGovBrEndpoints)) == (
+        "authorize",
+        "token",
+        "userinfo",
+        "jwks",
+        "issuer",
+    )
+    assert tuple(field.name for field in fields(FakeGovBrRuntime)) == (
+        "settings",
+        "provider",
+        "credential_authenticator",
+        "users",
+        "credentials",
+        "prefix",
+        "endpoints",
+    )
+    assert fake.FakeLoginCredential is FakeLoginCredential
+    assert fake.FakeGovBrEndpoints is FakeGovBrEndpoints
+    assert fake.FakeGovBrRuntime is FakeGovBrRuntime
+    assert fake.create_fake_govbr_runtime is create_fake_govbr_runtime
