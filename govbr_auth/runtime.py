@@ -156,8 +156,9 @@ def create_govbr_runtime(
     if oauth is None:
         raise ValueError("official runtime requires OAuth settings")
 
+    create_client = _create_client(oauth)
     owned_http = None if http is not None else httpx.AsyncClient()
-    client = _create_client(oauth, http=http or owned_http)
+    client = create_client(http if http is not None else owned_http)
     return GovBrRuntime(
         settings=settings,
         client=client,
@@ -167,14 +168,17 @@ def create_govbr_runtime(
     )
 
 
-def _create_client(settings: GovBrSettings, *, http: httpx.AsyncClient) -> GovBrClient:
-    """Compose the common OAuth client used by each runtime provider."""
-    return GovBrClient(
-        settings,
-        InMemoryTransactionStore(settings.transaction_secret),
-        IdTokenValidator(settings=settings),
-        http,
-    )
+def _create_client(
+    settings: GovBrSettings,
+) -> Callable[[httpx.AsyncClient], GovBrClient]:
+    """Prepare the common OAuth client composition used by each provider."""
+    transactions = InMemoryTransactionStore(settings.transaction_secret)
+    validator = IdTokenValidator(settings=settings)
+
+    def create(http: httpx.AsyncClient) -> GovBrClient:
+        return GovBrClient(settings, transactions, validator, http)
+
+    return create
 
 
 def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:

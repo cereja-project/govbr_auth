@@ -1,5 +1,6 @@
 """Tests for framework-neutral runtime configuration and lifecycle."""
 
+from datetime import UTC
 from pathlib import Path
 
 import httpx
@@ -13,6 +14,7 @@ from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntimeSettings,
     create_govbr_runtime,
+    utc_now,
 )
 
 
@@ -199,6 +201,42 @@ async def test_runtime_closes_an_owned_http_client_only_once(
 
     assert isinstance(owned_http, CountingAsyncClient)
     assert owned_http.close_calls == 1
+
+
+def test_official_runtime_validates_dependencies_before_creating_owned_http(
+    settings: GovBrRuntimeSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invalid transaction encryption must not allocate a client to leak."""
+    assert settings.oauth is not None
+    invalid_settings = settings.model_copy(
+        update={
+            "oauth": settings.oauth.model_copy(
+                update={"transaction_secret": SecretStr("invalid-fernet-key")}
+            )
+        }
+    )
+    http_created = False
+
+    def fail_if_http_created() -> httpx.AsyncClient:
+        nonlocal http_created
+        http_created = True
+        raise AssertionError("the owned HTTP client must not be created")
+
+    monkeypatch.setattr(runtime_module.httpx, "AsyncClient", fail_if_http_created)
+
+    with pytest.raises(ValueError):
+        create_govbr_runtime(invalid_settings)
+
+    assert http_created is False
+
+
+def test_utc_now_returns_timezone_aware_utc_datetime() -> None:
+    """Runtime clocks must supply an aware datetime in the UTC timezone."""
+    current_time = utc_now()
+
+    assert current_time.tzinfo is UTC
+    assert current_time.utcoffset().total_seconds() == 0
 
 
 def test_runtime_source_has_no_web_framework_imports() -> None:
