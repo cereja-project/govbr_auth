@@ -101,6 +101,35 @@ def test_runtime_settings_select_fake_explicitly(
     assert settings.provider is GovBrProvider.FAKE
 
 
+def test_runtime_settings_parse_explicit_false_end_to_end() -> None:
+    """The canonical false spelling must keep the provider-only profile."""
+    settings = GovBrRuntimeSettings.from_environment(
+        {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_END_TO_END": "false"}
+    )
+
+    assert settings.fake_end_to_end is False
+
+
+def test_runtime_settings_build_official_oauth_from_environment() -> None:
+    """Official environment fields must populate the nested OAuth settings."""
+    settings = GovBrRuntimeSettings.from_environment(
+        {
+            "GOVBR_AUTHORIZATION_URL": "https://sso.example.test/authorize",
+            "GOVBR_TOKEN_URL": "https://sso.example.test/token",
+            "GOVBR_USERINFO_URL": "https://sso.example.test/userinfo",
+            "GOVBR_CLIENT_ID": "test-client",
+            "GOVBR_CLIENT_SECRET": "test-client-secret",
+            "GOVBR_REDIRECT_URI": "https://consumer.example.test/oauth/callback",
+            "GOVBR_TRANSACTION_SECRET": Fernet.generate_key().decode("ascii"),
+            "GOVBR_ISSUER": "https://sso.example.test",
+            "GOVBR_JWKS_URL": "https://sso.example.test/jwks",
+        }
+    )
+
+    assert settings.oauth is not None
+    assert settings.oauth.client_id == "test-client"
+
+
 def test_runtime_settings_reject_unknown_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -222,6 +251,17 @@ def test_embedded_runtime_revalidates_fake_provider_prefix() -> None:
             settings,
             fake_transport_factory=fail_if_factory_called,
         )
+
+
+def test_official_runtime_rejects_unvalidated_settings_without_oauth() -> None:
+    """Runtime composition must retain its defensive OAuth invariant."""
+    settings = GovBrRuntimeSettings.model_construct(
+        provider=GovBrProvider.OFFICIAL,
+        oauth=None,
+    )
+
+    with pytest.raises(ValueError, match="official runtime requires OAuth settings"):
+        create_govbr_runtime(settings)
 
 
 @pytest.mark.asyncio
