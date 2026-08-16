@@ -21,10 +21,10 @@ e use ``GovBrAuth``; as factories abaixo atendem topologias avançadas.
 
 .. autoclass:: govbr_auth.fake.InMemoryFakeUserStore
 
-.. py:function:: create_fake_govbr_router(runtime, *, prefix=None, credential_authenticator=None)
+.. py:function:: create_fake_govbr_router(runtime, *, prefix=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)
 
    Cria as rotas ASGI de um runtime FakeGov existente.
 
-.. py:function:: create_fake_govbr_app(runtime, *, credential_authenticator=None)
+.. py:function:: create_fake_govbr_app(runtime, *, credential_authenticator=None, automatic_subject=None, clock=utc_now)
 
    Cria uma aplicação ASGI de provedor separado para uso avançado.

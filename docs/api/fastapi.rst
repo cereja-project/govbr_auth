@@ -18,6 +18,8 @@ Uso comum:
 
    Contexto entregue ao handler após a validação completa da autenticação.
 
-.. py:function:: create_govbr_router(runtime, *, on_success, on_error=None)
+.. py:function:: create_govbr_router(*, client, on_success, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now)
 
-   Factory avançada para um runtime já composto.
+   Factory avançada que cria as rotas de autenticação sobre um
+   ``GovBrClient`` já composto. ``client`` e ``on_success`` são obrigatórios
+   e todos os argumentos são nomeados.
