@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import MappingProxyType
+from functools import partial
 from typing import TYPE_CHECKING
 
-import httpx
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from govbr_auth.core.client import GovBrClient
@@ -30,7 +30,7 @@ from govbr_auth.runtime import (
 )
 
 if TYPE_CHECKING:
-    from govbr_auth.fake.runtime import FakeGovBrRuntime, FakeUserRepository
+    from govbr_auth.fake.runtime import FakeUserRepository
 
 __all__ = [
     "AuthContext",
@@ -129,12 +129,14 @@ class GovBrAuth:
                 settings or GovBrRuntimeSettings.from_environment(),
                 prefix,
             )
+            fake_transport_factory = None
+            if resolved_settings.provider is GovBrProvider.FAKE:
+                from govbr_auth.fake.fastapi import _fake_asgi_transport
+
+                fake_transport_factory = partial(_fake_asgi_transport, clock=clock)
             runtime = create_govbr_runtime(
                 resolved_settings,
-                fake_transport_factory=lambda fake: _fake_asgi_transport(
-                    fake,
-                    clock=clock,
-                ),
+                fake_transport_factory=fake_transport_factory,
                 clock=clock,
                 user_repository=user_repository,
             )
@@ -235,18 +237,3 @@ def _validate_runtime_callback(runtime: GovBrRuntime, prefix: str) -> None:
     configured = str(runtime.fake.settings.clients[0].registered_redirect_uris[0])
     if configured != expected:
         raise ValueError("fake runtime redirect URI does not match the router callback")
-
-
-def _fake_asgi_transport(
-    runtime: "FakeGovBrRuntime",
-    *,
-    clock: Callable[[], datetime],
-) -> httpx.AsyncBaseTransport:
-    """Create the FastAPI-owned in-process transport for a fake runtime."""
-    from govbr_auth.fake.fastapi import create_fake_govbr_router
-
-    provider_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    provider_app.include_router(create_fake_govbr_router(runtime, clock=clock))
-    return httpx.ASGITransport(
-        app=provider_app,
-    )

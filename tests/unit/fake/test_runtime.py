@@ -8,6 +8,7 @@ import pytest
 from pydantic import SecretStr, ValidationError
 
 from govbr_auth.fake import FakeUser, InMemoryFakeUserRepository
+from govbr_auth.fake import runtime as runtime_module
 from govbr_auth.fake.credentials import FakeLoginCredential
 from govbr_auth.fake.runtime import create_fake_govbr_runtime
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
@@ -60,6 +61,31 @@ def test_fake_runtime_contains_one_consistent_provider_graph(
             password=SecretStr("ana-demo"),
         )
         == runtime.users[0]
+    )
+
+
+def test_default_credentials_are_derived_from_the_default_user_source(
+    fake_settings: GovBrRuntimeSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Adding one default identity must also add its presented login credential."""
+    extra_user = FakeUser(
+        sub="11122233344",
+        name="Carla Demo",
+        email="carla@example.test",
+    )
+    monkeypatch.setattr(
+        runtime_module,
+        "_DEFAULT_USERS",
+        runtime_module._DEFAULT_USERS + ((extra_user, SecretStr("carla-demo")),),
+    )
+
+    runtime = create_fake_govbr_runtime(fake_settings, clock=fixed_clock)
+
+    assert runtime.credentials[-1] == FakeLoginCredential(
+        cpf="11122233344",
+        password="carla-demo",
+        name="Carla Demo",
     )
 
 

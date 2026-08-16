@@ -77,18 +77,6 @@ _DEFAULT_USERS = (
         SecretStr("bruno-demo"),
     ),
 )
-_DEFAULT_CREDENTIALS = (
-    FakeLoginCredential(
-        cpf="12345678901",
-        password="ana-demo",
-        name="Ana Demo",
-    ),
-    FakeLoginCredential(
-        cpf="98765432100",
-        password="bruno-demo",
-        name="Bruno Demo",
-    ),
-)
 
 
 def create_fake_govbr_runtime(
@@ -148,7 +136,15 @@ def _resolve_repository(
         return explicit, ()
     if settings.fake_users_file is not None:
         return JsonFakeUserRepository.from_file(settings.fake_users_file), ()
-    return InMemoryFakeUserRepository(_DEFAULT_USERS), _DEFAULT_CREDENTIALS
+    credentials = tuple(
+        FakeLoginCredential(
+            cpf=user.sub,
+            password=password.get_secret_value(),
+            name=user.name,
+        )
+        for user, password in _DEFAULT_USERS
+    )
+    return InMemoryFakeUserRepository(_DEFAULT_USERS), credentials
 
 
 def _fake_endpoints(

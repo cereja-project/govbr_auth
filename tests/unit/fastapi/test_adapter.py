@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import RedirectResponse, Response
@@ -115,6 +116,40 @@ def test_fastapi_facade_rejects_settings_and_runtime_together() -> None:
             runtime=client_runtime(RecordingClient()),
             on_success=success_handler,
         )
+
+
+@pytest.mark.asyncio
+async def test_fake_facade_uses_the_fake_adapter_transport_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The consumer facade must reuse the fake adapter's canonical ASGI transport."""
+    import govbr_auth.fake.fastapi as fake_adapter
+    from govbr_auth.fastapi import GovBrAuth
+
+    transported = []
+
+    def create_transport(runtime, *, clock):
+        transported.append((runtime, clock))
+        return httpx.MockTransport(lambda request: httpx.Response(500))
+
+    monkeypatch.setattr(fake_adapter, "_fake_asgi_transport", create_transport)
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    auth = GovBrAuth(
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        on_success=success_handler,
+    )
+
+    try:
+        assert len(transported) == 1
+        assert transported[0][0] is auth.runtime.fake
+    finally:
+        await auth.runtime.aclose()
 
 
 @pytest.mark.asyncio

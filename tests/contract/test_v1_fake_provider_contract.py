@@ -124,8 +124,8 @@ def test_fake_package_exports_runtime_contract() -> None:
     assert fake.create_fake_govbr_runtime is create_fake_govbr_runtime
 
 
-def test_fake_runtime_import_does_not_load_web_frameworks() -> None:
-    """Importing the neutral runtime must not activate FastAPI or Starlette."""
+def test_neutral_modules_do_not_load_web_frameworks() -> None:
+    """Importing neutral runtime and presentation modules must load no adapter."""
     result = subprocess.run(
         [
             sys.executable,
@@ -133,9 +133,11 @@ def test_fake_runtime_import_does_not_load_web_frameworks() -> None:
             (
                 "import sys\n"
                 "import govbr_auth.fake.runtime\n"
+                "import govbr_auth.runtime\n"
+                "import govbr_auth.presentation\n"
                 "loaded = sorted(name for name in sys.modules "
-                "if name == 'fastapi' or name.startswith('fastapi.') "
-                "or name == 'starlette' or name.startswith('starlette.'))\n"
+                "if name.split('.', 1)[0] in "
+                "{'fastapi', 'starlette', 'flask', 'werkzeug', 'django', 'asgiref'})\n"
                 "print('\\n'.join(loaded))\n"
                 "raise SystemExit(bool(loaded))\n"
             ),
