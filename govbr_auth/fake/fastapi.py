@@ -26,7 +26,11 @@ from govbr_auth.fake.provider import (
     FakeOAuthError,
     FakeTokenRequest,
 )
-from govbr_auth.fake.runtime import FakeGovBrRuntime, create_fake_govbr_runtime
+from govbr_auth.fake.runtime import (
+    FakeGovBrRuntime,
+    FakeUserRepository,
+    create_fake_govbr_runtime,
+)
 from govbr_auth.fastapi import AuthContext, GovBrAuth, utc_now
 from govbr_auth.presentation import render_error, render_home, render_success
 from govbr_auth.runtime import (
@@ -111,7 +115,7 @@ def create_fake_govbr_app(
     application = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     runtime = _as_http_runtime(
         runtime,
-        prefix="",
+        prefix=None if isinstance(runtime, FakeGovBrRuntime) else "",
         credential_authenticator=credential_authenticator,
     )
     application.include_router(
@@ -128,7 +132,7 @@ def create_fake_app(
     settings: GovBrRuntimeSettings | None = None,
     *,
     clock: Callable[[], datetime] = utc_now,
-    user_repository: object | None = None,
+    user_repository: FakeUserRepository | None = None,
 ) -> FastAPI:
     """Create the provider-only or complete local fake application profile."""
     resolved_settings = settings or _launcher_settings()
@@ -413,6 +417,9 @@ def _as_http_runtime(
     credential_authenticator: FakeCredentialAuthenticator | None,
 ) -> _FakeHttpRuntime:
     if isinstance(runtime, FakeGovBrRuntime):
+        if prefix is not None and prefix != runtime.prefix:
+            raise ValueError("prefix does not match runtime prefix")
+
         return _ProviderRuntimeAdapter(
             provider=runtime.provider,
             credential_authenticator=(
@@ -420,7 +427,7 @@ def _as_http_runtime(
                 if credential_authenticator is None
                 else credential_authenticator
             ),
-            prefix=runtime.prefix if prefix is None else prefix,
+            prefix=runtime.prefix,
         )
     return _ProviderRuntimeAdapter(
         provider=runtime,

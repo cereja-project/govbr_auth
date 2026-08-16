@@ -299,6 +299,53 @@ async def test_router_consumes_canonical_fake_runtime() -> None:
 
 
 @pytest.mark.asyncio
+async def test_app_publishes_canonical_fake_runtime_endpoint() -> None:
+    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+
+    runtime = create_fake_govbr_runtime(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        clock=lambda: FIXED_NOW,
+    )
+    application = create_fake_govbr_app(runtime, clock=lambda: FIXED_NOW)
+    client = runtime.settings.clients[0]
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://127.0.0.1:8000",
+    ) as http:
+        response = await http.get(
+            runtime.endpoints.authorize,
+            params=authorization_params(
+                client_id=client.client_id,
+                redirect_uri=str(client.registered_redirect_uris[0]),
+            ),
+        )
+
+    assert response.status_code == 200
+    assert 'name="cpf"' in response.text
+
+
+def test_runtime_router_rejects_prefix_that_diverges_from_canonical_endpoints() -> None:
+    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+
+    runtime = create_fake_govbr_runtime(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        clock=lambda: FIXED_NOW,
+    )
+
+    with pytest.raises(ValueError, match="runtime prefix"):
+        create_fake_govbr_router(runtime, prefix="/different")
+
+
+@pytest.mark.asyncio
 async def test_mounted_router_completes_http_flow_with_prefix_and_root_path() -> None:
     from fastapi import FastAPI
 

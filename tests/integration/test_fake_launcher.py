@@ -1,6 +1,7 @@
 """Exercise the unified local Fake Gov.br launcher profiles."""
 
 import json
+from typing import get_type_hints
 import runpy
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -385,6 +386,15 @@ async def test_end_to_end_explicit_repository_precedes_environment(
     assert "Environment User" not in callback.text
     assert "Credenciais da demo" not in home.text
     assert "explicit-secret" not in home.text
+
+
+def test_create_fake_app_exposes_public_repository_contract() -> None:
+    from govbr_auth.fake.fastapi import create_fake_app
+    from govbr_auth.fake.runtime import FakeUserRepository
+
+    assert get_type_hints(create_fake_app)["user_repository"] == (
+        FakeUserRepository | None
+    )
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 from govbr_auth.core import GovBrUser
@@ -32,6 +34,15 @@ def test_shared_shell_escapes_title_but_accepts_owned_body_markup() -> None:
 
     assert "<script>" not in page
     assert "<p>seguro</p>" in page
+
+
+def test_shared_shell_rejects_unknown_layout() -> None:
+    with pytest.raises(ValueError, match="layout must be 'wide' or 'card'"):
+        render_page(
+            title="Teste",
+            body="<p>conteúdo</p>",
+            layout=cast(object, "unknown"),
+        )
 
 
 def test_shared_presentation_components_escape_untrusted_values() -> None:

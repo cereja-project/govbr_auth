@@ -195,10 +195,12 @@ def render_page(*, title: str, body: str, layout: Literal["wide", "card"]) -> st
 Ambiente local para desenvolvimento e testes. Não use credenciais reais.
 </div></footer>
 </body>"""
-    else:
+    elif layout == "card":
         page_body = f"""<body class="card-layout">
 <main class="card-layout-main">{render_simulation_badge()}{body}</main>
 </body>"""
+    else:
+        raise ValueError("layout must be 'wide' or 'card'")
 
     return f"""<!doctype html>
 <html lang="pt-BR">
