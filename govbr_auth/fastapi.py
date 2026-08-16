@@ -70,6 +70,7 @@ def create_govbr_router(
     clock: Callable[[], datetime] = utc_now,
 ) -> APIRouter:
     """Create consumer authentication routes backed by a strict core client."""
+    prefix = _validate_router_prefix(prefix)
     router = APIRouter(prefix=prefix)
 
     @router.get("/login")
@@ -120,6 +121,7 @@ class GovBrAuth:
     ) -> None:
         if settings is not None and runtime is not None:
             raise TypeError("settings and runtime are mutually exclusive")
+        prefix = _validate_router_prefix(prefix)
         if runtime is None:
             runtime = create_govbr_runtime(
                 settings or GovBrRuntimeSettings.from_environment(),
@@ -182,6 +184,14 @@ def _auth_error_response(error: GovBrAuthError) -> JSONResponse:
         status_code=status_code,
         content={"error": error.code, "message": safe_message},
     )
+
+
+def _validate_router_prefix(prefix: str) -> str:
+    if prefix and not prefix.startswith("/"):
+        raise ValueError("prefix must be empty or start with '/'")
+    if prefix.endswith("/"):
+        raise ValueError("prefix must not end with '/'")
+    return prefix
 
 
 def _fake_asgi_transport(

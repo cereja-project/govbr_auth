@@ -118,6 +118,55 @@ def test_fastapi_facade_rejects_settings_and_runtime_together() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("prefix", "expected_message"),
+    (
+        ("auth", "prefix must be empty or start with '/'"),
+        ("/auth/", "prefix must not end with '/'"),
+    ),
+    ids=("missing-leading-slash", "trailing-slash"),
+)
+async def test_invalid_prefix_is_rejected_before_runtime_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+    prefix: str,
+    expected_message: str,
+) -> None:
+    import govbr_auth.fastapi as fastapi_adapter
+    from govbr_auth.fastapi import GovBrAuth
+
+    allocated_http: list[AsyncClient] = []
+
+    def allocate_runtime(*args, **kwargs) -> GovBrRuntime:
+        del args, kwargs
+        owned_http = AsyncClient()
+        allocated_http.append(owned_http)
+        return client_runtime(RecordingClient(), owned_http=owned_http)
+
+    monkeypatch.setattr(fastapi_adapter, "create_govbr_runtime", allocate_runtime)
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    raised: Exception | None = None
+    try:
+        GovBrAuth(
+            settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+            on_success=success_handler,
+            prefix=prefix,
+        )
+    except Exception as error:
+        raised = error
+
+    try:
+        assert allocated_http == []
+        assert isinstance(raised, ValueError)
+        assert str(raised) == expected_message
+    finally:
+        for http in allocated_http:
+            await http.aclose()
+
+
+@pytest.mark.asyncio
 async def test_router_lifespan_closes_runtime() -> None:
     from govbr_auth.fastapi import GovBrAuth
 
