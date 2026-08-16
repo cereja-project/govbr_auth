@@ -26,6 +26,7 @@ from govbr_auth.fake.provider import (
 from govbr_auth.fake.runtime import (
     FakeGovBrEndpoints,
     FakeGovBrRuntime,
+    FakeUserRepository,
     create_fake_govbr_runtime,
 )
 from govbr_auth.fake.signing import FakeSigningKey, FakeTokenIssuer
@@ -60,6 +61,7 @@ __all__ = (
     "FakeTokenRequest",
     "FakeTokenResponse",
     "FakeUser",
+    "FakeUserRepository",
     "FakeUserStore",
     "InMemoryAuthorizationCodeReplayStore",
     "InMemoryFakeUserStore",

@@ -30,7 +30,7 @@ from govbr_auth.runtime import (
 )
 
 if TYPE_CHECKING:
-    from govbr_auth.fake.runtime import FakeGovBrRuntime
+    from govbr_auth.fake.runtime import FakeGovBrRuntime, FakeUserRepository
 
 __all__ = [
     "AuthContext",
@@ -119,7 +119,7 @@ class GovBrAuth:
         expose_tokens: bool = False,
         prefix: str = "/auth/govbr",
         clock: Callable[[], datetime] = utc_now,
-        user_repository: object | None = None,
+        user_repository: "FakeUserRepository | None" = None,
     ) -> None:
         if settings is not None and runtime is not None:
             raise TypeError("settings and runtime are mutually exclusive")

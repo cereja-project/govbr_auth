@@ -25,7 +25,7 @@ from govbr_auth.fake.stores import (
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
 
-class _FakeUserRepository(
+class FakeUserRepository(
     FakeCredentialAuthenticator,
     FakeUserStore,
     Protocol,
@@ -95,7 +95,7 @@ def create_fake_govbr_runtime(
     settings: GovBrRuntimeSettings,
     *,
     clock: Callable[[], datetime],
-    user_repository: _FakeUserRepository | None = None,
+    user_repository: FakeUserRepository | None = None,
 ) -> FakeGovBrRuntime:
     """Compose one fake provider without importing an HTTP framework."""
     if settings.provider is not GovBrProvider.FAKE:
@@ -142,8 +142,8 @@ def create_fake_govbr_runtime(
 
 def _resolve_repository(
     settings: GovBrRuntimeSettings,
-    explicit: _FakeUserRepository | None,
-) -> tuple[_FakeUserRepository, tuple[FakeLoginCredential, ...]]:
+    explicit: FakeUserRepository | None,
+) -> tuple[FakeUserRepository, tuple[FakeLoginCredential, ...]]:
     if explicit is not None:
         return explicit, ()
     if settings.fake_users_file is not None:

@@ -88,6 +88,7 @@ def test_fake_exports_exact_optional_provider_surface() -> None:
         "FakeTokenRequest",
         "FakeTokenResponse",
         "FakeUser",
+        "FakeUserRepository",
         "FakeUserStore",
         "InMemoryAuthorizationCodeReplayStore",
         "InMemoryFakeUserStore",

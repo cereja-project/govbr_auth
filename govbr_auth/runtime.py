@@ -29,7 +29,7 @@ from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import InMemoryTransactionStore
 
 if TYPE_CHECKING:
-    from govbr_auth.fake.runtime import FakeGovBrRuntime
+    from govbr_auth.fake.runtime import FakeGovBrRuntime, FakeUserRepository
 
 
 class GovBrProvider(StrEnum):
@@ -175,7 +175,7 @@ def create_govbr_runtime(
         Callable[["FakeGovBrRuntime"], httpx.AsyncBaseTransport] | None
     ) = None,
     clock: Callable[[], datetime] = utc_now,
-    user_repository: object | None = None,
+    user_repository: "FakeUserRepository | None" = None,
 ) -> GovBrRuntime:
     """Compose an official or local fake runtime without a web framework."""
     if settings.provider is GovBrProvider.FAKE:
@@ -211,7 +211,7 @@ def _create_fake_consumer_runtime(
         Callable[["FakeGovBrRuntime"], httpx.AsyncBaseTransport] | None
     ),
     clock: Callable[[], datetime],
-    user_repository: object | None,
+    user_repository: "FakeUserRepository | None",
 ) -> GovBrRuntime:
     """Compose the fake provider before allocating its owned HTTP client."""
     if http is not None:

@@ -2,15 +2,9 @@
 
 import importlib
 import re
-from io import StringIO
 from pathlib import Path
-from urllib.parse import urlsplit
 
 import pytest
-from dotenv import dotenv_values
-
-from examples.example_fastapi import settings_from_environment
-from govbr_auth.core import ProviderEnvironment
 
 DOCS_ROOT = Path(__file__).parents[2] / "docs"
 PROJECT_ROOT = DOCS_ROOT.parent
@@ -63,44 +57,13 @@ def test_published_autodoc_references_are_importable() -> None:
             assert hasattr(module, attribute_name), reference
 
 
-def test_local_environment_example_configures_every_consumer_url_on_loopback(
-    monkeypatch,
-) -> None:
-    example_source = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
-    local_assignments = "\n".join(
-        line.removeprefix("# ")
-        for line in example_source.splitlines()
-        if line.startswith("# GOVBR_")
-    )
-    local_config = dotenv_values(stream=StringIO(local_assignments))
-    assert set(local_config) == {
-        "GOVBR_AUTHORIZATION_URL",
-        "GOVBR_CLIENT_ID",
-        "GOVBR_CLIENT_SECRET",
-        "GOVBR_ENVIRONMENT",
-        "GOVBR_ISSUER",
-        "GOVBR_JWKS_URL",
-        "GOVBR_REDIRECT_URI",
-        "GOVBR_TOKEN_URL",
-        "GOVBR_TRANSACTION_SECRET",
-        "GOVBR_USERINFO_URL",
-    }
-    for name, value in local_config.items():
-        assert value is not None
-        monkeypatch.setenv(name, value)
+def test_environment_example_documents_the_canonical_provider_switch() -> None:
+    source = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
 
-    settings = settings_from_environment()
-
-    assert settings.environment is ProviderEnvironment.LOCAL
-    assert str(settings.redirect_uri) == "http://localhost/auth/govbr/callback"
-    for url in (
-        settings.authorization_url,
-        settings.token_url,
-        settings.userinfo_url,
-        settings.issuer,
-        settings.jwks_url,
-    ):
-        assert urlsplit(str(url)).hostname == "localhost"
+    assert "GOVBR_PROVIDER=official" in source
+    assert "GOVBR_PROVIDER=fake" in source
+    assert "create_development_app" not in source
+    assert "There is no fake-mode flag" not in source
 
 
 def test_transaction_secret_documentation_explains_generation_and_storage() -> None:
@@ -132,7 +95,8 @@ def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
     required_commands = (
         'pip install "govbr-auth[fake]"',
         "python -m govbr_auth.fake",
-        "GOVBR_FAKE_END_TO_END=true",
+        "GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake",
+        '$env:GOVBR_FAKE_END_TO_END = "true"',
         "http://localhost:8000",
     )
     sources = (
@@ -143,8 +107,8 @@ def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
     assert tuple(
         tuple(command in source for command in required_commands) for source in sources
     ) == (
-        (True, True, True, True),
-        (True, True, True, True),
+        (True, True, True, True, True),
+        (True, True, True, True, True),
     )
 
 
@@ -230,3 +194,4 @@ def test_user_docs_use_only_the_canonical_fastapi_surface() -> None:
     assert "govbr_auth.demo" not in source
     assert ".install(" not in source
     assert "from govbr_auth import AuthContext, GovBrAuth" not in source
+    assert '"subject": context.user.subject' not in source

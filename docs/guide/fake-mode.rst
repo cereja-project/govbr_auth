@@ -28,9 +28,13 @@ FakeGov sem duplicar factories no código do usuário.
 Executar end-to-end
 -------------------
 
-Para iniciar frontend, backend e FakeGov no mesmo processo::
+Para iniciar frontend, backend e FakeGov no mesmo processo no POSIX::
 
-    GOVBR_FAKE_END_TO_END=true
+    GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
+
+No PowerShell::
+
+    $env:GOVBR_FAKE_END_TO_END = "true"
     python -m govbr_auth.fake
 
 Abra ``http://localhost:8000``. Para usar somente a tela de login/provedor,
@@ -61,10 +65,19 @@ O arquivo é carregado na inicialização, exige ao menos um usuário, CPF com 1
 dígitos e CPFs únicos. JSON inválido, campos extras e campos ausentes são
 rejeitados; não use credenciais reais e mantenha o arquivo fora do Git.
 
-Para persistência própria, implemente ``FakeUserRepository``. O repositório
-deve fornecer identidades e verificar credenciais sem expor senhas. Use hashes
-apropriados em fontes persistentes. ``InMemoryFakeUserRepository`` e
-``JsonFakeUserRepository`` são implementações prontas.
+Para persistência própria, implemente o protocolo público
+``govbr_auth.fake.FakeUserRepository``:
+
+.. code-block:: python
+
+    from govbr_auth.fake import FakeUserRepository
+
+O protocolo exige ``get(subject)``, ``list()`` e
+``authenticate(cpf=..., password=...)``. O repositório deve fornecer
+identidades e verificar credenciais sem expor senhas. Use hashes apropriados
+em fontes persistentes. ``InMemoryFakeUserRepository`` e
+``JsonFakeUserRepository`` são implementações prontas. Passe a implementação
+como ``user_repository`` ao construir ``GovBrAuth``.
 
 Uso avançado
 ------------

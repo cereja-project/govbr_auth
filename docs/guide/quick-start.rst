@@ -8,10 +8,18 @@ Instale o perfil local::
 
     pip install "govbr-auth[fake]"
 
-Ative a composição completa e execute o único launcher::
+No POSIX, ative a composição completa para o comando::
 
-    GOVBR_FAKE_END_TO_END=true
+    GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
+
+No PowerShell::
+
+    $env:GOVBR_FAKE_END_TO_END = "true"
     python -m govbr_auth.fake
+
+Para remover a variável da sessão após o teste no PowerShell::
+
+    Remove-Item Env:GOVBR_FAKE_END_TO_END
 
 Abra ``http://localhost:8000``, clique em **Entrar com Gov.br**, informe um
 usuário fictício e acompanhe o retorno validado ao backend.
@@ -29,7 +37,7 @@ No FastAPI, a aplicação monta somente a fachada pública:
     app = FastAPI()
 
     async def authenticated(context: AuthContext):
-        return {"subject": context.user.subject}
+        return {"authenticated": True}
 
     auth = GovBrAuth(on_success=authenticated)
     app.include_router(auth.router)

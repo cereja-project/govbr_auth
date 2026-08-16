@@ -20,7 +20,7 @@ from govbr_auth.fastapi import AuthContext, GovBrAuth
 app = FastAPI()
 
 async def authenticated(context: AuthContext):
-    return JSONResponse({"subject": context.user.subject})
+    return JSONResponse({"authenticated": True})
 
 auth = GovBrAuth(on_success=authenticated)
 app.include_router(auth.router)
@@ -34,9 +34,18 @@ a composição selecionada pela configuração muda.
 
 Para experimentar frontend, backend e login FakeGov no mesmo processo:
 
-```bash
+No POSIX:
+
+```sh
 pip install "govbr-auth[fake]"
-GOVBR_FAKE_END_TO_END=true
+GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
+```
+
+No PowerShell:
+
+```powershell
+pip install "govbr-auth[fake]"
+$env:GOVBR_FAKE_END_TO_END = "true"
 python -m govbr_auth.fake
 ```
 
