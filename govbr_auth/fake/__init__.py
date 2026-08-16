@@ -12,7 +12,6 @@ from govbr_auth.fake.credentials import (
     InMemoryFakeUserRepository,
     JsonFakeUserRepository,
 )
-from govbr_auth.fake.fastapi import create_fake_govbr_app, create_fake_govbr_router
 from govbr_auth.fake.models import FakeClient, FakeUser
 from govbr_auth.fake.provider import (
     FakeAuthorizationRedirect,
@@ -70,3 +69,22 @@ __all__ = (
     "create_fake_govbr_app",
     "create_fake_govbr_router",
 )
+
+
+def __getattr__(name: str) -> object:
+    """Load optional FastAPI factories only when callers request them."""
+    if name not in {"create_fake_govbr_app", "create_fake_govbr_router"}:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    from govbr_auth.fake.fastapi import (
+        create_fake_govbr_app,
+        create_fake_govbr_router,
+    )
+
+    factories = {
+        "create_fake_govbr_app": create_fake_govbr_app,
+        "create_fake_govbr_router": create_fake_govbr_router,
+    }
+    value = factories[name]
+    globals()[name] = value
+    return value

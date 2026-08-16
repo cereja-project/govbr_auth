@@ -170,6 +170,60 @@ def test_runtime_settings_reject_invalid_fake_port(port: str) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "prefix",
+    (
+        "",
+        "   ",
+        "fake-govbr",
+        "/",
+        "/fake-govbr/",
+        "/fake-govbr?debug=1",
+        "/fake-govbr#fragment",
+        "https://example.test/fake-govbr",
+        "//example.test/fake-govbr",
+    ),
+    ids=(
+        "empty",
+        "whitespace",
+        "missing-leading-slash",
+        "root",
+        "trailing-slash",
+        "query",
+        "fragment",
+        "absolute-url",
+        "network-path",
+    ),
+)
+def test_end_to_end_settings_reject_invalid_fake_provider_prefix(
+    prefix: str,
+) -> None:
+    """Mounted fake routes require one unambiguous non-root path prefix."""
+    with pytest.raises(ValidationError, match="fake provider prefix"):
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+            fake_provider_prefix=prefix,
+        )
+
+
+def test_embedded_runtime_revalidates_fake_provider_prefix() -> None:
+    """Consumer embedding must validate a prefix unused by provider-only mode."""
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_provider_prefix="//example.test/fake-govbr",
+    )
+
+    def fail_if_factory_called(_):
+        raise AssertionError("invalid prefix must fail before transport composition")
+
+    with pytest.raises(ValidationError, match="fake provider prefix"):
+        create_govbr_runtime(
+            settings,
+            fake_transport_factory=fail_if_factory_called,
+        )
+
+
 @pytest.mark.asyncio
 async def test_official_runtime_owns_and_closes_created_http_client(
     settings: GovBrRuntimeSettings,

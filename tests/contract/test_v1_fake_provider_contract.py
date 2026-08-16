@@ -1,6 +1,9 @@
 """Freeze the public v1 contract of the framework-independent fake provider."""
 
+import subprocess
+import sys
 from dataclasses import fields
+from pathlib import Path
 
 from govbr_auth.fake import (
     FakeAuthorizationRedirect,
@@ -19,6 +22,8 @@ from govbr_auth.fake import (
     FakeTokenResponse,
     create_fake_govbr_runtime,
 )
+
+PROJECT_ROOT = Path(__file__).parents[2]
 
 
 def test_fake_provider_request_field_names_are_stable() -> None:
@@ -114,3 +119,28 @@ def test_fake_package_exports_runtime_contract() -> None:
     assert fake.FakeGovBrEndpoints is FakeGovBrEndpoints
     assert fake.FakeGovBrRuntime is FakeGovBrRuntime
     assert fake.create_fake_govbr_runtime is create_fake_govbr_runtime
+
+
+def test_fake_runtime_import_does_not_load_web_frameworks() -> None:
+    """Importing the neutral runtime must not activate FastAPI or Starlette."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys\n"
+                "import govbr_auth.fake.runtime\n"
+                "loaded = sorted(name for name in sys.modules "
+                "if name == 'fastapi' or name.startswith('fastapi.') "
+                "or name == 'starlette' or name.startswith('starlette.'))\n"
+                "print('\\n'.join(loaded))\n"
+                "raise SystemExit(bool(loaded))\n"
+            ),
+        ],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr

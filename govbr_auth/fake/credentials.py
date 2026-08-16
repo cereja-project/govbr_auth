@@ -14,7 +14,7 @@ from govbr_auth.fake.models import FakeUser
 class FakeLoginCredential:
     """Describe a demonstrative credential without attaching it to a user."""
 
-    cpf: str
+    cpf: str = field(repr=False)
     password: str = field(repr=False)
     name: str
 

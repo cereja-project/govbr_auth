@@ -8,6 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Callable
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -18,6 +19,7 @@ from pydantic import (
     PositiveInt,
     SecretStr,
     field_validator,
+    model_validator,
 )
 
 from govbr_auth.core.client import GovBrClient
@@ -83,6 +85,29 @@ class GovBrRuntimeSettings(BaseModel):
         if not 1 <= value <= 65535:
             raise ValueError("fake port must be between 1 and 65535")
         return value
+
+    @model_validator(mode="after")
+    def validate_mounted_fake_provider_prefix(self) -> "GovBrRuntimeSettings":
+        """Require one unambiguous path prefix when fake routes are mounted."""
+        if not self.fake_end_to_end:
+            return self
+        prefix = self.fake_provider_prefix
+        parsed = urlsplit(prefix)
+        if (
+            not prefix.startswith("/")
+            or prefix == "/"
+            or prefix.endswith("/")
+            or parsed.scheme
+            or parsed.netloc
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != prefix
+        ):
+            raise ValueError(
+                "fake provider prefix must be a non-root path without a trailing "
+                "slash, query, fragment, or absolute URL"
+            )
+        return self
 
     @classmethod
     def from_environment(

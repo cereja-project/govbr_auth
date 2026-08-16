@@ -1,7 +1,7 @@
 """Canonical framework-independent composition for the local fake provider."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 
@@ -51,8 +51,8 @@ class FakeGovBrRuntime:
     settings: FakeGovBrSettings
     provider: FakeGovBrProvider
     credential_authenticator: FakeCredentialAuthenticator
-    users: tuple[FakeUser, ...]
-    credentials: tuple[FakeLoginCredential, ...]
+    users: tuple[FakeUser, ...] = field(repr=False)
+    credentials: tuple[FakeLoginCredential, ...] = field(repr=False)
     prefix: str
     endpoints: FakeGovBrEndpoints
 
@@ -101,6 +101,7 @@ def create_fake_govbr_runtime(
     if settings.provider is not GovBrProvider.FAKE:
         raise ValueError("fake runtime requires the fake provider")
 
+    settings = GovBrRuntimeSettings.model_validate(settings.model_dump())
     del clock
     repository, credentials = _resolve_repository(settings, user_repository)
     prefix = settings.fake_provider_prefix if settings.fake_end_to_end else ""
