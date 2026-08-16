@@ -19,6 +19,7 @@ def test_fake_login_has_accessible_native_fields_and_warning() -> None:
     assert 'autocomplete="current-password"' in page
     assert 'aria-describedby="fake-guidance"' in page
     assert ":focus-visible" in page
+    assert "SIMULAÇÃO LOCAL" in page
     assert "Não informe credenciais reais" in page
     assert "opaque-request" in page
 

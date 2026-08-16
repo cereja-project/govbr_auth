@@ -4,67 +4,7 @@ import html
 
 from govbr_auth.fake.models import FakeUser
 from govbr_auth.fake.provider import FakeAuthorizationSession
-
-_PAGE_STYLE = """
-:root {
-  color-scheme: light;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  line-height: 1.5;
-}
-* { box-sizing: border-box; }
-body {
-  align-items: center;
-  background: #f3f5f7;
-  display: flex;
-  justify-content: center;
-  margin: 0;
-  min-height: 100vh;
-  padding: 1.5rem;
-}
-main {
-  background: #fff;
-  border-radius: 0.75rem;
-  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 12%);
-  max-width: 32rem;
-  padding: 2rem;
-  width: 100%;
-}
-h1 { font-size: 1.5rem; margin-top: 0; }
-.warning {
-  background: #fff4cc;
-  border-left: 0.3rem solid #c58b00;
-  padding: 0.75rem;
-}
-.error { color: #b3261e; font-weight: 700; }
-form { display: grid; gap: 0.75rem; }
-label { font-weight: 700; }
-input {
-  border: 1px solid #6c737f;
-  border-radius: 0.35rem;
-  font: inherit;
-  padding: 0.75rem;
-  width: 100%;
-}
-button {
-  background: #1351b4;
-  border: 0;
-  border-radius: 0.35rem;
-  color: #fff;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 700;
-  padding: 0.75rem 1rem;
-}
-button + button { margin-top: 0.25rem; }
-input:focus-visible, button:focus-visible {
-  outline: 0.2rem solid #ffcd07;
-  outline-offset: 0.15rem;
-}
-@media (max-width: 36rem) {
-  body { padding: 0; }
-  main { border-radius: 0; box-shadow: none; min-height: 100vh; padding: 1.25rem; }
-}
-""".strip()
+from govbr_auth.presentation import render_page
 
 
 def render_fake_login(
@@ -97,7 +37,7 @@ def render_fake_login(
         '<button type="submit">Entrar</button>'
         "</form>"
     )
-    return _render_page(content)
+    return render_page(title="FAKE / SIMULAÇÃO", body=content, layout="card")
 
 
 def render_fake_user_selection(
@@ -116,7 +56,7 @@ def render_fake_user_selection(
         f'<input type="hidden" name="request" value="{request_value}">'
         f"{choices}</form>"
     )
-    return _render_page(content)
+    return render_page(title="FAKE / SIMULAÇÃO", body=content, layout="card")
 
 
 def _render_user_choice(user: FakeUser) -> str:
@@ -126,14 +66,4 @@ def _render_user_choice(user: FakeUser) -> str:
     return (
         f'<button type="submit" name="subject" value="{subject}">'
         f"{label} ({subject})</button>"
-    )
-
-
-def _render_page(content: str) -> str:
-    return (
-        "<!doctype html>"
-        '<html lang="pt-BR"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>FAKE / SIMULAÇÃO</title>"
-        f"<style>{_PAGE_STYLE}</style></head><body><main>{content}</main></body></html>"
     )

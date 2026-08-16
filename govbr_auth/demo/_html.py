@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from html import escape
 
 from govbr_auth.core import GovBrUser
+from govbr_auth.presentation import (
+    render_page,
+    render_primary_action,
+    render_safe_error_panel,
+)
 
 _ERROR_GUIDANCE = {
     "govbr_auth_error": "Não foi possível concluir a autenticação. Tente novamente mais tarde.",
@@ -37,7 +42,7 @@ def render_home(credentials: tuple[DemoCredential, ...] = ()) -> str:
             '<h1 id="page-title">Teste a autenticação completa em ambiente local</h1>'
             '<p class="lead">Percorra uma simulação segura, isolada e sem acesso '
             "a serviços externos.</p>"
-            '<a class="primary" href="/auth/govbr/login">Entrar com Gov.br</a>'
+            f'{render_primary_action(href="/auth/govbr/login", label="Entrar com Gov.br")}'
             "</section>"
             '<section class="workflow" aria-labelledby="workflow-title">'
             '<p class="section-kicker">Como funciona</p>'
@@ -73,7 +78,7 @@ def render_success(user: GovBrUser) -> str:
             f"<div><dt>CPF</dt><dd>{masked_cpf}</dd></div>"
             f"<div><dt>E-mail</dt><dd>{email}</dd></div>"
             "</dl>"
-            '<a class="primary" href="/auth/govbr/login">Repetir o fluxo</a>'
+            f'{render_primary_action(href="/auth/govbr/login", label="Repetir o fluxo")}'
             "</section>"
         ),
     )
@@ -84,7 +89,6 @@ def render_error(*, code: str, status_code: int) -> str:
     public_code = code if code in _ERROR_GUIDANCE else "govbr_auth_error"
     safe_code = escape(public_code)
     safe_status = escape(str(status_code))
-    guidance = _ERROR_GUIDANCE[public_code]
     return _page(
         title="Não foi possível autenticar",
         body=(
@@ -92,10 +96,10 @@ def render_error(*, code: str, status_code: int) -> str:
             '<div class="error-mark" aria-hidden="true">!</div>'
             '<p class="eyebrow">Fluxo interrompido</p>'
             '<h1 id="page-title">Não foi possível autenticar</h1>'
-            f'<p class="lead">{guidance}</p>'
+            f"{render_safe_error_panel(message=_ERROR_GUIDANCE[public_code])}"
             f'<p class="error-code">Código: <code>{safe_code}</code> '
             f"(HTTP {safe_status})</p>"
-            '<a class="primary" href="/auth/govbr/login">Tentar novamente</a>'
+            f'{render_primary_action(href="/auth/govbr/login", label="Tentar novamente")}'
             "</section>"
         ),
     )
@@ -135,112 +139,4 @@ def _mask_cpf(cpf: str) -> str:
 
 
 def _page(*, title: str, body: str) -> str:
-    """Wrap content in the self-contained, accessible demo shell."""
-    return f"""<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>{escape(title)}</title>
-<style>
-:root {{
-  --ink: #17213b;
-  --muted: #536078;
-  --surface: #ffffff;
-  --canvas: #eef3f8;
-  --primary: #1351b4;
-  --primary-dark: #0c3d8f;
-  --accent: #ffcd07;
-  --line: #d9e2ec;
-  --success: #168821;
-  --danger: #b3261e;
-  --radius: 1rem;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
-  line-height: 1.5;
-}}
-* {{ box-sizing: border-box; }}
-body {{ background: var(--canvas); color: var(--ink); margin: 0; min-height: 100vh; }}
-.container {{ margin-inline: auto; max-width: 70rem; padding-inline: 1.5rem; }}
-.site-header {{ background: #071d41; color: #fff; }}
-.brand-row {{ align-items: center; display: flex; justify-content: space-between; min-height: 4.5rem; }}
-.brand {{ font-size: 1.15rem; font-weight: 800; letter-spacing: -.02em; }}
-.simulation-badge {{
-  background: var(--accent); border-radius: 999px; color: #302800; font-size: .72rem;
-  font-weight: 800; letter-spacing: .08em; padding: .35rem .7rem;
-}}
-main.container {{ display: grid; gap: 1.5rem; padding-block: 3rem; }}
-section {{ background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2rem; }}
-.hero {{ background: linear-gradient(135deg, #fff 55%, #e8f1ff); padding-block: 3rem; }}
-.eyebrow, .section-kicker {{
-  color: var(--primary); font-size: .78rem; font-weight: 800; letter-spacing: .09em;
-  margin: 0 0 .6rem; text-transform: uppercase;
-}}
-h1 {{ font-size: clamp(2rem, 5vw, 3.6rem); letter-spacing: -.045em; line-height: 1.08; margin: 0; max-width: 15ch; }}
-h2 {{ font-size: clamp(1.45rem, 3vw, 2rem); letter-spacing: -.025em; margin: 0 0 1rem; }}
-.lead {{ color: var(--muted); font-size: 1.12rem; max-width: 58ch; }}
-.primary {{
-  background: var(--primary); border-radius: .55rem; color: #fff; display: inline-block;
-  font-weight: 750; margin-top: .8rem; padding: .85rem 1.15rem; text-decoration: none;
-  transition: background-color .18s ease, transform .18s ease;
-}}
-.primary:hover {{ background: var(--primary-dark); transform: translateY(-1px); }}
-:focus-visible {{
-  box-shadow: 0 0 0 .38rem #071d41;
-  outline: .16rem solid #fff;
-  outline-offset: .1rem;
-}}
-.steps {{ display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); list-style: none; margin: 1.5rem 0 0; padding: 0; }}
-.steps li {{ border-top: .2rem solid var(--primary); display: flex; gap: .8rem; padding-top: 1rem; }}
-.steps span {{
-  align-items: center; background: #e8f1ff; border-radius: 50%; color: var(--primary);
-  display: inline-flex; flex: 0 0 2rem; font-weight: 800; height: 2rem;
-  justify-content: center;
-}}
-.steps p {{ color: var(--muted); margin: .35rem 0 0; }}
-.credentials {{ min-width: 0; }}
-.table-scroll {{ overflow-x: auto; }}
-table {{ border-collapse: collapse; min-width: 34rem; width: 100%; }}
-th, td {{ border-bottom: 1px solid var(--line); padding: .85rem; text-align: left; }}
-thead th {{ color: var(--muted); font-size: .8rem; text-transform: uppercase; }}
-code {{ background: #edf2f7; border-radius: .3rem; color: var(--ink); padding: .15rem .35rem; }}
-.result {{ margin-inline: auto; max-width: 44rem; width: 100%; }}
-.success-mark, .error-mark {{
-  align-items: center; border-radius: 50%; color: #fff; display: flex; font-size: 1.5rem;
-  font-weight: 900; height: 3rem; justify-content: center; margin-bottom: 1.25rem;
-  width: 3rem;
-}}
-.success-mark {{ background: var(--success); }}
-.error-mark {{ background: var(--danger); }}
-.identity {{ border-top: 1px solid var(--line); margin-block: 1.5rem; }}
-.identity div {{
-  border-bottom: 1px solid var(--line); display: grid; gap: 1rem;
-  grid-template-columns: 8rem 1fr; padding-block: .8rem;
-}}
-.identity dt {{ color: var(--muted); font-weight: 700; }}
-.identity dd {{ margin: 0; overflow-wrap: anywhere; }}
-.error-code {{ color: var(--muted); }}
-.site-footer {{ color: var(--muted); font-size: .88rem; padding-block: 0 2rem; text-align: center; }}
-@media (max-width: 44rem) {{
-  .container {{ padding-inline: 1rem; }}
-  main.container {{ padding-block: 1rem 2rem; }}
-  section, .hero {{ padding: 1.35rem; }}
-  .steps {{ grid-template-columns: 1fr; }}
-  .identity div {{ gap: .25rem; grid-template-columns: 1fr; }}
-}}
-@media (prefers-reduced-motion: reduce) {{
-  *, *::before, *::after {{ scroll-behavior: auto !important; transition-duration: .01ms !important; }}
-}}
-</style>
-</head>
-<body>
-<header class="site-header"><div class="container brand-row">
-<span class="brand">gov.br auth</span><span class="simulation-badge">SIMULAÇÃO LOCAL</span>
-</div></header>
-<main class="container">{body}</main>
-<footer class="site-footer"><div class="container">
-Ambiente local para desenvolvimento e testes. Não use credenciais reais.
-</div></footer>
-</body>
-</html>"""
+    return render_page(title=title, body=body, layout="wide")
