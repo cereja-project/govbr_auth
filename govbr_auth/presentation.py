@@ -2,6 +2,7 @@
 
 from html import escape
 from typing import Literal
+from urllib.parse import urlsplit
 
 _THEME_CSS = """
 :root {
@@ -78,22 +79,39 @@ code { background: #edf2f7; border-radius: .3rem; color: var(--ink); padding: .1
 .identity dd { margin: 0; overflow-wrap: anywhere; }
 .error-code { color: var(--muted); }
 .site-footer { color: var(--muted); font-size: .88rem; padding-block: 0 2rem; text-align: center; }
-.card { margin-inline: auto; max-width: 32rem; width: 100%; }
-.card h1 { font-size: 1.5rem; max-width: none; }
+body.card-layout {
+  align-items: center; background: #f3f5f7; display: flex; justify-content: center;
+  margin: 0; min-height: 100vh; padding: 1.5rem;
+}
+main.card-layout-main {
+  background: #fff; border-radius: 0.75rem; box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 12%);
+  max-width: 32rem; padding: 2rem; width: 100%;
+}
+.card-layout-main h1 { font-size: 1.5rem; max-width: none; }
 .warning { background: #fff4cc; border-left: .3rem solid #c58b00; padding: .75rem; }
 .error { color: var(--danger); font-weight: 700; }
-.card form { display: grid; gap: .75rem; }
-.card label { font-weight: 700; }
-.card input {
+.card-layout-main form { display: grid; gap: .75rem; }
+.card-layout-main label { font-weight: 700; }
+.card-layout-main input {
   border: 1px solid #6c737f; border-radius: .35rem; font: inherit; padding: .75rem; width: 100%;
 }
-.card button + button { margin-top: .25rem; }
+.card-layout-main button {
+  border-radius: .35rem; font-weight: 700; margin-top: 0; padding: .75rem 1rem;
+}
+.card-layout-main button + button { margin-top: .25rem; }
+.card-layout-main input:focus-visible, .card-layout-main button:focus-visible {
+  box-shadow: none; outline: .2rem solid #ffcd07; outline-offset: .15rem;
+}
 @media (max-width: 44rem) {
   .container { padding-inline: 1rem; }
   main.container { padding-block: 1rem 2rem; }
   section, .hero { padding: 1.35rem; }
   .steps { grid-template-columns: 1fr; }
   .identity div { gap: .25rem; grid-template-columns: 1fr; }
+}
+@media (max-width: 36rem) {
+  body.card-layout { padding: 0; }
+  main.card-layout-main { border-radius: 0; box-shadow: none; min-height: 100vh; padding: 1.25rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
@@ -112,8 +130,30 @@ def render_simulation_badge() -> str:
 
 
 def render_primary_action(*, href: str, label: str) -> str:
-    """Render a safely escaped primary navigation action."""
+    """Render a safely escaped primary action for an internal absolute path."""
+    _validate_internal_absolute_path(href)
     return f'<a class="primary" href="{escape(href, quote=True)}">{escape(label)}</a>'
+
+
+def _validate_internal_absolute_path(href: str) -> None:
+    """Reject external, executable, and non-canonical action destinations."""
+    try:
+        parts = urlsplit(href)
+    except ValueError as error:
+        raise ValueError("href must be an internal absolute path") from error
+
+    if (
+        not href.startswith("/")
+        or href.startswith("//")
+        or "\\" in href
+        or parts.scheme
+        or parts.netloc
+        or parts.query
+        or parts.fragment
+        or not parts.path
+        or any(character.isspace() for character in href)
+    ):
+        raise ValueError("href must be an internal absolute path")
 
 
 def render_safe_error_panel(*, message: str) -> str:
@@ -123,7 +163,21 @@ def render_safe_error_panel(*, message: str) -> str:
 
 def render_page(*, title: str, body: str, layout: Literal["wide", "card"]) -> str:
     """Wrap owned HTML markup in the shared, accessible local shell."""
-    content = body if layout == "wide" else f'<section class="card">{body}</section>'
+    if layout == "wide":
+        page_body = f"""<body>
+<header class="site-header"><div class="container brand-row">
+<span class="brand">gov.br auth</span>{render_simulation_badge()}
+</div></header>
+<main class="container">{body}</main>
+<footer class="site-footer"><div class="container">
+Ambiente local para desenvolvimento e testes. Não use credenciais reais.
+</div></footer>
+</body>"""
+    else:
+        page_body = f"""<body class="card-layout">
+<main class="card-layout-main">{render_simulation_badge()}{body}</main>
+</body>"""
+
     return f"""<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -133,13 +187,5 @@ def render_page(*, title: str, body: str, layout: Literal["wide", "card"]) -> st
 <title>{escape(title)}</title>
 <style>{responsive_css()}</style>
 </head>
-<body>
-<header class="site-header"><div class="container brand-row">
-<span class="brand">gov.br auth</span>{render_simulation_badge()}
-</div></header>
-<main class="container">{content}</main>
-<footer class="site-footer"><div class="container">
-Ambiente local para desenvolvimento e testes. Não use credenciais reais.
-</div></footer>
-</body>
+{page_body}
 </html>"""
