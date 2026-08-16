@@ -26,7 +26,10 @@ from pydantic import (
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
 from govbr_auth.core.token_validation import IdTokenValidator
-from govbr_auth.core.transactions import InMemoryTransactionStore
+from govbr_auth.core.transactions import (
+    InMemoryTransactionStore,
+    generate_transaction_secret,
+)
 
 if TYPE_CHECKING:
     from govbr_auth.fake.runtime import FakeGovBrRuntime, FakeUserRepository
@@ -93,24 +96,7 @@ class GovBrRuntimeSettings(BaseModel):
         if not self.fake_end_to_end:
             return self
         prefix = self.fake_provider_prefix
-        parsed = urlsplit(prefix)
-        segments = prefix[1:].split("/")
-        if (
-            not prefix.startswith("/")
-            or prefix == "/"
-            or prefix.endswith("/")
-            or parsed.scheme
-            or parsed.netloc
-            or parsed.query
-            or parsed.fragment
-            or parsed.path != prefix
-            or not prefix.isascii()
-            or any(
-                segment in {"", ".", ".."}
-                or _FAKE_PREFIX_SEGMENT.fullmatch(segment) is None
-                for segment in segments
-            )
-        ):
+        if not _is_canonical_path_prefix(prefix):
             raise ValueError(
                 "fake provider prefix must be a non-root path without a trailing "
                 "slash, query, fragment, or absolute URL"
@@ -257,7 +243,7 @@ def _fake_oauth_settings(fake: "FakeGovBrRuntime") -> GovBrSettings:
         client_id=client.client_id,
         client_secret=client.client_secret,
         redirect_uri=client.registered_redirect_uris[0],
-        transaction_secret=fake.settings.artifact_secret,
+        transaction_secret=SecretStr(generate_transaction_secret()),
         issuer=fake.endpoints.issuer,
         jwks_url=fake.endpoints.jwks,
     )
@@ -365,6 +351,31 @@ _FAKE_FIELDS = {
     "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS": "fake_id_token_ttl_seconds",
     "GOVBR_FAKE_USERS_FILE": "fake_users_file",
 }
+
+
+def _is_canonical_path_prefix(prefix: str, *, allow_empty: bool = False) -> bool:
+    """Return whether a route prefix identifies one unambiguous path."""
+    if allow_empty and prefix == "":
+        return True
+    parsed = urlsplit(prefix)
+    segments = prefix[1:].split("/")
+    return not (
+        not prefix.startswith("/")
+        or prefix == "/"
+        or prefix.endswith("/")
+        or parsed.scheme
+        or parsed.netloc
+        or parsed.query
+        or parsed.fragment
+        or parsed.path != prefix
+        or not prefix.isascii()
+        or any(
+            segment in {"", ".", ".."}
+            or _FAKE_PREFIX_SEGMENT.fullmatch(segment) is None
+            for segment in segments
+        )
+    )
+
 
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 _FAKE_PREFIX_SEGMENT = re.compile(r"[A-Za-z0-9._~-]+")

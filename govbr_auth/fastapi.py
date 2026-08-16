@@ -26,6 +26,7 @@ from govbr_auth.runtime import (
     GovBrRuntime,
     GovBrRuntimeSettings,
     _fake_callback_url,
+    _is_canonical_path_prefix,
     create_govbr_runtime,
 )
 
@@ -201,6 +202,8 @@ def _validate_router_prefix(prefix: str) -> str:
         raise ValueError("prefix must be empty or start with '/'")
     if prefix.endswith("/"):
         raise ValueError("prefix must not end with '/'")
+    if not _is_canonical_path_prefix(prefix, allow_empty=True):
+        raise ValueError("prefix must be an empty string or a canonical path")
     return prefix
 
 

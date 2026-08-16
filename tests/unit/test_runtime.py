@@ -401,6 +401,24 @@ def test_fake_runtime_uses_its_exact_endpoint_set(
     assert str(runtime.client._settings.issuer) == runtime.fake.endpoints.issuer
 
 
+def test_fake_consumer_uses_distinct_provider_and_transaction_secrets(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """Compromising one fake-flow codec must not compromise the other."""
+    runtime = create_govbr_runtime(
+        fake_settings,
+        fake_transport_factory=lambda _: httpx.MockTransport(
+            lambda __: httpx.Response(500)
+        ),
+    )
+
+    assert runtime.fake is not None
+    assert (
+        runtime.client._settings.transaction_secret
+        != runtime.fake.settings.artifact_secret
+    )
+
+
 def test_fake_consumer_runtime_mounts_provider_below_configured_prefix(
     fake_settings: GovBrRuntimeSettings,
 ) -> None:
