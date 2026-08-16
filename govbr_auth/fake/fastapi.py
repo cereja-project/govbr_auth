@@ -56,6 +56,10 @@ _TOKEN_FIELDS = ("grant_type", "code", "redirect_uri", "code_verifier")
 _AUTHORIZATION_REQUEST_INVALID = "The authorization request is invalid."
 _CLIENT_INVALID = "Client authentication failed."
 _TOKEN_INVALID = "The access token is invalid or expired."
+_TOKEN_RESPONSE_HEADERS = {
+    "Cache-Control": "no-store",
+    "Pragma": "no-cache",
+}
 
 
 class _FakeHttpRuntime(Protocol):
@@ -128,6 +132,8 @@ def create_fake_app(
 ) -> FastAPI:
     """Create the provider-only or complete local fake application profile."""
     resolved_settings = settings or _launcher_settings()
+    if resolved_settings.provider is not GovBrProvider.FAKE:
+        raise ValueError("fake launcher requires the fake provider")
     if not resolved_settings.fake_end_to_end:
         runtime = create_fake_govbr_runtime(
             resolved_settings,
@@ -344,13 +350,18 @@ def _build_fake_govbr_routes(
     async def token(request: Request) -> Response:
         credentials = _parse_basic_authorization(request.headers.get("authorization"))
         if credentials is None:
-            return _boundary_error_response("invalid_client", _CLIENT_INVALID)
+            return _boundary_error_response(
+                "invalid_client",
+                _CLIENT_INVALID,
+                headers=_TOKEN_RESPONSE_HEADERS,
+            )
         form = await _read_form(request)
         values = _required_text_values(form, _TOKEN_FIELDS)
         if values is None:
             return _boundary_error_response(
                 "invalid_request",
                 _AUTHORIZATION_REQUEST_INVALID,
+                headers=_TOKEN_RESPONSE_HEADERS,
             )
         token_request = FakeTokenRequest(
             grant_type=values["grant_type"],
@@ -365,7 +376,7 @@ def _build_fake_govbr_routes(
                 now=clock(),
             )
         except FakeOAuthError as error:
-            return _oauth_error_response(error)
+            return _oauth_error_response(error, extra_headers=_TOKEN_RESPONSE_HEADERS)
         return JSONResponse(
             {
                 "access_token": response.access_token.get_secret_value(),
@@ -373,7 +384,8 @@ def _build_fake_govbr_routes(
                 "expires_in": response.expires_in,
                 "id_token": response.id_token.get_secret_value(),
                 "scope": response.scope,
-            }
+            },
+            headers=_TOKEN_RESPONSE_HEADERS,
         )
 
     @router.get("/jwk")
@@ -475,19 +487,31 @@ def _parse_authorization_scheme(value: str | None, *, scheme: str) -> str | None
     return credentials
 
 
-def _boundary_error_response(error: str, description: str) -> JSONResponse:
-    return _oauth_error_response(FakeOAuthError(error=error, description=description))
+def _boundary_error_response(
+    error: str,
+    description: str,
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> JSONResponse:
+    return _oauth_error_response(
+        FakeOAuthError(error=error, description=description),
+        extra_headers=headers,
+    )
 
 
-def _oauth_error_response(error: FakeOAuthError) -> JSONResponse:
+def _oauth_error_response(
+    error: FakeOAuthError,
+    *,
+    extra_headers: Mapping[str, str] | None = None,
+) -> JSONResponse:
     status_code = 400
-    headers = None
+    headers = dict(extra_headers or {})
     if error.error == "invalid_client":
         status_code = 401
-        headers = {"WWW-Authenticate": 'Basic realm="fake-govbr"'}
+        headers["WWW-Authenticate"] = 'Basic realm="fake-govbr"'
     elif error.error == "invalid_token":
         status_code = 401
-        headers = {"WWW-Authenticate": "Bearer"}
+        headers["WWW-Authenticate"] = "Bearer"
     elif error.error == "access_denied":
         status_code = 403
     return JSONResponse(

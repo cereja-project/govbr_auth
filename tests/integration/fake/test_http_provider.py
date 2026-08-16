@@ -556,6 +556,8 @@ async def test_interactive_flow_returns_exact_oauth_and_userinfo_contract() -> N
     assert login_response.status_code == 302
     assert redirect_values["state"] == ["state-123"]
     assert token_response.status_code == 200
+    assert token_response.headers["cache-control"] == "no-store"
+    assert token_response.headers["pragma"] == "no-cache"
     assert set(token_payload) == {
         "access_token",
         "token_type",
@@ -672,6 +674,8 @@ async def test_token_rejects_malformed_basic_without_echoing_header(
         )
 
     assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
     assert response.json() == {
         "error": "invalid_client",
         "error_description": "Client authentication failed.",

@@ -50,7 +50,7 @@ class FakeGovBrRuntime:
 
     settings: FakeGovBrSettings
     provider: FakeGovBrProvider
-    credential_authenticator: FakeCredentialAuthenticator
+    credential_authenticator: FakeCredentialAuthenticator = field(repr=False)
     users: tuple[FakeUser, ...] = field(repr=False)
     credentials: tuple[FakeLoginCredential, ...] = field(repr=False)
     prefix: str

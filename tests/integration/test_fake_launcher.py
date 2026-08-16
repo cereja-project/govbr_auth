@@ -156,6 +156,30 @@ def test_fake_module_launcher_selects_fake_when_provider_is_absent(monkeypatch) 
     assert route_paths(app) == {"/authorize", "/login", "/token", "/userinfo", "/jwk"}
 
 
+def test_end_to_end_rejects_official_provider_before_runtime_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fake launcher must reject a wrong provider before composing resources."""
+    import govbr_auth.fake.fastapi as fake_fastapi
+
+    settings = GovBrRuntimeSettings.model_construct(
+        provider=GovBrProvider.OFFICIAL,
+        fake_end_to_end=True,
+    )
+    runtime_calls: list[object] = []
+
+    def record_runtime_allocation(*args, **kwargs):
+        runtime_calls.append((args, kwargs))
+        raise AssertionError("runtime allocation must not be reached")
+
+    monkeypatch.setattr(fake_fastapi, "create_govbr_runtime", record_runtime_allocation)
+
+    with pytest.raises(ValueError, match="fake launcher requires the fake provider"):
+        create_fake_app(settings=settings, clock=fixed_clock)
+
+    assert runtime_calls == []
+
+
 @pytest.mark.asyncio
 async def test_end_to_end_home_exposes_credentials_and_provider_login_form() -> None:
     """The interactive profile must preserve the current home and credential form."""

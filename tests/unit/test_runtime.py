@@ -211,6 +211,13 @@ def test_runtime_settings_reject_invalid_fake_port(port: str) -> None:
         "/fake-govbr#fragment",
         "https://example.test/fake-govbr",
         "//example.test/fake-govbr",
+        "/fake govbr",
+        "/fake\\govbr",
+        "/fake/./govbr",
+        "/fake/../govbr",
+        "/fake//govbr",
+        "/fake%2Fgovbr",
+        "/fake\x00govbr",
     ),
     ids=(
         "empty",
@@ -222,6 +229,13 @@ def test_runtime_settings_reject_invalid_fake_port(port: str) -> None:
         "fragment",
         "absolute-url",
         "network-path",
+        "embedded-whitespace",
+        "backslash",
+        "dot-segment",
+        "parent-segment",
+        "empty-segment",
+        "percent-encoding",
+        "control-character",
     ),
 )
 def test_end_to_end_settings_reject_invalid_fake_provider_prefix(

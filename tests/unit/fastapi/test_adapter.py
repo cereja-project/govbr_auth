@@ -167,6 +167,67 @@ async def test_invalid_prefix_is_rejected_before_runtime_allocation(
 
 
 @pytest.mark.asyncio
+async def test_fake_facade_aligns_default_redirect_with_custom_router_prefix() -> None:
+    """A custom public router prefix must remain usable with the composed fake flow."""
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    auth = GovBrAuth(
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        on_success=success_handler,
+        prefix="/custom-auth",
+    )
+
+    try:
+        assert auth.runtime.fake is not None
+        assert str(
+            auth.runtime.fake.settings.clients[0].registered_redirect_uris[0]
+        ) == ("http://127.0.0.1:8000/custom-auth/callback")
+    finally:
+        await auth.runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_fake_facade_rejects_supplied_runtime_with_mismatched_callback() -> None:
+    """A caller-owned fake runtime must not mount under an inconsistent callback path."""
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    owner = GovBrAuth(
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        on_success=success_handler,
+    )
+
+    raised: Exception | None = None
+    try:
+        try:
+            GovBrAuth(
+                runtime=owner.runtime,
+                on_success=success_handler,
+                prefix="/custom-auth",
+            )
+        except Exception as error:
+            raised = error
+
+        assert isinstance(raised, ValueError)
+        assert str(raised) == (
+            "fake runtime redirect URI does not match the router callback"
+        )
+    finally:
+        await owner.runtime.aclose()
+
+
+@pytest.mark.asyncio
 async def test_router_lifespan_closes_runtime() -> None:
     from govbr_auth.fastapi import GovBrAuth
 

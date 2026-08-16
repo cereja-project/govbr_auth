@@ -22,8 +22,10 @@ from govbr_auth.core.errors import (
 )
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.runtime import (
+    GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
+    _fake_callback_url,
     create_govbr_runtime,
 )
 
@@ -123,8 +125,12 @@ class GovBrAuth:
             raise TypeError("settings and runtime are mutually exclusive")
         prefix = _validate_router_prefix(prefix)
         if runtime is None:
-            runtime = create_govbr_runtime(
+            resolved_settings = _settings_for_router_callback(
                 settings or GovBrRuntimeSettings.from_environment(),
+                prefix,
+            )
+            runtime = create_govbr_runtime(
+                resolved_settings,
                 fake_transport_factory=lambda fake: _fake_asgi_transport(
                     fake,
                     clock=clock,
@@ -132,6 +138,8 @@ class GovBrAuth:
                 clock=clock,
                 user_repository=user_repository,
             )
+        else:
+            _validate_runtime_callback(runtime, prefix)
         self._runtime = runtime
 
         @asynccontextmanager
@@ -192,6 +200,41 @@ def _validate_router_prefix(prefix: str) -> str:
     if prefix.endswith("/"):
         raise ValueError("prefix must not end with '/'")
     return prefix
+
+
+def _settings_for_router_callback(
+    settings: GovBrRuntimeSettings,
+    prefix: str,
+) -> GovBrRuntimeSettings:
+    if settings.provider is not GovBrProvider.FAKE:
+        return settings
+    expected = _fake_callback_url(settings.fake_host, settings.fake_port, prefix)
+    configured = (
+        None if settings.fake_redirect_uri is None else str(settings.fake_redirect_uri)
+    )
+    default = _fake_callback_url(
+        settings.fake_host,
+        settings.fake_port,
+        "/auth/govbr",
+    )
+    if configured is not None and configured not in {default, expected}:
+        raise ValueError("fake redirect URI does not match the router callback")
+    values = settings.model_dump()
+    values["fake_redirect_uri"] = expected
+    return GovBrRuntimeSettings.model_validate(values)
+
+
+def _validate_runtime_callback(runtime: GovBrRuntime, prefix: str) -> None:
+    if runtime.fake is None:
+        return
+    expected = _fake_callback_url(
+        runtime.settings.fake_host,
+        runtime.settings.fake_port,
+        prefix,
+    )
+    configured = str(runtime.fake.settings.clients[0].registered_redirect_uris[0])
+    if configured != expected:
+        raise ValueError("fake runtime redirect URI does not match the router callback")
 
 
 def _fake_asgi_transport(

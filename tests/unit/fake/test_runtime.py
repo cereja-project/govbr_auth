@@ -90,6 +90,25 @@ def test_fake_runtime_repr_hides_users_and_credentials(
     assert "ana@example.test" not in rendered
 
 
+def test_fake_runtime_repr_hides_credential_authenticator(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """Runtime diagnostics must not invoke a repository repr that may contain secrets."""
+
+    class SensitiveRepository(InMemoryFakeUserRepository):
+        def __repr__(self) -> str:
+            return "SensitiveRepository(password=repository-secret-marker)"
+
+    repository = SensitiveRepository(())
+    runtime = create_fake_govbr_runtime(
+        fake_settings,
+        clock=fixed_clock,
+        user_repository=repository,
+    )
+
+    assert "repository-secret-marker" not in repr(runtime)
+
+
 def test_explicit_repository_precedes_users_file(
     fake_settings: GovBrRuntimeSettings,
     repository: InMemoryFakeUserRepository,

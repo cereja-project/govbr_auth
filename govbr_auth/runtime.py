@@ -1,6 +1,7 @@
 """Framework-neutral configuration and composition for Gov.br runtimes."""
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -93,6 +94,7 @@ class GovBrRuntimeSettings(BaseModel):
             return self
         prefix = self.fake_provider_prefix
         parsed = urlsplit(prefix)
+        segments = prefix[1:].split("/")
         if (
             not prefix.startswith("/")
             or prefix == "/"
@@ -102,6 +104,12 @@ class GovBrRuntimeSettings(BaseModel):
             or parsed.query
             or parsed.fragment
             or parsed.path != prefix
+            or not prefix.isascii()
+            or any(
+                segment in {"", ".", ".."}
+                or _FAKE_PREFIX_SEGMENT.fullmatch(segment) is None
+                for segment in segments
+            )
         ):
             raise ValueError(
                 "fake provider prefix must be a non-root path without a trailing "
@@ -306,9 +314,13 @@ def _prefixed_values(
 def _default_fake_redirect_uri(values: Mapping[str, object]) -> str:
     """Return the callback URL used by the local end-to-end runtime."""
     host = str(values.get("fake_host", "127.0.0.1"))
+    return _fake_callback_url(host, values.get("fake_port", 8000), "/auth/govbr")
+
+
+def _fake_callback_url(host: object, port: object, prefix: str) -> str:
+    """Build the local consumer callback shared by settings and adapters."""
     rendered_host = f"[{host}]" if host == "::1" else host
-    port = values.get("fake_port", 8000)
-    return f"http://{rendered_host}:{port}/auth/govbr/callback"
+    return f"http://{rendered_host}:{port}{prefix}/callback"
 
 
 _OFFICIAL_OAUTH_FIELDS = {
@@ -355,3 +367,4 @@ _FAKE_FIELDS = {
 }
 
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+_FAKE_PREFIX_SEGMENT = re.compile(r"[A-Za-z0-9._~-]+")
