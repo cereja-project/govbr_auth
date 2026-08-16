@@ -2,12 +2,15 @@
 
 import base64
 import binascii
+import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
+import httpx
 from fastapi import APIRouter, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import SecretStr
 from starlette.datastructures import FormData
@@ -23,8 +26,21 @@ from govbr_auth.fake.provider import (
     FakeOAuthError,
     FakeTokenRequest,
 )
-from govbr_auth.fake.runtime import FakeGovBrRuntime
-from govbr_auth.fastapi import utc_now
+from govbr_auth.fake.runtime import FakeGovBrRuntime, create_fake_govbr_runtime
+from govbr_auth.fastapi import AuthContext, GovBrAuth, utc_now
+from govbr_auth.presentation import render_error, render_home, render_success
+from govbr_auth.runtime import (
+    GovBrProvider,
+    GovBrRuntimeSettings,
+    create_govbr_runtime,
+)
+from govbr_auth.core import (
+    ExpiredTransactionError,
+    GovBrAuthError,
+    InvalidIdTokenError,
+    InvalidStateError,
+)
+from govbr_auth.core.errors import ProviderRejectedError, ProviderUnavailableError
 
 _AUTHORIZATION_FIELDS = (
     "response_type",
@@ -102,6 +118,129 @@ def create_fake_govbr_app(
         )
     )
     return application
+
+
+def create_fake_app(
+    settings: GovBrRuntimeSettings | None = None,
+    *,
+    clock: Callable[[], datetime] = utc_now,
+    user_repository: object | None = None,
+) -> FastAPI:
+    """Create the provider-only or complete local fake application profile."""
+    resolved_settings = settings or _launcher_settings()
+    if not resolved_settings.fake_end_to_end:
+        runtime = create_fake_govbr_runtime(
+            resolved_settings,
+            clock=clock,
+            user_repository=user_repository,
+        )
+        return create_fake_govbr_app(runtime, clock=clock)
+
+    runtime = create_govbr_runtime(
+        resolved_settings,
+        fake_transport_factory=lambda fake: _fake_asgi_transport(fake, clock=clock),
+        clock=clock,
+        user_repository=user_repository,
+    )
+
+    async def authenticated(context: AuthContext) -> Response:
+        return HTMLResponse(
+            render_success(context.user),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    async def authentication_failed(error: GovBrAuthError) -> Response:
+        code, status_code = _public_error(error)
+        return HTMLResponse(
+            render_error(code=code, status_code=status_code),
+            status_code=status_code,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    auth = GovBrAuth(
+        runtime=runtime,
+        on_success=authenticated,
+        on_error=authentication_failed,
+        clock=clock,
+    )
+    fake_runtime = runtime.fake
+    if fake_runtime is None:
+        raise RuntimeError("end-to-end launcher requires the fake provider runtime")
+    application = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+    @application.get("/", include_in_schema=False)
+    async def home() -> HTMLResponse:
+        return HTMLResponse(
+            render_home(credentials=fake_runtime.credentials),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @application.exception_handler(RequestValidationError)
+    async def invalid_callback(
+        _: Request,
+        __: RequestValidationError,
+    ) -> HTMLResponse:
+        return HTMLResponse(
+            render_error(code="invalid_callback", status_code=400),
+            status_code=400,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @application.exception_handler(Exception)
+    async def internal_error(_: Request, __: Exception) -> HTMLResponse:
+        return HTMLResponse(
+            render_error(code="internal_error", status_code=500),
+            status_code=500,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    application.include_router(auth.router)
+    return application
+
+
+def _public_error(error: GovBrAuthError) -> tuple[str, int]:
+    if isinstance(error, InvalidStateError):
+        return "invalid_state", 400
+    if isinstance(error, ExpiredTransactionError):
+        return "expired_transaction", 400
+    if isinstance(error, InvalidIdTokenError):
+        return "invalid_id_token", 502
+    if isinstance(error, ProviderRejectedError):
+        return "provider_rejected", 502
+    if isinstance(error, ProviderUnavailableError):
+        return "provider_unavailable", 503
+    return "govbr_auth_error", 502
+
+
+def run() -> None:
+    """Run the selected fake profile on its validated loopback endpoint."""
+    import uvicorn
+
+    settings = _launcher_settings()
+    uvicorn.run(
+        "govbr_auth.fake:create_fake_app",
+        factory=True,
+        host=settings.fake_host,
+        port=settings.fake_port,
+    )
+
+
+def _fake_asgi_transport(
+    runtime: FakeGovBrRuntime,
+    *,
+    clock: Callable[[], datetime],
+) -> httpx.AsyncBaseTransport:
+    """Host the exact mounted provider routes used by the consumer runtime."""
+    provider_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    provider_app.include_router(create_fake_govbr_router(runtime, clock=clock))
+    return httpx.ASGITransport(app=provider_app)
+
+
+def _launcher_settings() -> GovBrRuntimeSettings:
+    """Default this explicit fake entry point without changing library defaults."""
+    environ = dict(os.environ)
+    environ.setdefault("GOVBR_PROVIDER", GovBrProvider.FAKE.value)
+    return GovBrRuntimeSettings.from_environment(environ)
 
 
 def _build_fake_govbr_routes(

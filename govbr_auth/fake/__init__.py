@@ -66,24 +66,35 @@ __all__ = (
     "InMemoryFakeUserRepository",
     "JsonFakeUserRepository",
     "create_fake_govbr_runtime",
+    "create_fake_app",
     "create_fake_govbr_app",
     "create_fake_govbr_router",
+    "run",
 )
 
 
 def __getattr__(name: str) -> object:
     """Load optional FastAPI factories only when callers request them."""
-    if name not in {"create_fake_govbr_app", "create_fake_govbr_router"}:
+    if name not in {
+        "create_fake_app",
+        "create_fake_govbr_app",
+        "create_fake_govbr_router",
+        "run",
+    }:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
     from govbr_auth.fake.fastapi import (
+        create_fake_app,
         create_fake_govbr_app,
         create_fake_govbr_router,
+        run,
     )
 
     factories = {
+        "create_fake_app": create_fake_app,
         "create_fake_govbr_app": create_fake_govbr_app,
         "create_fake_govbr_router": create_fake_govbr_router,
+        "run": run,
     }
     value = factories[name]
     globals()[name] = value
