@@ -124,7 +124,7 @@ wrappers `build_authorize_url_sync` e `exchange_code_for_token_sync`, e a
 ativação fake implícita. Migre para:
 
 - `GovBrSettings`, `GovBrClient` e stores assíncronos em `govbr_auth.core`;
-- `GovBrAuth` ou `create_govbr_router` em `govbr_auth`;
+- `GovBrAuth` ou `create_govbr_router` em `govbr_auth.fastapi`;
 - factories explícitas do provedor local em `govbr_auth.fake`.
 
 Não existe fallback fake no cliente oficial. Aplicações que precisam do fake

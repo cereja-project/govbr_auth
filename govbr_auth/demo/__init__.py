@@ -2,13 +2,11 @@
 
 import os
 from collections.abc import Callable
-from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Protocol
 
-import httpx
-from cryptography.fernet import Fernet
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, Response
 from pydantic import SecretStr
@@ -16,13 +14,8 @@ from pydantic import SecretStr
 from govbr_auth.core import (
     ExpiredTransactionError,
     GovBrAuthError,
-    GovBrClient,
-    GovBrSettings,
-    IdTokenValidator,
-    InMemoryTransactionStore,
     InvalidIdTokenError,
     InvalidStateError,
-    ProviderEnvironment,
 )
 from govbr_auth.core.errors import ProviderRejectedError, ProviderUnavailableError
 from govbr_auth.demo._html import (
@@ -32,19 +25,11 @@ from govbr_auth.demo._html import (
     render_success,
 )
 from govbr_auth.fake import (
-    FakeClient,
     FakeCredentialAuthenticator,
-    FakeGovBrProvider,
-    FakeGovBrSettings,
-    FakeSigningKey,
-    FakeUser,
     FakeUserStore,
-    InMemoryAuthorizationCodeReplayStore,
-    InMemoryFakeUserRepository,
-    JsonFakeUserRepository,
-    create_fake_govbr_router,
 )
 from govbr_auth.fastapi import AuthContext, GovBrAuth, utc_now
+from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
 DEMO_BASE_URL = "http://localhost:8000"
 DEMO_PROVIDER_PREFIX = "/fake-govbr"
@@ -52,31 +37,6 @@ DEMO_PROVIDER_PREFIX = "/fake-govbr"
 _DEMO_CLIENT_ID = "govbr-auth-demo"
 _DEMO_CLIENT_SECRET = "local-demo-only"
 _DEMO_CALLBACK_URL = f"{DEMO_BASE_URL}/auth/govbr/callback"
-_DEMO_PROVIDER_URL = f"{DEMO_BASE_URL}{DEMO_PROVIDER_PREFIX}"
-_DEMO_USERS = (
-    (
-        FakeUser(
-            sub="12345678901",
-            name="Ana Demo",
-            email="ana@example.test",
-            email_verified=True,
-        ),
-        SecretStr("ana-demo"),
-    ),
-    (
-        FakeUser(
-            sub="98765432100",
-            name="Bruno Demo",
-            email="bruno@example.test",
-            email_verified=True,
-        ),
-        SecretStr("bruno-demo"),
-    ),
-)
-_DEMO_CREDENTIALS = (
-    DemoCredential(cpf="12345678901", password="ana-demo", name="Ana Demo"),
-    DemoCredential(cpf="98765432100", password="bruno-demo", name="Bruno Demo"),
-)
 
 __all__ = ["DEMO_BASE_URL", "DEMO_PROVIDER_PREFIX", "create_demo_app", "run"]
 
@@ -91,35 +51,6 @@ def create_demo_app(
     user_repository: FakeUserRepository | None = None,
 ) -> FastAPI:
     """Create the loopback consumer and interactive fake provider showcase."""
-    transaction_secret = SecretStr(Fernet.generate_key().decode("ascii"))
-    repository, credentials = _resolve_user_repository(user_repository)
-    _, fake_router = _create_provider(clock=clock, user_repository=repository)
-    provider_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    provider_app.include_router(fake_router)
-    provider_http = httpx.AsyncClient(transport=httpx.ASGITransport(app=provider_app))
-    settings = _create_consumer_settings(transaction_secret=transaction_secret)
-    client = GovBrClient(
-        settings,
-        InMemoryTransactionStore(transaction_secret),
-        IdTokenValidator(settings=settings),
-        provider_http,
-    )
-
-    @asynccontextmanager
-    async def lifespan(_: FastAPI):
-        try:
-            yield
-        finally:
-            await provider_http.aclose()
-
-    application = FastAPI(lifespan=lifespan)
-
-    @application.get("/", include_in_schema=False)
-    async def home() -> HTMLResponse:
-        return HTMLResponse(
-            render_home(credentials=credentials),
-            headers={"Cache-Control": "no-store"},
-        )
 
     async def authenticated(context: AuthContext) -> Response:
         return HTMLResponse(
@@ -132,6 +63,48 @@ def create_demo_app(
         return HTMLResponse(
             render_error(code=code, status_code=status_code),
             status_code=status_code,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_end_to_end=True,
+        fake_host="localhost",
+        fake_port=8000,
+        fake_provider_prefix=DEMO_PROVIDER_PREFIX,
+        fake_client_id=_DEMO_CLIENT_ID,
+        fake_client_secret=SecretStr(_DEMO_CLIENT_SECRET),
+        fake_redirect_uri=_DEMO_CALLBACK_URL,
+        fake_users_file=(
+            Path(users_file)
+            if (users_file := os.environ.get("GOVBR_FAKE_USERS_FILE"))
+            else None
+        ),
+    )
+    auth = GovBrAuth(
+        settings=settings,
+        on_success=authenticated,
+        on_error=authentication_failed,
+        clock=clock,
+        user_repository=user_repository,
+    )
+    fake_runtime = auth.runtime.fake
+    if fake_runtime is None:
+        raise RuntimeError("demo requires the fake provider runtime")
+    credentials = tuple(
+        DemoCredential(
+            cpf=credential.cpf,
+            password=credential.password,
+            name=credential.name,
+        )
+        for credential in fake_runtime.credentials
+    )
+    application = FastAPI()
+
+    @application.get("/", include_in_schema=False)
+    async def home() -> HTMLResponse:
+        return HTMLResponse(
+            render_home(credentials=credentials),
             headers={"Cache-Control": "no-store"},
         )
 
@@ -154,77 +127,8 @@ def create_demo_app(
             headers={"Cache-Control": "no-store"},
         )
 
-    GovBrAuth(
-        client=client,
-        on_success=authenticated,
-        on_error=authentication_failed,
-        clock=clock,
-    ).install(application)
-    application.include_router(fake_router)
+    application.include_router(auth.router)
     return application
-
-
-def _create_provider(
-    *,
-    clock: Callable[[], datetime],
-    user_repository: FakeUserRepository,
-) -> tuple[FakeGovBrProvider, APIRouter]:
-    issuer = f"{_DEMO_PROVIDER_URL}/"
-    settings = FakeGovBrSettings(
-        base_url=issuer,
-        issuer=issuer,
-        artifact_secret=SecretStr(Fernet.generate_key().decode("ascii")),
-        request_ttl_seconds=300,
-        authorization_code_ttl_seconds=60,
-        access_token_ttl_seconds=600,
-        id_token_ttl_seconds=300,
-        clients=(
-            FakeClient(
-                client_id=_DEMO_CLIENT_ID,
-                client_secret=SecretStr(_DEMO_CLIENT_SECRET),
-                registered_redirect_uris=(_DEMO_CALLBACK_URL,),
-            ),
-        ),
-    )
-    provider = FakeGovBrProvider(
-        settings=settings,
-        user_store=user_repository,
-        replay_store=InMemoryAuthorizationCodeReplayStore(),
-        signing_key=FakeSigningKey.generate(kid="govbr-auth-demo-key"),
-    )
-    router = create_fake_govbr_router(
-        provider,
-        prefix=DEMO_PROVIDER_PREFIX,
-        credential_authenticator=user_repository,
-        clock=clock,
-    )
-    return provider, router
-
-
-def _resolve_user_repository(
-    explicit: FakeUserRepository | None,
-) -> tuple[FakeUserRepository, tuple[DemoCredential, ...]]:
-    if explicit is not None:
-        return explicit, ()
-    json_path = os.environ.get("GOVBR_FAKE_USERS_FILE")
-    if json_path:
-        return JsonFakeUserRepository.from_file(json_path), ()
-    return InMemoryFakeUserRepository(_DEMO_USERS), _DEMO_CREDENTIALS
-
-
-def _create_consumer_settings(*, transaction_secret: SecretStr) -> GovBrSettings:
-    return GovBrSettings(
-        environment=ProviderEnvironment.LOCAL,
-        authorization_url=f"{_DEMO_PROVIDER_URL}/authorize",
-        token_url=f"{_DEMO_PROVIDER_URL}/token",
-        userinfo_url=f"{_DEMO_PROVIDER_URL}/userinfo",
-        client_id=_DEMO_CLIENT_ID,
-        client_secret=SecretStr(_DEMO_CLIENT_SECRET),
-        redirect_uri=_DEMO_CALLBACK_URL,
-        transaction_secret=transaction_secret,
-        issuer=f"{_DEMO_PROVIDER_URL}/",
-        jwks_url=f"{_DEMO_PROVIDER_URL}/jwk",
-    )
 
 
 def _public_error(error: GovBrAuthError) -> tuple[str, int]:

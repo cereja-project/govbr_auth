@@ -1,8 +1,8 @@
 Adaptador FastAPI
 =================
 
-.. autoclass:: govbr_auth.GovBrAuth
+.. autoclass:: govbr_auth.fastapi.GovBrAuth
 
-.. autoclass:: govbr_auth.AuthContext
+.. autoclass:: govbr_auth.fastapi.AuthContext
 
-.. autofunction:: govbr_auth.create_govbr_router
+.. autofunction:: govbr_auth.fastapi.create_govbr_router

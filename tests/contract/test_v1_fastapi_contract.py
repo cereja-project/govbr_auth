@@ -13,6 +13,7 @@ from pydantic import SecretStr
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
+from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
 
 FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 
@@ -51,6 +52,17 @@ class ContractClient:
         return GovBrUser(sub=expected_subject, name="Contract user")
 
 
+def contract_runtime(client: ContractClient) -> GovBrRuntime:
+    """Wrap the deterministic client in the facade's neutral runtime contract."""
+    return GovBrRuntime(
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        client=client,
+        provider=GovBrProvider.OFFICIAL,
+        fake=None,
+        _owned_http=None,
+    )
+
+
 def route_paths(app: FastAPI) -> set[str]:
     paths: set[str] = set()
     pending = list(app.routes)
@@ -80,9 +92,12 @@ async def test_callback_context_is_frozen_copies_claims_and_omits_tokens_by_defa
         return RedirectResponse("/signed-in", status_code=303)
 
     app = FastAPI()
-    GovBrAuth(
-        client=client, on_success=success_handler, clock=lambda: FIXED_NOW
-    ).install(app)
+    auth = GovBrAuth(
+        runtime=contract_runtime(client),
+        on_success=success_handler,
+        clock=lambda: FIXED_NOW,
+    )
+    app.include_router(auth.router)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
@@ -103,28 +118,23 @@ async def test_callback_context_is_frozen_copies_claims_and_omits_tokens_by_defa
         context.user = GovBrUser(sub="different-subject")
 
 
-def test_router_factory_and_installation_expose_the_same_consumer_routes() -> None:
-    from govbr_auth.fastapi import GovBrAuth, create_govbr_router
+def test_router_facade_exposes_consumer_routes_without_installation_method() -> None:
+    from govbr_auth.fastapi import GovBrAuth
 
     client = ContractClient({"sub": "12345678900"})
 
     async def success_handler(context) -> Response:
         return Response(status_code=204)
 
-    direct_app = FastAPI()
-    direct_app.include_router(
-        create_govbr_router(
-            client=client, on_success=success_handler, clock=lambda: FIXED_NOW
-        )
+    app = FastAPI()
+    auth = GovBrAuth(
+        runtime=contract_runtime(client),
+        on_success=success_handler,
+        clock=lambda: FIXED_NOW,
     )
-    installed_app = FastAPI()
-    GovBrAuth(
-        client=client, on_success=success_handler, clock=lambda: FIXED_NOW
-    ).install(installed_app)
+    app.include_router(auth.router)
 
     expected_paths = {"/auth/govbr/login", "/auth/govbr/callback"}
-    assert route_paths(direct_app) == expected_paths
-    assert route_paths(installed_app) == expected_paths
-    assert not any(
-        path.startswith("/fake-govbr") for path in route_paths(installed_app)
-    )
+    assert route_paths(app) == expected_paths
+    assert not hasattr(auth, "install")
+    assert not any(path.startswith("/fake-govbr") for path in route_paths(app))

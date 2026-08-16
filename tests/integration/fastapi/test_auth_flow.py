@@ -21,7 +21,6 @@ from starlette.requests import Request
 from starlette.types import Receive, Scope, Send
 
 import govbr_auth
-from govbr_auth import AuthContext, AuthSuccessHandler, GovBrAuth, create_govbr_router
 from govbr_auth import core
 from govbr_auth.core import (
     GovBrClient,
@@ -41,6 +40,13 @@ from govbr_auth.fake import (
     InMemoryFakeUserStore,
     create_fake_govbr_app,
 )
+from govbr_auth.fastapi import (
+    AuthContext,
+    AuthSuccessHandler,
+    GovBrAuth,
+    create_govbr_router,
+)
+from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
 from tests.integration.core.provider import GovBrAsgiProvider
 
 FIXED_NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
@@ -62,17 +68,27 @@ def fixed_clock() -> datetime:
     return _clock_value.get()
 
 
-def build_client(
+def build_runtime(
     settings: GovBrSettings,
     transport: httpx.AsyncBaseTransport,
-) -> GovBrClient:
-    """Build the real strict client over the selected provider transport."""
+) -> GovBrRuntime:
+    """Build a real runtime over the selected provider transport."""
     http = httpx.AsyncClient(transport=transport)
-    return GovBrClient(
+    client = GovBrClient(
         settings,
         InMemoryTransactionStore(settings.transaction_secret),
         IdTokenValidator(settings=settings),
         http,
+    )
+    return GovBrRuntime(
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.OFFICIAL,
+            oauth=settings,
+        ),
+        client=client,
+        provider=GovBrProvider.OFFICIAL,
+        fake=None,
+        _owned_http=http,
     )
 
 
@@ -83,13 +99,14 @@ def build_consumer(
     """Build one consumer application independent of provider implementation."""
     app = FastAPI()
     app.state.received_contexts = []
-    client = build_client(settings, transport)
+    runtime = build_runtime(settings, transport)
 
     async def on_success(context: AuthContext) -> Response:
         app.state.received_contexts.append(context)
         return JSONResponse({"sub": context.user.subject})
 
-    GovBrAuth(client=client, on_success=on_success, clock=fixed_clock).install(app)
+    auth = GovBrAuth(runtime=runtime, on_success=on_success, clock=fixed_clock)
+    app.include_router(auth.router)
     return app
 
 
@@ -460,32 +477,76 @@ def provider_variant(request: pytest.FixtureRequest) -> ProviderVariant:
 @pytest_asyncio.fixture
 async def browser(provider_variant: ProviderVariant):
     consumer = build_consumer(provider_variant.settings, provider_variant.transport)
-    async with (
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=consumer),
-            base_url=CONSUMER_BASE_URL,
-            follow_redirects=False,
-        ) as consumer_http,
-        httpx.AsyncClient(
-            transport=provider_variant.transport,
-            base_url=PROVIDER_BASE_URL,
-            follow_redirects=False,
-        ) as provider_http,
-    ):
-        yield OAuthBrowser(
-            consumer_http=consumer_http,
-            provider_http=provider_http,
-            received_contexts=consumer.state.received_contexts,
-        )
+    async with consumer.router.lifespan_context(consumer):
+        async with (
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=consumer),
+                base_url=CONSUMER_BASE_URL,
+                follow_redirects=False,
+            ) as consumer_http,
+            httpx.AsyncClient(
+                transport=provider_variant.transport,
+                base_url=PROVIDER_BASE_URL,
+                follow_redirects=False,
+            ) as provider_http,
+        ):
+            yield OAuthBrowser(
+                consumer_http=consumer_http,
+                provider_http=provider_http,
+                received_contexts=consumer.state.received_contexts,
+            )
 
 
 def test_supported_public_api_exports_fastapi_without_fake_factories() -> None:
-    assert govbr_auth.AuthContext is AuthContext
-    assert govbr_auth.AuthSuccessHandler is AuthSuccessHandler
-    assert govbr_auth.GovBrAuth is GovBrAuth
-    assert govbr_auth.create_govbr_router is create_govbr_router
+    assert not hasattr(govbr_auth, "AuthContext")
+    assert not hasattr(govbr_auth, "AuthSuccessHandler")
+    assert not hasattr(govbr_auth, "GovBrAuth")
+    assert not hasattr(govbr_auth, "create_govbr_router")
+    assert callable(GovBrAuth)
+    assert callable(create_govbr_router)
     assert not hasattr(govbr_auth, "create_fake_govbr_app")
     assert not hasattr(govbr_auth, "create_fake_govbr_router")
+
+
+@pytest.mark.asyncio
+async def test_fake_provider_environment_mounts_consumer_and_provider_on_same_router(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    monkeypatch.setenv("GOVBR_PROVIDER", "fake")
+    for name in (
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_USERINFO_URL",
+        "GOVBR_REDIRECT_URI",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    async def on_success(context: AuthContext) -> Response:
+        return Response(status_code=204)
+
+    auth = GovBrAuth(on_success=on_success, clock=fixed_clock)
+    app = FastAPI()
+    app.include_router(auth.router)
+
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://127.0.0.1:8000",
+            follow_redirects=False,
+        ) as http:
+            consumer_login = await http.get("/auth/govbr/login")
+            provider_authorize = await http.get("/fake-govbr/authorize")
+
+    assert consumer_login.status_code == 302
+    assert consumer_login.headers["location"].startswith(
+        "http://127.0.0.1:8000/fake-govbr/authorize?"
+    )
+    assert provider_authorize.status_code == 400
+    assert provider_authorize.json()["error"] == "invalid_request"
 
 
 @pytest.mark.asyncio

@@ -1,10 +1,13 @@
 """Thin asynchronous FastAPI adapter for the strict Gov.br OAuth core."""
 
 from collections.abc import Awaitable, Callable, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
+import httpx
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
@@ -18,6 +21,14 @@ from govbr_auth.core.errors import (
     ProviderUnavailableError,
 )
 from govbr_auth.core.models import GovBrUser, TokenSet
+from govbr_auth.runtime import (
+    GovBrRuntime,
+    GovBrRuntimeSettings,
+    create_govbr_runtime,
+)
+
+if TYPE_CHECKING:
+    from govbr_auth.fake.runtime import FakeGovBrRuntime
 
 __all__ = [
     "AuthContext",
@@ -93,30 +104,65 @@ def create_govbr_router(
 
 
 class GovBrAuth:
-    """Provide explicit installation of the Gov.br routes on a FastAPI app."""
+    """Expose runtime-backed Gov.br routes as an idiomatic FastAPI router."""
 
     def __init__(
         self,
         *,
-        client: GovBrClient,
         on_success: AuthSuccessHandler,
+        settings: GovBrRuntimeSettings | None = None,
+        runtime: GovBrRuntime | None = None,
         on_error: AuthErrorHandler | None = None,
         expose_tokens: bool = False,
         prefix: str = "/auth/govbr",
         clock: Callable[[], datetime] = utc_now,
+        user_repository: object | None = None,
     ) -> None:
-        self.router = create_govbr_router(
-            client=client,
-            on_success=on_success,
-            on_error=on_error,
-            expose_tokens=expose_tokens,
-            prefix=prefix,
-            clock=clock,
-        )
+        if settings is not None and runtime is not None:
+            raise TypeError("settings and runtime are mutually exclusive")
+        if runtime is None:
+            runtime = create_govbr_runtime(
+                settings or GovBrRuntimeSettings.from_environment(),
+                fake_transport_factory=lambda fake: _fake_asgi_transport(
+                    fake,
+                    clock=clock,
+                ),
+                clock=clock,
+                user_repository=user_repository,
+            )
+        self._runtime = runtime
 
-    def install(self, app: FastAPI) -> None:
-        """Install only the consumer-facing authentication routes."""
-        app.include_router(self.router)
+        @asynccontextmanager
+        async def lifespan(_: object):
+            async with runtime:
+                yield
+
+        router = APIRouter(lifespan=lifespan)
+        router.include_router(
+            create_govbr_router(
+                client=runtime.client,
+                on_success=on_success,
+                on_error=on_error,
+                expose_tokens=expose_tokens,
+                prefix=prefix,
+                clock=clock,
+            )
+        )
+        if runtime.fake is not None:
+            from govbr_auth.fake.fastapi import create_fake_govbr_router
+
+            router.include_router(create_fake_govbr_router(runtime.fake, clock=clock))
+        self._router = router
+
+    @property
+    def router(self) -> APIRouter:
+        """Return the framework-native router for explicit application inclusion."""
+        return self._router
+
+    @property
+    def runtime(self) -> GovBrRuntime:
+        """Return the neutral runtime consumed by this adapter."""
+        return self._runtime
 
 
 def _auth_error_response(error: GovBrAuthError) -> JSONResponse:
@@ -135,4 +181,19 @@ def _auth_error_response(error: GovBrAuthError) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content={"error": error.code, "message": safe_message},
+    )
+
+
+def _fake_asgi_transport(
+    runtime: "FakeGovBrRuntime",
+    *,
+    clock: Callable[[], datetime],
+) -> httpx.AsyncBaseTransport:
+    """Create the FastAPI-owned in-process transport for a fake runtime."""
+    from govbr_auth.fake.fastapi import create_fake_govbr_router
+
+    provider_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    provider_app.include_router(create_fake_govbr_router(runtime, clock=clock))
+    return httpx.ASGITransport(
+        app=provider_app,
     )

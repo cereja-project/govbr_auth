@@ -14,14 +14,12 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, Response
 from pydantic import SecretStr
 
-from govbr_auth import AuthContext, GovBrAuth
+from govbr_auth.fastapi import AuthContext, GovBrAuth
 from govbr_auth.core import (
-    GovBrClient,
     GovBrSettings,
-    IdTokenValidator,
-    InMemoryTransactionStore,
     ProviderEnvironment,
 )
+from govbr_auth.runtime import GovBrRuntimeSettings, create_govbr_runtime
 
 
 def utc_now() -> datetime:
@@ -56,11 +54,10 @@ def create_app(
     """Create one consumer whose routes do not depend on the selected provider."""
     settings = settings_from_environment()
     provider_http = httpx.AsyncClient(transport=provider_transport)
-    client = GovBrClient(
-        settings,
-        InMemoryTransactionStore(settings.transaction_secret),
-        IdTokenValidator(settings=settings),
-        provider_http,
+    runtime = create_govbr_runtime(
+        GovBrRuntimeSettings(oauth=settings),
+        http=provider_http,
+        clock=clock,
     )
 
     @asynccontextmanager
@@ -80,7 +77,8 @@ def create_app(
             }
         )
 
-    GovBrAuth(client=client, on_success=authenticated, clock=clock).install(application)
+    auth = GovBrAuth(runtime=runtime, on_success=authenticated, clock=clock)
+    application.include_router(auth.router)
     return application
 
 

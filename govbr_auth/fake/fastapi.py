@@ -3,7 +3,9 @@
 import base64
 import binascii
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Protocol
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -21,6 +23,7 @@ from govbr_auth.fake.provider import (
     FakeOAuthError,
     FakeTokenRequest,
 )
+from govbr_auth.fake.runtime import FakeGovBrRuntime
 from govbr_auth.fastapi import utc_now
 
 _AUTHORIZATION_FIELDS = (
@@ -39,26 +42,46 @@ _CLIENT_INVALID = "Client authentication failed."
 _TOKEN_INVALID = "The access token is invalid or expired."
 
 
+class _FakeHttpRuntime(Protocol):
+    """Expose only the canonical runtime fields required by HTTP routes."""
+
+    provider: FakeGovBrProvider
+    credential_authenticator: FakeCredentialAuthenticator | None
+    prefix: str
+
+
+@dataclass(frozen=True, slots=True)
+class _ProviderRuntimeAdapter:
+    """Adapt an advanced supplied provider without composing new resources."""
+
+    provider: FakeGovBrProvider
+    credential_authenticator: FakeCredentialAuthenticator | None
+    prefix: str
+
+
 def create_fake_govbr_router(
-    provider: FakeGovBrProvider,
+    runtime: FakeGovBrRuntime | FakeGovBrProvider,
     *,
-    prefix: str = "/fake-govbr",
+    prefix: str | None = None,
     credential_authenticator: FakeCredentialAuthenticator | None = None,
     automatic_subject: str | None = None,
     clock: Callable[[], datetime] = utc_now,
 ) -> APIRouter:
     """Create explicitly mounted fake-provider routes below ``prefix``."""
-    return _build_fake_govbr_routes(
-        provider,
+    runtime = _as_http_runtime(
+        runtime,
         prefix=prefix,
         credential_authenticator=credential_authenticator,
+    )
+    return _build_fake_govbr_routes(
+        runtime,
         automatic_subject=automatic_subject,
         clock=clock,
     )
 
 
 def create_fake_govbr_app(
-    provider: FakeGovBrProvider,
+    runtime: FakeGovBrRuntime | FakeGovBrProvider,
     *,
     credential_authenticator: FakeCredentialAuthenticator | None = None,
     automatic_subject: str | None = None,
@@ -66,11 +89,14 @@ def create_fake_govbr_app(
 ) -> FastAPI:
     """Create a standalone ASGI fake provider with routes at the application root."""
     application = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    runtime = _as_http_runtime(
+        runtime,
+        prefix="",
+        credential_authenticator=credential_authenticator,
+    )
     application.include_router(
         _build_fake_govbr_routes(
-            provider,
-            prefix="",
-            credential_authenticator=credential_authenticator,
+            runtime,
             automatic_subject=automatic_subject,
             clock=clock,
         )
@@ -79,14 +105,14 @@ def create_fake_govbr_app(
 
 
 def _build_fake_govbr_routes(
-    provider: FakeGovBrProvider,
+    runtime: _FakeHttpRuntime,
     *,
-    prefix: str,
-    credential_authenticator: FakeCredentialAuthenticator | None,
     automatic_subject: str | None,
     clock: Callable[[], datetime],
 ) -> APIRouter:
-    router = APIRouter(prefix=prefix)
+    provider = runtime.provider
+    credential_authenticator = runtime.credential_authenticator
+    router = APIRouter(prefix=runtime.prefix)
     login_route_name = f"fake_govbr_login_{id(router):x}"
 
     @router.get("/authorize")
@@ -227,6 +253,29 @@ def _build_fake_govbr_routes(
         return JSONResponse(user.model_dump(exclude_none=True, mode="json"))
 
     return router
+
+
+def _as_http_runtime(
+    runtime: FakeGovBrRuntime | FakeGovBrProvider,
+    *,
+    prefix: str | None,
+    credential_authenticator: FakeCredentialAuthenticator | None,
+) -> _FakeHttpRuntime:
+    if isinstance(runtime, FakeGovBrRuntime):
+        return _ProviderRuntimeAdapter(
+            provider=runtime.provider,
+            credential_authenticator=(
+                runtime.credential_authenticator
+                if credential_authenticator is None
+                else credential_authenticator
+            ),
+            prefix=runtime.prefix if prefix is None else prefix,
+        )
+    return _ProviderRuntimeAdapter(
+        provider=runtime,
+        credential_authenticator=credential_authenticator,
+        prefix="/fake-govbr" if prefix is None else prefix,
+    )
 
 
 async def _read_form(request: Request) -> FormData:

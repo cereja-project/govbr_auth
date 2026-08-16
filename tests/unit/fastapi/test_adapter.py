@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import RedirectResponse, Response
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
@@ -11,6 +11,7 @@ from pydantic import SecretStr
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
+from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
 
 FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 
@@ -62,10 +63,78 @@ class RecordingClient:
         return GovBrUser(sub=expected_subject, name="Unit user")
 
 
+def client_runtime(
+    client: RecordingClient,
+    *,
+    owned_http: AsyncClient | None = None,
+) -> GovBrRuntime:
+    """Build a real runtime around the adapter-boundary client."""
+    return GovBrRuntime(
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        client=client,
+        provider=GovBrProvider.OFFICIAL,
+        fake=None,
+        _owned_http=owned_http,
+    )
+
+
 async def request(app: FastAPI, path: str):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         return await http.get(path, follow_redirects=False)
+
+
+def test_fastapi_facade_exposes_read_only_router_without_install() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    auth = GovBrAuth(
+        runtime=client_runtime(RecordingClient()),
+        on_success=success_handler,
+    )
+
+    assert isinstance(auth.router, APIRouter)
+    assert not hasattr(auth, "install")
+    with pytest.raises(AttributeError):
+        auth.router = APIRouter()
+
+
+def test_fastapi_facade_rejects_settings_and_runtime_together() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    settings = GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
+
+    with pytest.raises(TypeError, match="settings and runtime are mutually exclusive"):
+        GovBrAuth(
+            settings=settings,
+            runtime=client_runtime(RecordingClient()),
+            on_success=success_handler,
+        )
+
+
+@pytest.mark.asyncio
+async def test_router_lifespan_closes_runtime() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    owned_http = AsyncClient()
+    runtime = client_runtime(RecordingClient(), owned_http=owned_http)
+    auth = GovBrAuth(runtime=runtime, on_success=success_handler)
+    app = FastAPI()
+    app.include_router(auth.router)
+
+    async with app.router.lifespan_context(app):
+        assert runtime.is_closed is False
+
+    assert runtime.is_closed is True
+    assert owned_http.is_closed is True
 
 
 @pytest.mark.asyncio

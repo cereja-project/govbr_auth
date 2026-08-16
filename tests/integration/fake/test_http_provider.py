@@ -264,6 +264,41 @@ def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> N
 
 
 @pytest.mark.asyncio
+async def test_router_consumes_canonical_fake_runtime() -> None:
+    from fastapi import FastAPI
+
+    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_end_to_end=True,
+    )
+    runtime = create_fake_govbr_runtime(settings, clock=lambda: FIXED_NOW)
+    application = FastAPI()
+    application.include_router(
+        create_fake_govbr_router(runtime, clock=lambda: FIXED_NOW)
+    )
+    client = runtime.settings.clients[0]
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://127.0.0.1:8000",
+    ) as http:
+        response = await http.get(
+            runtime.endpoints.authorize,
+            params=authorization_params(
+                client_id=client.client_id,
+                redirect_uri=str(client.registered_redirect_uris[0]),
+            ),
+        )
+
+    assert response.status_code == 200
+    assert "Ana Demo" not in response.text
+    assert 'name="cpf"' in response.text
+
+
+@pytest.mark.asyncio
 async def test_mounted_router_completes_http_flow_with_prefix_and_root_path() -> None:
     from fastapi import FastAPI
 

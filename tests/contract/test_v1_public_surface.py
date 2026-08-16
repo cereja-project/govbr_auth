@@ -23,14 +23,10 @@ def _project_metadata() -> dict[str, object]:
         return tomllib.load(pyproject_file)["project"]
 
 
-def test_top_level_exports_exact_fastapi_v1_surface() -> None:
-    assert tuple(govbr_auth.__all__) == (
-        "AuthContext",
-        "AuthSuccessHandler",
-        "GovBrAuth",
-        "create_govbr_router",
-        "generate_transaction_secret",
-    )
+def test_top_level_exports_exact_framework_neutral_v1_surface() -> None:
+    assert tuple(govbr_auth.__all__) == ("generate_transaction_secret",)
+    assert not hasattr(govbr_auth, "AuthContext")
+    assert not hasattr(govbr_auth, "GovBrAuth")
 
 
 def test_generate_transaction_secret_returns_valid_unique_fernet_keys() -> None:
