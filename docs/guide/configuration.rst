@@ -1,11 +1,18 @@
 Configuração
 ============
 
-O exemplo lê somente a seleção do ambiente, endpoints, credenciais OAuth,
-redirect e o segredo local de transações do consumidor:
+Seleção do provedor
+-------------------
+
+``GOVBR_PROVIDER`` aceita somente ``official`` ou ``fake``. O default é
+``official``. Use ``GOVBR_PROVIDER=fake`` apenas em desenvolvimento.
+
+Provedor oficial
+----------------
 
 .. code-block:: text
 
+    GOVBR_PROVIDER=official
     GOVBR_ENVIRONMENT=production
     GOVBR_AUTHORIZATION_URL=https://sso.acesso.gov.br/authorize
     GOVBR_TOKEN_URL=https://sso.acesso.gov.br/token
@@ -17,11 +24,7 @@ redirect e o segredo local de transações do consumidor:
     GOVBR_ISSUER=https://sso.acesso.gov.br/
     GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
 
-``GOVBR_TRANSACTION_SECRET`` protege ``state``, nonce e PKCE armazenados pelo
-consumidor. Não é uma credencial fornecida pelo provedor e deve permanecer
-secreto e estável entre processos do mesmo deployment.
-
-Gere uma vez e copie a saída para o ``.env``:
+``GOVBR_TRANSACTION_SECRET`` protege ``state``, nonce e PKCE. Gere uma vez:
 
 .. code-block:: python
 
@@ -29,30 +32,21 @@ Gere uma vez e copie a saída para o ``.env``:
 
     print(generate_transaction_secret())
 
-Mantenha o valor secreto e use o mesmo valor em todas as instâncias do
-deployment. Não gere uma chave nova a cada inicialização: o valor estável é
-necessário para validar transações iniciadas por outra instância.
+Mantenha o valor secreto e use o mesmo valor em todas as instâncias. Não gere
+uma chave nova a cada inicialização.
+
+FakeGov
+-------
+
+``GOVBR_FAKE_END_TO_END`` aceita apenas ``true`` ou ``false``. Host, porta,
+prefixo e fonte de usuários podem ser alterados por ``GOVBR_FAKE_HOST``,
+``GOVBR_FAKE_PORT``, ``GOVBR_FAKE_PROVIDER_PREFIX`` e
+``GOVBR_FAKE_USERS_FILE``. O host precisa ser ``localhost``, ``127.0.0.1`` ou
+``::1``.
 
 Configuração explícita
 ----------------------
 
-.. code-block:: python
-
-    from pydantic import SecretStr
-    from govbr_auth.core import GovBrSettings
-
-    settings = GovBrSettings(
-        authorization_url="https://sso.acesso.gov.br/authorize",
-        token_url="https://sso.acesso.gov.br/token",
-        userinfo_url="https://sso.acesso.gov.br/userinfo/",
-        client_id="seu-client-id",
-        client_secret=SecretStr("seu-client-secret"),
-        redirect_uri="https://app.example/auth/govbr/callback",
-        transaction_secret=SecretStr("substitua-pelo-valor-gerado"),
-        issuer="https://sso.acesso.gov.br/",
-        jwks_url="https://sso.acesso.gov.br/jwk",
-    )
-
-HTTP sem TLS é aceito apenas quando ``environment="local"`` e todas as URLs
-usam host de loopback. Não existe ``use_fake``: o fake é montado explicitamente
-no bootstrap de desenvolvimento.
+Aplicações avançadas podem construir ``GovBrRuntimeSettings`` e passá-lo a
+``GovBrAuth``. O caminho comum deve preferir variáveis de ambiente e a fachada
+FastAPI, mantendo a composição em um único lugar.

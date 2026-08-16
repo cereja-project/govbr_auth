@@ -38,7 +38,7 @@ def test_release_version_is_consistent_across_package_and_documentation() -> Non
     )
 
 
-def test_docs_job_installs_built_demo_wheel_before_sphinx() -> None:
+def test_docs_job_installs_built_fake_wheel_before_sphinx() -> None:
     workflow = _load_docs_workflow()
     steps = workflow["jobs"]["build"]["steps"]
     run_steps = [step for step in steps if "run" in step]
@@ -53,7 +53,7 @@ def test_docs_job_installs_built_demo_wheel_before_sphinx() -> None:
         for index, step in enumerate(run_steps)
         if any(
             line.strip().startswith("python -m pip install ")
-            and "${wheel_path}[demo]" in line
+            and "${wheel_path}[fake]" in line
             for line in step["run"].splitlines()
         )
     )

@@ -20,8 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-fake = ["python-multipart"]
-demo = ["python-multipart", "uvicorn"]
+fake = ["python-multipart", "uvicorn"]
 dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "flake8", "pytest-cov", "PyYAML"]
 
 [tool.setuptools]

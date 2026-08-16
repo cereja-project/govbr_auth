@@ -1,79 +1,66 @@
 # govbr-auth
 
-Biblioteca assíncrona para integrar autenticação Gov.br a aplicações FastAPI.
-O cliente oficial valida state/PKCE, tokens RS256 por JWKS, issuer, audience,
-nonce e vínculo de subject antes de entregar o usuário ao handler da aplicação.
+Biblioteca assíncrona para autenticação Gov.br em FastAPI. O núcleo de
+composição é independente de framework; nesta versão, o adaptador público
+disponível é o FastAPI.
 
-Este é um projeto comunitário: não é mantido, homologado nem endossado pelo
-Governo Federal.
+Projeto comunitário, sem manutenção, homologação ou endosso do Governo Federal.
 
-## Teste local em dois comandos
-
-```bash
-pip install "govbr-auth[demo]"
-python -m govbr_auth.demo
-```
-
-Abra `http://localhost:8000`, clique em **Entrar com Gov.br**, entre com um
-usuário fictício e acompanhe o callback validado. A simulação roda somente em
-loopback e não usa credenciais Gov.br.
-
-Por padrão, a página inicial mostra os usuários fictícios incluídos na demo.
-Para substituí-los completamente, defina `GOVBR_FAKE_USERS_FILE` com o caminho
-de um arquivo JSON. O objeto deve conter a lista `"users"`; cada item exige
-`"cpf"`, `"password"`, `"name"` e `"email"`. O formato completo está no
-[guia do provedor fake](docs/guide/fake-mode.rst).
-
-O arquivo é carregado e validado na inicialização. Quando ele é usado, os
-defaults não são mesclados e as credenciais não são listadas na página
-inicial. A fonte JSON funciona inteiramente em memória e não depende de ORM,
-banco ou migrações. Atenção: não use credenciais reais; mantenha o arquivo
-fora do Git.
-
-## Requisitos e instalação
-
-- Python 3.11+
-- FastAPI
+## Usar FakeGov no meu app
 
 ```bash
-python -m pip install govbr-auth
+pip install "govbr-auth[fake]"
 ```
 
-Para integrar um provedor local explícito na sua própria aplicação, instale o
-extra opcional `[fake]`:
+```python
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from govbr_auth.fastapi import AuthContext, GovBrAuth
+
+app = FastAPI()
+
+async def authenticated(context: AuthContext):
+    return JSONResponse({"subject": context.user.subject})
+
+auth = GovBrAuth(on_success=authenticated)
+app.include_router(auth.router)
+```
+
+Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
+fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente
+a composição selecionada pela configuração muda.
+
+## Executar end-to-end
+
+Para experimentar frontend, backend e login FakeGov no mesmo processo:
 
 ```bash
-python -m pip install "govbr-auth[fake]"
+pip install "govbr-auth[fake]"
+GOVBR_FAKE_END_TO_END=true
+python -m govbr_auth.fake
 ```
 
-Para desenvolvimento do projeto:
+Abra `http://localhost:8000`. Sem `GOVBR_FAKE_END_TO_END=true`, o mesmo comando
+`python -m govbr_auth.fake` inicia somente o provedor/login, sem página inicial.
+O launcher escuta apenas em loopback.
 
-```bash
-python -m pip install -r requirements-dev.txt
-python -m pytest --tb=short --disable-warnings -q
+## Customizar usuários
+
+Defina `GOVBR_FAKE_USERS_FILE` com um JSON fora do Git:
+
+```json
+{"users": [{"cpf": "12345678901", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
 ```
 
-## Integração com o provedor oficial
+O arquivo substitui os usuários defaults, é validado na inicialização e fica
+em memória; não use credenciais reais. Para fontes próprias, implemente o
+protocolo de repositório descrito no guia de FakeGov.
 
-Configure endpoints e credenciais do provedor, além do segredo local usado pelo
-consumidor para proteger suas transações:
+## Provedor oficial
 
-```text
-GOVBR_ENVIRONMENT=production
-GOVBR_AUTHORIZATION_URL=https://sso.acesso.gov.br/authorize
-GOVBR_TOKEN_URL=https://sso.acesso.gov.br/token
-GOVBR_USERINFO_URL=https://sso.acesso.gov.br/userinfo/
-GOVBR_CLIENT_ID=seu-client-id
-GOVBR_CLIENT_SECRET=seu-client-secret
-GOVBR_REDIRECT_URI=https://app.example/auth/govbr/callback
-GOVBR_TRANSACTION_SECRET=substitua-pelo-valor-gerado
-GOVBR_ISSUER=https://sso.acesso.gov.br/
-GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
-```
-
-`GOVBR_TRANSACTION_SECRET` protege o `state`, nonce e PKCE mantidos pelo
-consumidor. Ele não é uma credencial fornecida pelo Gov.br. Gere uma vez,
-antes de preencher o `.env`:
+Instale a biblioteca sem extras e configure `GOVBR_PROVIDER=official` (o
+default), endpoints, credenciais, redirect e `GOVBR_TRANSACTION_SECRET`.
+Gere uma vez o segredo:
 
 ```python
 from govbr_auth import generate_transaction_secret
@@ -81,54 +68,22 @@ from govbr_auth import generate_transaction_secret
 print(generate_transaction_secret())
 ```
 
-Mantenha o valor secreto e use o mesmo valor em todas as instâncias do
-deployment. Não gere uma chave nova a cada inicialização.
-
-Execute o consumidor configurado para o provedor oficial:
+Mantenha o valor secreto e use o mesmo valor em todas as instâncias. Não gere
+uma chave nova a cada inicialização. Execute o exemplo com:
 
 ```bash
 uvicorn examples.example_fastapi:create_app --factory
 ```
 
-O arquivo `examples/example_fastapi.py` cria sempre o mesmo app consumidor. A
-seleção do provedor ocorre exclusivamente pela configuração. O handler recebe
-`AuthContext` com usuário e claims validados; tokens brutos só são incluídos
-quando a aplicação opta explicitamente por `expose_tokens=True`.
+Consulte a [documentação](docs/index.rst) para configuração completa, solução
+de problemas e uso avançado.
 
-## Provedor fake local para integração
-
-O fake nunca é ativado por flag nem por detecção de URL. Ele existe em
-`govbr_auth.fake`; instale o extra `[fake]`, configure URLs locais e inicie
-explicitamente o bootstrap de desenvolvimento:
+## Desenvolvimento
 
 ```bash
-uvicorn examples.example_fastapi:create_development_app --factory
+python -m pip install -r requirements-dev.txt
+python -m pytest --tb=short --disable-warnings -q
 ```
-
-As factories e modelos do fake existem somente em `govbr_auth.fake`. O store de
-replay em memória rejeita reutilização de authorization code apenas dentro da
-mesma instância do fake. Instâncias distintas que compartilham as mesmas chaves
-criptográficas não conseguem rejeitar globalmente um replay sem um store
-compartilhado; esta distribuição não adiciona banco, Redis ou estado remoto.
-Essa limitação pertence exclusivamente ao provedor fake local e não descreve
-nem reduz garantias do provedor oficial Gov.br.
-
-Para autenticação local por CPF e senha, use os contratos públicos
-`FakeCredentialAuthenticator`, `InMemoryFakeUserRepository` e
-`JsonFakeUserRepository`, exportados por `govbr_auth.fake`.
-
-## Migração para a API v1
-
-Esta versão remove Flask, Django, `GovBrConnector`, o core legado síncrono,
-wrappers `build_authorize_url_sync` e `exchange_code_for_token_sync`, e a
-ativação fake implícita. Migre para:
-
-- `GovBrSettings`, `GovBrClient` e stores assíncronos em `govbr_auth.core`;
-- `GovBrAuth` ou `create_govbr_router` em `govbr_auth.fastapi`;
-- factories explícitas do provedor local em `govbr_auth.fake`.
-
-Não existe fallback fake no cliente oficial. Aplicações que precisam do fake
-devem montá-lo explicitamente em um bootstrap separado.
 
 ## Licença
 

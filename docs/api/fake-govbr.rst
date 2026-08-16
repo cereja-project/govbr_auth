@@ -1,9 +1,13 @@
-Provedor fake explícito
-=======================
+FakeGov avançado
+================
 
 O provedor local é opcional e nunca é ativado pelo cliente oficial. Instale o
-extra ``govbr-auth[fake]`` e monte uma factory de ``govbr_auth.fake`` somente
-no bootstrap de desenvolvimento.
+extra ``govbr-auth[fake]``. No caminho comum, selecione ``GOVBR_PROVIDER=fake``
+e use ``GovBrAuth``; as factories abaixo atendem topologias avançadas.
+
+.. autoclass:: govbr_auth.fake.FakeGovBrRuntime
+
+.. autofunction:: govbr_auth.fake.create_fake_govbr_runtime
 
 .. autoclass:: govbr_auth.fake.FakeGovBrSettings
 
@@ -17,6 +21,10 @@ no bootstrap de desenvolvimento.
 
 .. autoclass:: govbr_auth.fake.InMemoryFakeUserStore
 
-.. autofunction:: govbr_auth.fake.create_fake_govbr_router
+.. py:function:: create_fake_govbr_router(runtime, *, prefix=None, credential_authenticator=None)
 
-.. autofunction:: govbr_auth.fake.create_fake_govbr_app
+   Cria as rotas ASGI de um runtime FakeGov existente.
+
+.. py:function:: create_fake_govbr_app(runtime, *, credential_authenticator=None)
+
+   Cria uma aplicação ASGI de provedor separado para uso avançado.

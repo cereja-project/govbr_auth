@@ -1,9 +1,12 @@
 GovBR Auth
 ==========
 
-Biblioteca assíncrona FastAPI para autenticação Gov.br com OAuth 2.0, PKCE e
+Biblioteca assíncrona para autenticação Gov.br em FastAPI com OAuth 2.0, PKCE e
 OpenID Connect. O cliente valida ``state``, tokens RS256 por JWKS, ``issuer``,
 ``audience``, ``nonce`` e o vínculo do ``subject``.
+
+O núcleo de composição é neutro de framework. O adaptador público disponível
+nesta versão é FastAPI.
 
 .. toctree::
    :maxdepth: 2

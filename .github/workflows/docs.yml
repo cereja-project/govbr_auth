@@ -28,22 +28,22 @@ jobs:
         run: |
           wheel_path="$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name '*.whl' -print -quit)"
           test -n "$wheel_path"
-          python -m pip install "${wheel_path}[demo]"
-      - name: Smoke-test installed demo
+          python -m pip install "${wheel_path}[fake]"
+      - name: Smoke-test installed fake provider
         shell: bash
         run: |
           python -m venv /tmp/govbr-auth-demo
           wheel_path="$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name '*.whl' -print -quit)"
           test -n "$wheel_path"
-          /tmp/govbr-auth-demo/bin/python -m pip install "${wheel_path}[demo]"
+          /tmp/govbr-auth-demo/bin/python -m pip install "${wheel_path}[fake]"
           cd /tmp
           /tmp/govbr-auth-demo/bin/python -c \
             "import govbr_auth, pathlib; assert pathlib.Path(govbr_auth.__file__).is_relative_to('/tmp/govbr-auth-demo')"
-          /tmp/govbr-auth-demo/bin/python -m govbr_auth.demo > /tmp/govbr-auth-demo.log 2>&1 &
+          /tmp/govbr-auth-demo/bin/python -m govbr_auth.fake > /tmp/govbr-auth-demo.log 2>&1 &
           demo_pid=$!
           trap 'kill "$demo_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8000/ | grep -q "FAKE / SIMULAÇÃO"; then
+            if curl --fail --silent http://127.0.0.1:8000/jwk | grep -q '"keys"'; then
               exit 0
             fi
             sleep 1

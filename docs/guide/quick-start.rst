@@ -1,51 +1,55 @@
-Teste local em dois comandos
-=============================
+Início rápido
+=============
 
-Instalação
-----------
+Executar end-to-end
+-------------------
 
-Instale a demonstração empacotada::
+Instale o perfil local::
 
-    pip install "govbr-auth[demo]"
+    pip install "govbr-auth[fake]"
 
-Execução
---------
+Ative a composição completa e execute o único launcher::
 
-Inicie a demonstração local::
+    GOVBR_FAKE_END_TO_END=true
+    python -m govbr_auth.fake
 
-    python -m govbr_auth.demo
+Abra ``http://localhost:8000``, clique em **Entrar com Gov.br**, informe um
+usuário fictício e acompanhe o retorno validado ao backend.
 
-Abra ``http://localhost:8000``. A demonstração escuta somente no loopback e não
-usa credenciais Gov.br.
+Usar FakeGov no meu app
+-----------------------
 
-Fluxo guiado
-------------
+No FastAPI, a aplicação monta somente a fachada pública:
 
-1. Clique em **Entrar com Gov.br**.
-2. Entre com um usuário fictício na tela do provedor local.
-3. Acompanhe o retorno para o callback: a página mostra o usuário e as claims
-   validadas, sem expor tokens brutos.
+.. code-block:: python
 
-Usuários próprios
------------------
+    from fastapi import FastAPI
+    from govbr_auth.fastapi import AuthContext, GovBrAuth
 
-Para substituir os usuários incluídos, defina ``GOVBR_FAKE_USERS_FILE`` com o
-caminho de um arquivo JSON antes de iniciar a demo. O objeto usa a lista
-``"users"`` e cada item contém ``"cpf"``, ``"password"``, ``"name"`` e
-``"email"``. Consulte :doc:`fake-mode` para copiar o formato completo.
+    app = FastAPI()
 
-A demo valida o arquivo na inicialização, substitui todos os defaults e não
-lista as credenciais externas na página inicial. A fonte funciona em memória,
-sem ORM ou banco. Atenção: não use credenciais reais; mantenha o arquivo fora
-do Git.
+    async def authenticated(context: AuthContext):
+        return {"subject": context.user.subject}
 
-O que usar depois da demonstração
----------------------------------
+    auth = GovBrAuth(on_success=authenticated)
+    app.include_router(auth.router)
 
-Para integrar a sua aplicação com o Gov.br, siga a :doc:`configuration` e
-execute o seu consumidor FastAPI. Para testar essa integração sem credenciais
-oficiais, monte explicitamente o provedor de desenvolvimento em
-:doc:`fake-mode`; ele não é ativado por uma flag nem por detecção de URL.
+Execute seu app com ``GOVBR_PROVIDER=fake`` no desenvolvimento. Para produção,
+use o mesmo código com o provedor oficial configurado.
 
-O projeto é comunitário e não é mantido, homologado nem endossado pelo Governo
-Federal.
+Customizar usuários
+-------------------
+
+Defina ``GOVBR_FAKE_USERS_FILE`` com um JSON como
+``{"users": [{"cpf": "12345678901", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}``.
+O arquivo substitui os defaults; não use credenciais reais e mantenha-o fora
+do Git. Veja :doc:`fake-mode` para validação e repositórios próprios.
+
+Somente o login FakeGov
+-----------------------
+
+Sem a variável end-to-end, o launcher publica apenas o provedor local::
+
+    python -m govbr_auth.fake
+
+Esse perfil não possui página inicial em ``/`` e atende aplicações web próprias.

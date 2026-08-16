@@ -1,6 +1,7 @@
 """Freeze the FastAPI-only v1 public and distribution contracts."""
 
 import importlib.util
+import os
 import subprocess
 import sys
 import tarfile
@@ -174,14 +175,13 @@ def test_project_version_is_static_without_importing_runtime_dependencies() -> N
     assert "dynamic" not in metadata
 
 
-def test_optional_dependencies_split_fake_demo_and_development_tools() -> None:
+def test_optional_dependencies_split_fake_and_development_tools() -> None:
     metadata = _project_metadata()
 
     optional_dependencies = metadata["optional-dependencies"]
 
-    assert set(optional_dependencies) == {"demo", "dev", "fake"}
-    assert optional_dependencies["fake"] == ["python-multipart"]
-    assert optional_dependencies["demo"] == ["python-multipart", "uvicorn"]
+    assert set(optional_dependencies) == {"dev", "fake"}
+    assert optional_dependencies["fake"] == ["python-multipart", "uvicorn"]
     assert optional_dependencies["dev"] == [
         "uvicorn",
         "pytest",
@@ -223,6 +223,7 @@ def test_built_distributions_exclude_legacy_and_cache_artifacts(
             sys.executable,
             "-m",
             "build",
+            "--no-isolation",
             "--outdir",
             str(tmp_path),
         ],
@@ -230,6 +231,7 @@ def test_built_distributions_exclude_legacy_and_cache_artifacts(
         check=True,
         capture_output=True,
         text=True,
+        env={**os.environ, "PYTHONUTF8": "1"},
     )
     (wheel_path,) = tmp_path.glob("*.whl")
     (sdist_path,) = tmp_path.glob("*.tar.gz")
@@ -247,6 +249,7 @@ def test_built_distributions_exclude_legacy_and_cache_artifacts(
         "govbr_auth/core/govbr.py",
         "govbr_auth/fake_govbr.py",
         "govbr_auth/utils.py",
+        "govbr_auth/demo",
     }
     invalid_entries = [
         entry
@@ -260,3 +263,7 @@ def test_built_distributions_exclude_legacy_and_cache_artifacts(
     ]
 
     assert invalid_entries == []
+
+
+def test_demo_module_is_not_importable() -> None:
+    assert importlib.util.find_spec("govbr_auth.demo") is None

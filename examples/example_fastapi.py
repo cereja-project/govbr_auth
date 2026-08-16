@@ -1,25 +1,17 @@
-"""Executable FastAPI consumer with an explicit local-provider bootstrap."""
+"""FastAPI consumer using the canonical govbr-auth facade."""
 
 import os
-from contextlib import asynccontextmanager
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urlsplit
 
-import httpx
-from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, Response
 from pydantic import SecretStr
 
+from govbr_auth.core import GovBrSettings, ProviderEnvironment
 from govbr_auth.fastapi import AuthContext, GovBrAuth
-from govbr_auth.core import (
-    GovBrSettings,
-    ProviderEnvironment,
-)
-from govbr_auth.runtime import GovBrRuntimeSettings, create_govbr_runtime
 
 
 def utc_now() -> datetime:
@@ -28,7 +20,7 @@ def utc_now() -> datetime:
 
 
 def settings_from_environment() -> GovBrSettings:
-    """Load only provider endpoints, credentials, and transaction configuration."""
+    """Load the official-provider settings used by configuration examples."""
     load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     return GovBrSettings(
         environment=ProviderEnvironment(
@@ -46,104 +38,14 @@ def settings_from_environment() -> GovBrSettings:
     )
 
 
-def create_app(
-    *,
-    provider_transport: httpx.AsyncBaseTransport | None = None,
-    clock: Callable[[], datetime] = utc_now,
-) -> FastAPI:
-    """Create one consumer whose routes do not depend on the selected provider."""
-    settings = settings_from_environment()
-    provider_http = httpx.AsyncClient(transport=provider_transport)
-    runtime = create_govbr_runtime(
-        GovBrRuntimeSettings(oauth=settings),
-        http=provider_http,
-        clock=clock,
-    )
-
-    @asynccontextmanager
-    async def lifespan(_: FastAPI):
-        try:
-            yield
-        finally:
-            await provider_http.aclose()
-
-    application = FastAPI(lifespan=lifespan)
+def create_app(*, clock: Callable[[], datetime] = utc_now) -> FastAPI:
+    """Create the same consumer for the official or selected fake provider."""
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
+    application = FastAPI()
 
     async def authenticated(context: AuthContext) -> Response:
-        return JSONResponse(
-            {
-                "authenticated": True,
-                "subject": context.user.subject,
-            }
-        )
+        return JSONResponse({"authenticated": True, "subject": context.user.subject})
 
-    auth = GovBrAuth(runtime=runtime, on_success=authenticated, clock=clock)
+    auth = GovBrAuth(on_success=authenticated, clock=clock)
     application.include_router(auth.router)
-    return application
-
-
-def create_development_app(
-    *,
-    clock: Callable[[], datetime] = utc_now,
-) -> FastAPI:
-    """Explicitly mount the optional fake provider for local development."""
-    from govbr_auth.fake import (
-        FakeClient,
-        FakeGovBrProvider,
-        FakeGovBrSettings,
-        FakeSigningKey,
-        FakeUser,
-        InMemoryAuthorizationCodeReplayStore,
-        InMemoryFakeUserStore,
-        create_fake_govbr_router,
-    )
-
-    settings = settings_from_environment()
-    issuer = str(settings.issuer)
-    authorization_path = urlsplit(str(settings.authorization_url)).path
-    provider_prefix = authorization_path.removesuffix("/authorize")
-    fake_settings = FakeGovBrSettings(
-        base_url=issuer,
-        issuer=issuer,
-        artifact_secret=SecretStr(Fernet.generate_key().decode("ascii")),
-        request_ttl_seconds=300,
-        authorization_code_ttl_seconds=60,
-        access_token_ttl_seconds=600,
-        id_token_ttl_seconds=300,
-        clients=(
-            FakeClient(
-                client_id=settings.client_id,
-                client_secret=settings.client_secret,
-                registered_redirect_uris=(settings.redirect_uri,),
-            ),
-        ),
-    )
-    provider = FakeGovBrProvider(
-        settings=fake_settings,
-        user_store=InMemoryFakeUserStore(
-            (
-                FakeUser(
-                    sub="local-example-subject",
-                    name="Local Example User",
-                    email="local@example.test",
-                    email_verified=True,
-                ),
-            )
-        ),
-        replay_store=InMemoryAuthorizationCodeReplayStore(),
-        signing_key=FakeSigningKey.generate(kid="local-example-key"),
-    )
-    fake_router = create_fake_govbr_router(
-        provider,
-        prefix=provider_prefix,
-        automatic_subject="local-example-subject",
-        clock=clock,
-    )
-    provider_application = FastAPI()
-    provider_application.include_router(fake_router)
-    application = create_app(
-        provider_transport=httpx.ASGITransport(app=provider_application),
-        clock=clock,
-    )
-    application.include_router(fake_router)
     return application

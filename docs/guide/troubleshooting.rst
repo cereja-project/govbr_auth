@@ -1,61 +1,49 @@
 Solução de problemas
 ====================
 
-Conexão recusada em ``http://localhost:8000``
----------------------------------------------
-
-O processo da demo não está em execução ou foi iniciado em outro terminal.
-Instale o extra e execute novamente::
-
-    pip install "govbr-auth[demo]"
-    python -m govbr_auth.demo
-
-Porta 8000 ocupada
-------------------
-
-A demo usa a porta 8000 no loopback. Encerre ou reconfigure o processo local
-que já a utiliza e execute ``python -m govbr_auth.demo`` novamente. Não exponha
-a demo em uma interface de rede para contornar o conflito.
-
-Transação expirada
-------------------
-
-Uma transação de autenticação expira por projeto. Volte para a página inicial,
-clique em **Entrar com Gov.br** e conclua a nova transação; não reutilize a URL
-de callback anterior.
-
-Estado inválido após reiniciar
+Instalação ou launcher ausente
 ------------------------------
 
-Reiniciar a aplicação remove as transações mantidas em memória. Inicie um novo
-fluxo de login depois do reinício. Não desative a validação de ``state`` para
-aceitar callbacks antigos.
+Instale o extra que contém dependências do servidor local::
+
+    pip install "govbr-auth[fake]"
+    python -m govbr_auth.fake
+
+Porta ocupada
+-------------
+
+O launcher usa a porta 8000. Encerre o processo local que já a utiliza ou
+defina ``GOVBR_FAKE_PORT`` com outra porta válida. Não exponha o FakeGov em uma
+interface de rede.
+
+Provider ou booleano inválido
+-----------------------------
+
+``GOVBR_PROVIDER`` aceita apenas ``official`` e ``fake``.
+``GOVBR_FAKE_END_TO_END`` aceita exatamente ``true`` ou ``false`` em
+minúsculas. Corrija a variável e reinicie o processo.
+
+Host recusado
+-------------
+
+``GOVBR_FAKE_HOST`` aceita somente ``localhost``, ``127.0.0.1`` ou ``::1``.
+Essa restrição evita publicar acidentalmente o simulador na rede.
 
 Arquivo de usuários ausente ou inválido
 ---------------------------------------
 
-Se a inicialização falhar com ``fake user JSON file is unavailable``, confira
-se ``GOVBR_FAKE_USERS_FILE`` aponta para um arquivo existente e legível. Se a
-mensagem for ``fake user JSON is invalid``, valide a sintaxe e o schema descrito
-em :doc:`fake-mode`. Uma lista vazia gera ``users must contain at least one
-item``; CPFs duplicados também impedem a inicialização.
+Se ``GOVBR_FAKE_USERS_FILE`` não existir ou não puder ser lido, a inicialização
+falha. O JSON deve conter ``{"users": [...]}``; cada item exige ``"cpf"``,
+``"password"``, ``"name"`` e ``"email"``. Não use credenciais reais.
 
-Corrija o arquivo e reinicie a demo. Não use credenciais reais; mantenha o
-arquivo fora do Git.
+Transação expirada ou estado inválido
+-------------------------------------
 
-CPF ou senha inválidos
-----------------------
+Volte ao início e crie um novo fluxo. Reiniciar o processo remove transações
+mantidas em memória. Não desative validação de ``state``, nonce ou PKCE.
 
-O formulário retorna ``CPF ou senha inválidos.`` com status 401 tanto para um
-CPF desconhecido quanto para uma senha incorreta. Confirme os dados no arquivo
-configurado, sem registrar ou exibir a senha para diagnóstico. O CPF aceita 11
-dígitos com ou sem pontos e hífen.
+Configuração oficial conflitante com FakeGov
+---------------------------------------------
 
-Configuração oficial e fake misturadas por acidente
----------------------------------------------------
-
-Mantenha a configuração do fake em um bootstrap de desenvolvimento explícito e
-as URLs, credenciais e o ``GovBrSettings`` do provedor oficial em uma
-configuração separada. Não combine endpoints fake com credenciais oficiais, nem
-reduza validações de token, ``state``, nonce, issuer ou TLS para fazer a mistura
-funcionar.
+Ao usar ``GOVBR_PROVIDER=fake``, remova variáveis de endpoints oficiais. A
+biblioteca rejeita a mistura para evitar um grafo ambíguo.

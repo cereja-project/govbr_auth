@@ -128,10 +128,11 @@ def test_transaction_secret_documentation_explains_generation_and_storage() -> N
     )
 
 
-def test_installable_demo_command_is_consistent_across_entry_documents() -> None:
+def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
     required_commands = (
-        'pip install "govbr-auth[demo]"',
-        "python -m govbr_auth.demo",
+        'pip install "govbr-auth[fake]"',
+        "python -m govbr_auth.fake",
+        "GOVBR_FAKE_END_TO_END=true",
         "http://localhost:8000",
     )
     sources = (
@@ -142,12 +143,12 @@ def test_installable_demo_command_is_consistent_across_entry_documents() -> None
     assert tuple(
         tuple(command in source for command in required_commands) for source in sources
     ) == (
-        (True, True, True),
-        (True, True, True),
+        (True, True, True, True),
+        (True, True, True, True),
     )
 
 
-def test_installable_demo_command_is_an_exact_line_in_every_instruction() -> None:
+def test_installable_fake_command_is_an_exact_line_in_every_instruction() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
@@ -156,7 +157,7 @@ def test_installable_demo_command_is_an_exact_line_in_every_instruction() -> Non
 
     assert tuple(
         any(
-            'pip install "govbr-auth[demo]"' == line.strip()
+            'pip install "govbr-auth[fake]"' == line.strip()
             for line in source.splitlines()
         )
         for source in sources
@@ -167,10 +168,18 @@ def test_installable_demo_command_is_an_exact_line_in_every_instruction() -> Non
     )
 
 
-def test_docs_distinguish_demo_fake_and_official_provider() -> None:
+def test_docs_explain_both_fake_intents_and_official_provider() -> None:
     source = (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8")
 
-    assert all(term in source for term in ("[demo]", "[fake]", "provedor oficial"))
+    assert all(
+        term in source
+        for term in (
+            "Usar FakeGov no meu app",
+            "Executar end-to-end",
+            "Uso avançado",
+            "provedor oficial",
+        )
+    )
 
 
 @pytest.mark.parametrize(
@@ -191,8 +200,8 @@ def test_fake_credentials_journey_is_documented_in_every_entry_guide(
         '"cpf"',
         '"password"',
         "não use credenciais reais",
-        'pip install "govbr-auth[demo]"',
-        "python -m govbr_auth.demo",
+        'pip install "govbr-auth[fake]"',
+        "python -m govbr_auth.fake",
     )
 
     source = document.read_text(encoding="utf-8")
@@ -206,3 +215,18 @@ def test_fake_credentials_journey_is_documented_in_every_entry_guide(
         True,
         True,
     )
+
+
+def test_user_docs_use_only_the_canonical_fastapi_surface() -> None:
+    source = "\n".join(
+        document.read_text(encoding="utf-8")
+        for document in _published_documents() | {PROJECT_ROOT / "README.md"}
+    )
+
+    assert "from govbr_auth.fastapi import AuthContext, GovBrAuth" in source
+    assert "GOVBR_PROVIDER=fake" in source
+    assert "app.include_router(auth.router)" in source
+    assert "[demo]" not in source
+    assert "govbr_auth.demo" not in source
+    assert ".install(" not in source
+    assert "from govbr_auth import AuthContext, GovBrAuth" not in source

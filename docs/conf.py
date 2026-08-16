@@ -19,7 +19,6 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
-    'sphinx.ext.intersphinx',
     'myst_parser',
 ]
 
@@ -66,11 +65,6 @@ html_theme_options = {
 
 html_logo = None
 html_favicon = None
-
-# Intersphinx mapping
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-}
 
 # Highlighting options
 pygments_style = 'sphinx'
