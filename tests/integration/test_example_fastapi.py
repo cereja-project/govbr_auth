@@ -10,6 +10,26 @@ import pytest
 FIXED_NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 
 
+def test_example_loads_only_the_working_directory_env(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    example = importlib.import_module("examples.example_fastapi")
+    loaded: dict[str, object] = {}
+
+    def record_load_dotenv(*, dotenv_path: Path, override: bool) -> bool:
+        loaded.update(dotenv_path=dotenv_path, override=override)
+        return False
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(example, "load_dotenv", record_load_dotenv)
+    monkeypatch.setenv("GOVBR_PROVIDER", "fake")
+
+    example.create_app(clock=lambda: FIXED_NOW)
+
+    assert loaded == {"dotenv_path": tmp_path / ".env", "override": False}
+
+
 def test_example_uses_only_the_canonical_fastapi_facade() -> None:
     source = (Path(__file__).parents[2] / "examples" / "example_fastapi.py").read_text(
         encoding="utf-8"
