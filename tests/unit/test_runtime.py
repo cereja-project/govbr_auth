@@ -14,9 +14,10 @@ from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntimeSettings,
     create_govbr_runtime,
-    utc_now,
+    utc_now
 )
 
+ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
 
 @pytest.fixture(autouse=True)
 def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -506,7 +507,7 @@ def test_utc_now_returns_timezone_aware_utc_datetime() -> None:
 
 def test_runtime_source_has_no_web_framework_imports() -> None:
     """Runtime composition must remain usable without a web framework."""
-    source = Path("govbr_auth/runtime.py").read_text(encoding="utf-8")
+    source = ROOT_DIR.joinpath("govbr_auth/runtime.py").read_text(encoding="utf-8")
 
     assert all(
         name not in source for name in ("fastapi", "starlette", "flask", "django")
