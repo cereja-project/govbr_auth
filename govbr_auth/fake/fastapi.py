@@ -8,7 +8,6 @@ from typing import Protocol
 
 import httpx
 from fastapi import APIRouter, FastAPI, Request
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import SecretStr
 from starlette.datastructures import FormData
@@ -37,20 +36,14 @@ from govbr_auth.fake.runtime import (
     FakeUserRepository,
     create_fake_govbr_runtime,
 )
-from govbr_auth.fastapi import AuthContext, GovBrAuth, utc_now
+from govbr_auth.fastapi import utc_now
+from govbr_auth.fake.launcher import create_end_to_end_app
 from govbr_auth.presentation import render_error, render_home, render_success
 from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntimeSettings,
     create_govbr_runtime,
 )
-from govbr_auth.core import (
-    ExpiredTransactionError,
-    GovBrAuthError,
-    InvalidIdTokenError,
-    InvalidStateError,
-)
-from govbr_auth.core.errors import ProviderRejectedError, ProviderUnavailableError
 
 _AUTHORIZATION_FIELDS = (
     "response_type",
@@ -158,74 +151,13 @@ def create_fake_app(
         clock=clock,
         user_repository=user_repository,
     )
-
-    async def authenticated(context: AuthContext) -> Response:
-        return HTMLResponse(
-            render_success(context.user),
-            headers={"Cache-Control": "no-store"},
-        )
-
-    async def authentication_failed(error: GovBrAuthError) -> Response:
-        code, status_code = _public_error(error)
-        return HTMLResponse(
-            render_error(code=code, status_code=status_code),
-            status_code=status_code,
-            headers={"Cache-Control": "no-store"},
-        )
-
-    auth = GovBrAuth(
-        runtime=runtime,
-        on_success=authenticated,
-        on_error=authentication_failed,
+    return create_end_to_end_app(
+        runtime,
         clock=clock,
+        render_success_page=render_success,
+        render_error_page=render_error,
+        render_home_page=render_home,
     )
-    fake_runtime = runtime.fake
-    if fake_runtime is None:
-        raise RuntimeError("end-to-end launcher requires the fake provider runtime")
-    application = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-
-    @application.get("/", include_in_schema=False)
-    async def home() -> HTMLResponse:
-        return HTMLResponse(
-            render_home(credentials=fake_runtime.credentials),
-            headers={"Cache-Control": "no-store"},
-        )
-
-    @application.exception_handler(RequestValidationError)
-    async def invalid_callback(
-        _: Request,
-        __: RequestValidationError,
-    ) -> HTMLResponse:
-        return HTMLResponse(
-            render_error(code="invalid_callback", status_code=400),
-            status_code=400,
-            headers={"Cache-Control": "no-store"},
-        )
-
-    @application.exception_handler(Exception)
-    async def internal_error(_: Request, __: Exception) -> HTMLResponse:
-        return HTMLResponse(
-            render_error(code="internal_error", status_code=500),
-            status_code=500,
-            headers={"Cache-Control": "no-store"},
-        )
-
-    application.include_router(auth.router)
-    return application
-
-
-def _public_error(error: GovBrAuthError) -> tuple[str, int]:
-    if isinstance(error, InvalidStateError):
-        return "invalid_state", 400
-    if isinstance(error, ExpiredTransactionError):
-        return "expired_transaction", 400
-    if isinstance(error, InvalidIdTokenError):
-        return "invalid_id_token", 502
-    if isinstance(error, ProviderRejectedError):
-        return "provider_rejected", 502
-    if isinstance(error, ProviderUnavailableError):
-        return "provider_unavailable", 503
-    return "govbr_auth_error", 502
 
 
 def run() -> None:
