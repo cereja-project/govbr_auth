@@ -1,6 +1,5 @@
 """Asynchronous HTTP orchestration for the strict Gov.br OAuth core."""
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -8,13 +7,19 @@ from types import MappingProxyType
 from typing import NoReturn
 
 import httpx
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
 from govbr_auth.core.authorization import AuthorizationBuilder, AuthorizationRequest
 from govbr_auth.core.errors import (
     GovBrAuthError,
     ProviderRejectedError,
     ProviderUnavailableError,
+)
+from govbr_auth.core.http import (
+    GovBrHttpTransport,
+    decode_jwks,
+    decode_tokens,
+    decode_userinfo,
 )
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings
@@ -23,10 +28,7 @@ from govbr_auth.core.transactions import TransactionStore
 
 _OAUTH_REJECTION_MESSAGE = "Gov.br rejected the authorization code"
 _PROVIDER_FAILURE_MESSAGE = "Gov.br provider request failed"
-_PROVIDER_TIMEOUT_MESSAGE = "Gov.br provider request timed out"
-_TOKEN_RESPONSE_MESSAGE = "Gov.br token response is invalid"
 _JWKS_REJECTION_MESSAGE = "Gov.br rejected the JWKS request"
-_JWKS_RESPONSE_MESSAGE = "Gov.br JWKS response is invalid"
 _USERINFO_REJECTION_MESSAGE = "Gov.br rejected the access token"
 _USERINFO_RESPONSE_MESSAGE = "Gov.br userinfo response is invalid"
 
@@ -65,13 +67,8 @@ class GovBrClient:
         self._transactions = transactions
         self._validator = validator
         self._http = http
+        self._transport = GovBrHttpTransport(settings, http)
         self._authorization = AuthorizationBuilder(settings, transactions)
-        self._timeout = httpx.Timeout(
-            connect=settings.connect_timeout_seconds,
-            read=settings.read_timeout_seconds,
-            write=settings.read_timeout_seconds,
-            pool=settings.connect_timeout_seconds,
-        )
 
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         """Create an authorization request bound to a stored transaction."""
@@ -172,115 +169,25 @@ class GovBrClient:
         return user
 
     async def _post_token(self, form: Mapping[str, str]) -> httpx.Response:
-        try:
-            return await self._http.post(
-                str(self._settings.token_url),
-                data=form,
-                auth=(
-                    self._settings.client_id,
-                    self._settings.client_secret.get_secret_value(),
-                ),
-                timeout=self._timeout,
-            )
-        except httpx.TimeoutException as error:
-            failure_message = _PROVIDER_TIMEOUT_MESSAGE
-            failure_type = type(error).__name__
-        except httpx.TransportError as error:
-            failure_message = _PROVIDER_FAILURE_MESSAGE
-            failure_type = type(error).__name__
-
-        self._raise_transport_error(
-            ProviderUnavailableError,
-            failure_message,
-            failure_type,
-        )
+        return await self._transport.post_token(form)
 
     async def _get_userinfo(self, access_token: SecretStr) -> httpx.Response:
-        try:
-            return await self._http.get(
-                str(self._settings.userinfo_url),
-                headers={"Authorization": f"Bearer {access_token.get_secret_value()}"},
-                timeout=self._timeout,
-            )
-        except httpx.TimeoutException as error:
-            failure_message = _PROVIDER_TIMEOUT_MESSAGE
-            failure_type = type(error).__name__
-        except httpx.TransportError as error:
-            failure_message = _PROVIDER_FAILURE_MESSAGE
-            failure_type = type(error).__name__
-
-        self._raise_transport_error(
-            ProviderUnavailableError,
-            failure_message,
-            failure_type,
-        )
+        return await self._transport.get_userinfo(access_token)
 
     async def _get_jwks(self) -> httpx.Response:
-        try:
-            return await self._http.get(
-                str(self._settings.jwks_url),
-                timeout=self._timeout,
-            )
-        except httpx.TimeoutException as error:
-            failure_message = _PROVIDER_TIMEOUT_MESSAGE
-            failure_type = type(error).__name__
-        except httpx.TransportError as error:
-            failure_message = _PROVIDER_FAILURE_MESSAGE
-            failure_type = type(error).__name__
-
-        self._raise_transport_error(
-            ProviderUnavailableError,
-            failure_message,
-            failure_type,
-        )
+        return await self._transport.get_jwks()
 
     @staticmethod
     def _parse_tokens(response: httpx.Response) -> TokenSet:
-        try:
-            payload = response.json()
-            return TokenSet.model_validate(payload)
-        except (json.JSONDecodeError, UnicodeDecodeError, ValidationError) as error:
-            failure_type = type(error).__name__
-
-        GovBrClient._raise_invalid_response(_TOKEN_RESPONSE_MESSAGE, failure_type)
+        return decode_tokens(response)
 
     @staticmethod
     def _parse_userinfo(response: httpx.Response) -> GovBrUser:
-        try:
-            payload = response.json()
-            return GovBrUser.model_validate(payload)
-        except (json.JSONDecodeError, UnicodeDecodeError, ValidationError) as error:
-            failure_type = type(error).__name__
-
-        GovBrClient._raise_invalid_response(_USERINFO_RESPONSE_MESSAGE, failure_type)
+        return decode_userinfo(response)
 
     @staticmethod
     def _parse_jwks(response: httpx.Response) -> Mapping[str, object]:
-        try:
-            payload = response.json()
-        except (json.JSONDecodeError, UnicodeDecodeError) as error:
-            failure_type = type(error).__name__
-        else:
-            if isinstance(payload, Mapping):
-                keys = payload.get("keys")
-                if (
-                    isinstance(keys, list)
-                    and keys
-                    and all(isinstance(key, Mapping) and key for key in keys)
-                ):
-                    return {"keys": [dict(key) for key in keys]}
-            failure_type = "InvalidJwks"
-
-        GovBrClient._raise_invalid_response(_JWKS_RESPONSE_MESSAGE, failure_type)
-
-    @staticmethod
-    def _raise_transport_error(
-        error_type: type[GovBrAuthError],
-        message: str,
-        failure_type: str,
-    ) -> NoReturn:
-        safe_cause = RuntimeError(f"Gov.br HTTP transport failed ({failure_type})")
-        raise error_type(message) from safe_cause
+        return decode_jwks(response)
 
     @staticmethod
     def _raise_http_error(
