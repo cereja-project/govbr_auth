@@ -1,7 +1,5 @@
 """Explicit FastAPI and ASGI factories for the local Fake Gov.br provider."""
 
-import base64
-import binascii
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -17,11 +15,15 @@ from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException
 
 from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
+from govbr_auth.fake.http.parsing import (
+    parse_basic_authorization,
+    parse_bearer_authorization,
+    required_text_values,
+)
 from govbr_auth.fake.credentials import FakeCredentialAuthenticator
 from govbr_auth.fake.provider import (
     FakeAuthorizationRequest,
     FakeAuthorizationSession,
-    FakeClientCredentials,
     FakeGovBrProvider,
     FakeOAuthError,
     FakeTokenRequest,
@@ -266,7 +268,7 @@ def _build_fake_govbr_routes(
 
     @router.get("/authorize")
     async def authorize(request: Request) -> Response:
-        values = _required_text_values(request.query_params, _AUTHORIZATION_FIELDS)
+        values = required_text_values(request.query_params, _AUTHORIZATION_FIELDS)
         if values is None:
             return _boundary_error_response(
                 "invalid_request",
@@ -303,7 +305,7 @@ def _build_fake_govbr_routes(
     async def login(request: Request) -> Response:
         form = await _read_form(request)
         if credential_authenticator is None:
-            values = _required_text_values(form, ("request", "subject"))
+            values = required_text_values(form, ("request", "subject"))
             if values is None:
                 return _boundary_error_response(
                     "invalid_request",
@@ -311,7 +313,7 @@ def _build_fake_govbr_routes(
                 )
             subject = values["subject"]
         else:
-            values = _required_text_values(form, ("request", "cpf", "password"))
+            values = required_text_values(form, ("request", "cpf", "password"))
             if values is None:
                 return _boundary_error_response(
                     "invalid_request",
@@ -352,7 +354,7 @@ def _build_fake_govbr_routes(
 
     @router.post("/token")
     async def token(request: Request) -> Response:
-        credentials = _parse_basic_authorization(request.headers.get("authorization"))
+        credentials = parse_basic_authorization(request.headers.get("authorization"))
         if credentials is None:
             return _boundary_error_response(
                 "invalid_client",
@@ -360,7 +362,7 @@ def _build_fake_govbr_routes(
                 headers=_TOKEN_RESPONSE_HEADERS,
             )
         form = await _read_form(request)
-        values = _required_text_values(form, _TOKEN_FIELDS)
+        values = required_text_values(form, _TOKEN_FIELDS)
         if values is None:
             return _boundary_error_response(
                 "invalid_request",
@@ -398,7 +400,7 @@ def _build_fake_govbr_routes(
 
     @router.get("/userinfo")
     async def userinfo(request: Request) -> Response:
-        access_token = _parse_bearer_authorization(request.headers.get("authorization"))
+        access_token = parse_bearer_authorization(request.headers.get("authorization"))
         if access_token is None:
             return _boundary_error_response("invalid_token", _TOKEN_INVALID)
         try:
@@ -441,57 +443,6 @@ async def _read_form(request: Request) -> FormData:
         return await request.form()
     except (MultiPartException, UnicodeDecodeError, ValueError):
         return FormData()
-
-
-def _required_text_values(
-    values: Mapping[str, object],
-    names: tuple[str, ...],
-) -> dict[str, str] | None:
-    parsed: dict[str, str] = {}
-    for name in names:
-        value = values.get(name)
-        if not isinstance(value, str) or not value.strip():
-            return None
-        parsed[name] = value
-    return parsed
-
-
-def _parse_basic_authorization(value: str | None) -> FakeClientCredentials | None:
-    encoded = _parse_authorization_scheme(value, scheme="Basic")
-    if encoded is None:
-        return None
-    try:
-        decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
-    except (binascii.Error, UnicodeDecodeError, ValueError):
-        return None
-    client_id, separator, client_secret = decoded.partition(":")
-    if not separator or not client_id.strip() or not client_secret.strip():
-        return None
-    return FakeClientCredentials(
-        client_id=client_id,
-        client_secret=SecretStr(client_secret),
-    )
-
-
-def _parse_bearer_authorization(value: str | None) -> SecretStr | None:
-    token = _parse_authorization_scheme(value, scheme="Bearer")
-    if token is None or any(character.isspace() for character in token):
-        return None
-    return SecretStr(token)
-
-
-def _parse_authorization_scheme(value: str | None, *, scheme: str) -> str | None:
-    if value is None or len(value) > 8192:
-        return None
-    parsed_scheme, separator, credentials = value.partition(" ")
-    if (
-        not separator
-        or parsed_scheme.casefold() != scheme.casefold()
-        or not credentials
-        or credentials != credentials.strip()
-    ):
-        return None
-    return credentials
 
 
 def _boundary_error_response(
