@@ -1,7 +1,7 @@
 """Explicit FastAPI and ASGI factories for the local Fake Gov.br provider."""
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
@@ -19,6 +19,10 @@ from govbr_auth.fake.http.parsing import (
     parse_basic_authorization,
     parse_bearer_authorization,
     required_text_values,
+)
+from govbr_auth.fake.http.responses import (
+    boundary_error_response,
+    oauth_error_response,
 )
 from govbr_auth.fake.credentials import FakeCredentialAuthenticator
 from govbr_auth.fake.provider import (
@@ -270,7 +274,7 @@ def _build_fake_govbr_routes(
     async def authorize(request: Request) -> Response:
         values = required_text_values(request.query_params, _AUTHORIZATION_FIELDS)
         if values is None:
-            return _boundary_error_response(
+            return boundary_error_response(
                 "invalid_request",
                 _AUTHORIZATION_REQUEST_INVALID,
             )
@@ -288,7 +292,7 @@ def _build_fake_govbr_routes(
                 )
                 return RedirectResponse(redirect.redirect_uri, status_code=302)
         except FakeOAuthError as error:
-            return _oauth_error_response(error)
+            return oauth_error_response(error)
 
         login_action = request.url_for(login_route_name).path
         page = (
@@ -307,7 +311,7 @@ def _build_fake_govbr_routes(
         if credential_authenticator is None:
             values = required_text_values(form, ("request", "subject"))
             if values is None:
-                return _boundary_error_response(
+                return boundary_error_response(
                     "invalid_request",
                     _AUTHORIZATION_REQUEST_INVALID,
                 )
@@ -315,7 +319,7 @@ def _build_fake_govbr_routes(
         else:
             values = required_text_values(form, ("request", "cpf", "password"))
             if values is None:
-                return _boundary_error_response(
+                return boundary_error_response(
                     "invalid_request",
                     _AUTHORIZATION_REQUEST_INVALID,
                 )
@@ -349,14 +353,14 @@ def _build_fake_govbr_routes(
                 now=clock(),
             )
         except FakeOAuthError as error:
-            return _oauth_error_response(error)
+            return oauth_error_response(error)
         return RedirectResponse(redirect.redirect_uri, status_code=302)
 
     @router.post("/token")
     async def token(request: Request) -> Response:
         credentials = parse_basic_authorization(request.headers.get("authorization"))
         if credentials is None:
-            return _boundary_error_response(
+            return boundary_error_response(
                 "invalid_client",
                 _CLIENT_INVALID,
                 headers=_TOKEN_RESPONSE_HEADERS,
@@ -364,7 +368,7 @@ def _build_fake_govbr_routes(
         form = await _read_form(request)
         values = required_text_values(form, _TOKEN_FIELDS)
         if values is None:
-            return _boundary_error_response(
+            return boundary_error_response(
                 "invalid_request",
                 _AUTHORIZATION_REQUEST_INVALID,
                 headers=_TOKEN_RESPONSE_HEADERS,
@@ -382,7 +386,7 @@ def _build_fake_govbr_routes(
                 now=clock(),
             )
         except FakeOAuthError as error:
-            return _oauth_error_response(error, extra_headers=_TOKEN_RESPONSE_HEADERS)
+            return oauth_error_response(error, extra_headers=_TOKEN_RESPONSE_HEADERS)
         return JSONResponse(
             {
                 "access_token": response.access_token.get_secret_value(),
@@ -402,11 +406,11 @@ def _build_fake_govbr_routes(
     async def userinfo(request: Request) -> Response:
         access_token = parse_bearer_authorization(request.headers.get("authorization"))
         if access_token is None:
-            return _boundary_error_response("invalid_token", _TOKEN_INVALID)
+            return boundary_error_response("invalid_token", _TOKEN_INVALID)
         try:
             user = provider.userinfo(access_token, now=clock())
         except FakeOAuthError as error:
-            return _oauth_error_response(error)
+            return oauth_error_response(error)
         return JSONResponse(user.model_dump(exclude_none=True, mode="json"))
 
     return router
@@ -443,40 +447,3 @@ async def _read_form(request: Request) -> FormData:
         return await request.form()
     except (MultiPartException, UnicodeDecodeError, ValueError):
         return FormData()
-
-
-def _boundary_error_response(
-    error: str,
-    description: str,
-    *,
-    headers: Mapping[str, str] | None = None,
-) -> JSONResponse:
-    return _oauth_error_response(
-        FakeOAuthError(error=error, description=description),
-        extra_headers=headers,
-    )
-
-
-def _oauth_error_response(
-    error: FakeOAuthError,
-    *,
-    extra_headers: Mapping[str, str] | None = None,
-) -> JSONResponse:
-    status_code = 400
-    headers = dict(extra_headers or {})
-    if error.error == "invalid_client":
-        status_code = 401
-        headers["WWW-Authenticate"] = 'Basic realm="fake-govbr"'
-    elif error.error == "invalid_token":
-        status_code = 401
-        headers["WWW-Authenticate"] = "Bearer"
-    elif error.error == "access_denied":
-        status_code = 403
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "error": error.error,
-            "error_description": error.description,
-        },
-        headers=headers,
-    )
