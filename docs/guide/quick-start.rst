@@ -82,7 +82,9 @@ que precisam apontar para um provedor local.
 Usar o provedor oficial
 -----------------------
 
-O valor padrão é ``GOVBR_PROVIDER=official``. Configure client ID, segredo,
+O valor padrão é ``GOVBR_PROVIDER=official``. O ``GOVBR_REDIRECT_URI`` deve
+apontar para o callback da API, por exemplo
+``https://api.example.com/auth/govbr/callback``. Configure client ID, segredo,
 redirect URI, endpoints OAuth/OIDC e ``GOVBR_TRANSACTION_SECRET`` conforme
 :doc:`configuration`, então execute a mesma aplicação FastAPI. O fluxo de
 login permanece igual; somente o runtime passa a conversar com o Gov.br
