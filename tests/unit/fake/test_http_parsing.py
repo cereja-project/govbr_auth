@@ -18,10 +18,13 @@ def test_required_text_values_returns_only_nonempty_strings() -> None:
 
 def test_required_text_values_rejects_missing_or_blank_values() -> None:
     assert required_text_values({"request": "opaque"}, ("request", "subject")) is None
-    assert required_text_values(
-        {"request": "opaque", "subject": "   "},
-        ("request", "subject"),
-    ) is None
+    assert (
+        required_text_values(
+            {"request": "opaque", "subject": "   "},
+            ("request", "subject"),
+        )
+        is None
+    )
 
 
 def test_parse_basic_authorization_returns_client_credentials() -> None:

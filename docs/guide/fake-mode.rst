@@ -11,7 +11,10 @@ A API usa ``govbr_auth`` no backend; o frontend chama a API, e a API inicia e
 conclui o fluxo OAuth. A tela HTML de login do FakeGov existe somente porque o
 protocolo OAuth redireciona o navegador para a interface do provedor.
 
-Usar FakeGov na API
+A mesma fachada e as mesmas rotas do backend são usadas com o provedor oficial;
+somente a composição selecionada pela configuração muda.
+
+Usar FakeGov no meu app
 -------------------
 
 Instale::
@@ -41,7 +44,7 @@ código da aplicação não precisa criar factories do provedor.
 O fluxo completo entre frontend, API, FakeGov e runtime está em
 :doc:`communication-flow`.
 
-Executar o launcher local
+Executar end-to-end
 -------------------------
 
 O launcher é uma conveniência para demonstrar o fluxo sem uma aplicação

@@ -15,16 +15,12 @@ from govbr_auth.core.errors import (
     ProviderRejectedError,
     ProviderUnavailableError,
 )
-from govbr_auth.core.http import (
-    GovBrHttpTransport,
-    decode_jwks,
-    decode_tokens,
-    decode_userinfo,
-)
+from govbr_auth.core.decoders import decode_jwks, decode_tokens, decode_userinfo
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import TransactionStore
+from govbr_auth.core.transport import GovBrHttpTransport
 
 _OAUTH_REJECTION_MESSAGE = "Gov.br rejected the authorization code"
 _PROVIDER_FAILURE_MESSAGE = "Gov.br provider request failed"
