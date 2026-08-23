@@ -13,6 +13,7 @@ nesta versão é FastAPI.
    :caption: Guia
 
    guide/quick-start
+   guide/communication-flow
    guide/configuration
    guide/fake-mode
    guide/troubleshooting

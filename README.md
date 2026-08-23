@@ -25,6 +25,17 @@ async def authenticated(context: AuthContext):
 auth = GovBrAuth(on_success=authenticated)
 app.include_router(auth.router)
 ```
+## Como a comunicação funciona
+
+A aplicação expõe `/auth/govbr/login` e `/auth/govbr/callback`. Depois do
+login, o backend troca o código no endpoint `token`, busca as chaves em `jwk`,
+valida o ID Token e consulta `userinfo` antes de chamar `on_success`.
+
+Com `GOVBR_PROVIDER=official`, essas chamadas vão para o Gov.br. Com
+`GOVBR_PROVIDER=fake`, as rotas FakeGov são montadas no mesmo router e o
+backend usa transporte ASGI em memória. O fluxo end-to-end do launcher também
+inclui a página inicial. O diagrama completo está em
+[`docs/guide/communication-flow.rst`](docs/guide/communication-flow.rst).
 
 Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
 fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente
