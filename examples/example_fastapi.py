@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, Response
 
 from govbr_auth.fastapi import AuthContext, GovBrAuth
+from examples.example_settings import runtime_settings
 
 
 def utc_now() -> datetime:
@@ -24,6 +25,10 @@ def create_app(*, clock: Callable[[], datetime] = utc_now) -> FastAPI:
     async def authenticated(context: AuthContext) -> Response:
         return JSONResponse({"authenticated": True})
 
-    auth = GovBrAuth(on_success=authenticated, clock=clock)
+    auth = GovBrAuth(
+        on_success=authenticated,
+        settings=runtime_settings(),
+        clock=clock,
+    )
     application.include_router(auth.router)
     return application

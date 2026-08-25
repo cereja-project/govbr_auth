@@ -50,6 +50,12 @@ Instale o adapter correspondente e inclua as URLs na aplicação Django::
     auth = GovBrAuth(on_success=authenticated)
     urlpatterns = auth.urlpatterns
 
+Para iniciar este exemplo em modo fake, a partir da raiz do repositório::
+
+    $env:GOVBR_PROVIDER = "fake"
+    $env:GOVBR_FAKE_END_TO_END = "true"
+    python -m django runserver 127.0.0.1:8000 --settings=examples.django_settings
+
 Aplicação Flask
 ---------------
 
@@ -69,6 +75,17 @@ No Flask, registre o adapter na aplicação hospedeira::
 
     auth = GovBrAuth(on_success=authenticated)
     auth.register(app)
+
+Inicie o exemplo em modo fake::
+
+    $env:GOVBR_PROVIDER = "fake"
+    $env:GOVBR_FAKE_END_TO_END = "true"
+    $env:GOVBR_FAKE_PORT = "5000"
+    flask --app examples.example_flask:create_app run --port 5000
+
+No fluxo fake, use somente credenciais fictícias configuradas para o ambiente
+local; por exemplo, o usuário padrão ``12345678901`` com a senha
+``ana-demo``. Esses valores ficam na documentação, não nas respostas da API.
 
 Testar com FakeGov
 ------------------

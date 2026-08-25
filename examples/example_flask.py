@@ -2,6 +2,7 @@
 
 from flask import Flask, jsonify
 
+from examples.example_settings import runtime_settings
 from govbr_auth.flask import GovBrAuth
 
 
@@ -10,8 +11,8 @@ def create_app() -> Flask:
     application = Flask(__name__)
 
     def authenticated(context, request):
-        return jsonify({"authenticated": True, "subject": context.user.subject})
+        return jsonify({"authenticated": True})
 
-    auth = GovBrAuth(on_success=authenticated)
+    auth = GovBrAuth(on_success=authenticated, settings=runtime_settings())
     auth.register(application)
     return application

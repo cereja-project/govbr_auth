@@ -194,6 +194,10 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "app.include_router(auth.router)" in source
     assert "urlpatterns = auth.urlpatterns" in source
     assert "auth.register(app)" in source
+    assert "python -m django runserver" in source
+    assert "flask --app examples.example_flask:create_app run" in source
+    assert "12345678901" in source
+    assert "ana-demo" in source
     assert "[demo]" not in source
     assert "govbr_auth.demo" not in source
     assert ".install(" not in source

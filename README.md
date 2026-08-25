@@ -40,6 +40,25 @@ No Django, inclua `auth.urlpatterns` no `urlpatterns` do projeto. No Flask,
 registre os dois blueprints condicionais com `auth.register(app)`. Em ambos os
 casos, `GovBrAuth` compõe a engine e o FakeGov somente quando o runtime está em
 modo fake.
+
+Para iniciar os exemplos locais em modo fake:
+
+```powershell
+# Django
+$env:GOVBR_PROVIDER = "fake"
+$env:GOVBR_FAKE_END_TO_END = "true"
+python -m django runserver 127.0.0.1:8000 --settings=examples.django_settings
+
+# Flask
+$env:GOVBR_PROVIDER = "fake"
+$env:GOVBR_FAKE_END_TO_END = "true"
+$env:GOVBR_FAKE_PORT = "5000"
+flask --app examples.example_flask:create_app run --port 5000
+```
+
+No login FakeGov, use apenas credenciais fictícias do ambiente local, como
+CPF `12345678901` e senha `ana-demo`. A aplicação não exibe esses valores nas
+respostas.
 ## Como a comunicação funciona
 
 A aplicação expõe `/auth/govbr/login` e `/auth/govbr/callback`. Depois do
