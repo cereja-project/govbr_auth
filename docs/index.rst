@@ -1,12 +1,12 @@
 GovBR Auth
 ==========
 
-Biblioteca assíncrona para autenticação Gov.br em FastAPI com OAuth 2.0, PKCE e
-OpenID Connect. O cliente valida ``state``, tokens RS256 por JWKS, ``issuer``,
+Engine de autenticação Gov.br com adapters opcionais para FastAPI, Django e
+Flask, usando OAuth 2.0, PKCE e OpenID Connect. O cliente valida ``state``, tokens RS256 por JWKS, ``issuer``,
 ``audience``, ``nonce`` e o vínculo do ``subject``.
 
-O núcleo de composição é neutro de framework. O adaptador público disponível
-nesta versão é FastAPI.
+O núcleo de composição é neutro de framework. Os adapters são instalados por
+extras e se acoplam à aplicação hospedeira.
 
 .. toctree::
    :maxdepth: 2
@@ -24,6 +24,8 @@ nesta versão é FastAPI.
 
    api/core
    api/fastapi
+   api/django
+   api/flask
    api/fake-govbr
 
 .. toctree::

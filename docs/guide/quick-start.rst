@@ -32,6 +32,44 @@ Essa aplicação não cria um cliente OAuth, uma rota de callback ou uma factory
 do FakeGov manualmente. ``GovBrAuth`` compõe o runtime selecionado e publica
 as rotas ``/auth/govbr/login`` e ``/auth/govbr/callback``.
 
+Aplicação Django
+----------------
+
+Instale o adapter correspondente e inclua as URLs na aplicação Django::
+
+    pip install "govbr-auth[django]"
+
+.. code-block:: python
+
+    from django.http import JsonResponse
+    from govbr_auth.django import GovBrAuth
+
+    def authenticated(context, request):
+        return JsonResponse({"authenticated": True})
+
+    auth = GovBrAuth(on_success=authenticated)
+    urlpatterns = auth.urlpatterns
+
+Aplicação Flask
+---------------
+
+No Flask, registre o adapter na aplicação hospedeira::
+
+    pip install "govbr-auth[flask]"
+
+.. code-block:: python
+
+    from flask import Flask, jsonify
+    from govbr_auth.flask import GovBrAuth
+
+    app = Flask(__name__)
+
+    def authenticated(context, request):
+        return jsonify({"authenticated": True})
+
+    auth = GovBrAuth(on_success=authenticated)
+    auth.register(app)
+
 Testar com FakeGov
 ------------------
 

@@ -1,10 +1,20 @@
 # govbr-auth
 
-Biblioteca assíncrona para autenticação Gov.br em FastAPI. O núcleo de
-composição é independente de framework; nesta versão, o adaptador público
-disponível é o FastAPI.
+Engine de autenticação Gov.br independente de framework, com adapters oficiais
+opcionais para FastAPI, Django e Flask. Instale somente o extra do framework
+usado pela aplicação.
 
 Projeto comunitário, sem manutenção, homologação ou endosso do Governo Federal.
+
+## Instalação
+
+```bash
+pip install govbr-auth                 # somente a engine
+pip install "govbr-auth[fastapi]"      # adapter FastAPI
+pip install "govbr-auth[django]"       # adapter Django
+pip install "govbr-auth[flask]"        # adapter Flask
+pip install "govbr-auth[fake]"         # launcher FakeGov
+```
 
 ## Usar FakeGov no meu app
 
@@ -25,6 +35,11 @@ async def authenticated(context: AuthContext):
 auth = GovBrAuth(on_success=authenticated)
 app.include_router(auth.router)
 ```
+
+No Django, inclua `auth.urlpatterns` no `urlpatterns` do projeto. No Flask,
+registre os dois blueprints condicionais com `auth.register(app)`. Em ambos os
+casos, `GovBrAuth` compõe a engine e o FakeGov somente quando o runtime está em
+modo fake.
 ## Como a comunicação funciona
 
 A aplicação expõe `/auth/govbr/login` e `/auth/govbr/callback`. Depois do

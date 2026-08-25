@@ -49,4 +49,4 @@ Configuração explícita
 
 Aplicações avançadas podem construir ``GovBrRuntimeSettings`` e passá-lo a
 ``GovBrAuth``. O caminho comum deve preferir variáveis de ambiente e a fachada
-FastAPI, mantendo a composição em um único lugar.
+adapter escolhido, mantendo a composição em um único lugar.

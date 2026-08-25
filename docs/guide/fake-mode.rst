@@ -15,7 +15,7 @@ A mesma fachada e as mesmas rotas do backend são usadas com o provedor oficial;
 somente a composição selecionada pela configuração muda.
 
 Usar FakeGov no meu app
--------------------
+-----------------------
 
 Instale::
 
@@ -136,6 +136,6 @@ framework. ``create_fake_govbr_runtime`` cria o grafo canônico do simulador.
 As factories ``create_fake_govbr_router`` e ``create_fake_govbr_app`` atendem
 topologias ASGI avançadas.
 
-O adaptador público desta versão é FastAPI. O store em memória rejeita replay
+Os adapters públicos desta versão são FastAPI, Django e Flask. O store em memória rejeita replay
 de authorization code apenas na mesma instância; distribuição entre
 processos exige um store compartilhado fornecido pela aplicação.
