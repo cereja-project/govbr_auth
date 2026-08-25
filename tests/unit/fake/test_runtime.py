@@ -5,11 +5,13 @@ import json
 from pathlib import Path
 
 import pytest
+from fastapi.responses import Response
 from pydantic import SecretStr, ValidationError
 
 from govbr_auth.fake import FakeUser, InMemoryFakeUserRepository
 from govbr_auth.fake import runtime as runtime_module
 from govbr_auth.fake.credentials import FakeLoginCredential
+from govbr_auth.fastapi import GovBrAuth
 from govbr_auth.fake.runtime import create_fake_govbr_runtime
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
@@ -237,3 +239,43 @@ def test_end_to_end_builder_revalidates_copied_prefix(
 
     with pytest.raises(ValidationError, match="fake provider prefix"):
         create_fake_govbr_runtime(invalid_settings, clock=fixed_clock)
+
+
+@pytest.mark.asyncio
+async def test_fake_facade_routes_and_transport_share_one_http_application(
+    fake_settings: GovBrRuntimeSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mounted fake routes and transport must reuse one neutral HTTP application."""
+    from govbr_auth.fake.http import routes as routes_module
+    from govbr_auth.fake.http import transport as transport_module
+
+    applications: list[object] = []
+    runtimes: list[object] = []
+
+    class RecordingApplication:
+        def __init__(self, runtime: object, *, clock: object) -> None:
+            del clock
+            applications.append(self)
+            runtimes.append(runtime)
+
+    monkeypatch.setattr(routes_module, "FakeGovHttpApplication", RecordingApplication)
+    monkeypatch.setattr(
+        transport_module,
+        "FakeGovHttpApplication",
+        RecordingApplication,
+    )
+
+    async def success_handler(context: object) -> Response:
+        del context
+        return Response(status_code=204)
+
+    auth = GovBrAuth(settings=fake_settings, on_success=success_handler)
+
+    try:
+        assert len(applications) == 2
+        assert runtimes[0] is auth.runtime.fake
+        assert getattr(runtimes[1], "provider", None) is auth.runtime.fake.provider
+        assert applications[0] is applications[1]
+    finally:
+        await auth.runtime.aclose()

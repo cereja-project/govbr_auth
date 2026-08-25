@@ -5,12 +5,18 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi.responses import Response
 from cryptography.fernet import Fernet
 from pydantic import SecretStr, ValidationError
 
 import govbr_auth.runtime as runtime_module
+from govbr_auth.authentication import AuthenticationService
 from govbr_auth.core.settings import GovBrSettings
+from govbr_auth.core.token_validation import IdTokenValidator
+from govbr_auth.core.transactions import InMemoryTransactionStore
+from govbr_auth.fastapi import create_govbr_router
 from govbr_auth.runtime import (
+    GovBrClient,
     GovBrProvider,
     GovBrRuntimeSettings,
     create_govbr_runtime,
@@ -279,6 +285,27 @@ def test_official_runtime_rejects_unvalidated_settings_without_oauth() -> None:
         create_govbr_runtime(settings)
 
 
+def test_official_runtime_keeps_one_consumer_authentication_stack(
+    settings: GovBrRuntimeSettings,
+) -> None:
+    """Official mode must keep the canonical consumer client and service types."""
+    runtime = create_govbr_runtime(settings)
+
+    async def success_handler(context: object) -> Response:
+        del context
+        return Response(status_code=204)
+
+    router = create_govbr_router(client=runtime.client, on_success=success_handler)
+    services = _route_authentication_services(router)
+
+    assert type(runtime.client) is GovBrClient
+    assert type(runtime.client._transactions) is InMemoryTransactionStore
+    assert type(runtime.client._validator) is IdTokenValidator
+    assert len(services) == 1
+    assert type(services[0]) is AuthenticationService
+    assert services[0]._client is runtime.client
+
+
 @pytest.mark.asyncio
 async def test_official_runtime_owns_and_closes_created_http_client(
     settings: GovBrRuntimeSettings,
@@ -512,3 +539,16 @@ def test_runtime_source_has_no_web_framework_imports() -> None:
     assert all(
         name not in source for name in ("fastapi", "starlette", "flask", "django")
     )
+
+
+def _route_authentication_services(router: object) -> list[AuthenticationService]:
+    services: list[AuthenticationService] = []
+    seen: set[int] = set()
+    for route in getattr(router, "routes", ()):
+        closure = getattr(route.endpoint, "__closure__", None) or ()
+        for cell in closure:
+            value = cell.cell_contents
+            if type(value) is AuthenticationService and id(value) not in seen:
+                seen.add(id(value))
+                services.append(value)
+    return services
