@@ -1,4 +1,4 @@
-"""Freeze the FastAPI-only v1 public and distribution contracts."""
+"""Freeze the framework-neutral v1 public and distribution contracts."""
 
 import importlib.util
 import os
