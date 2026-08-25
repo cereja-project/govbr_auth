@@ -1,16 +1,15 @@
 """Thin asynchronous FastAPI adapter for the strict Gov.br OAuth core."""
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from types import MappingProxyType
 from functools import partial
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
+from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import (
     ExpiredTransactionError,
@@ -20,7 +19,6 @@ from govbr_auth.core.errors import (
     ProviderRejectedError,
     ProviderUnavailableError,
 )
-from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntime,
@@ -47,18 +45,7 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-@dataclass(frozen=True, slots=True)
-class AuthContext:
-    """Expose validated user data to a consumer success handler."""
-
-    user: GovBrUser
-    claims: Mapping[str, object]
-    tokens: TokenSet | None = None
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "claims", MappingProxyType(dict(self.claims)))
-
-
+AuthContext = AuthenticationContext
 AuthSuccessHandler = Callable[[AuthContext], Awaitable[Response]]
 AuthErrorHandler = Callable[[GovBrAuthError], Awaitable[Response]]
 
@@ -75,33 +62,26 @@ def create_govbr_router(
     """Create consumer authentication routes backed by a strict core client."""
     prefix = _validate_router_prefix(prefix)
     router = APIRouter(prefix=prefix)
+    service = AuthenticationService(client, expose_tokens=expose_tokens)
 
     @router.get("/login")
     async def login() -> RedirectResponse:
-        authorization = client.authorization_url(now=clock())
+        authorization = service.authorization_url(now=clock())
         return RedirectResponse(authorization.url, status_code=302)
 
     @router.get("/callback")
     async def callback(code: str, state: str) -> Response:
         try:
-            result = await client.exchange_code(code=code, state=state, now=clock())
-            expected_subject = result.id_token_claims.get("sub")
-            if not isinstance(expected_subject, str) or not expected_subject.strip():
-                raise InvalidIdTokenError("Validated ID token has no usable subject")
-            user = await client.userinfo(
-                result.tokens.access_token,
-                expected_subject=expected_subject,
+            context = await service.authenticate(
+                code=code,
+                state=state,
+                now=clock(),
             )
         except GovBrAuthError as error:
             if on_error is not None:
                 return await on_error(error)
             return _auth_error_response(error)
 
-        context = AuthContext(
-            user=user,
-            claims=result.id_token_claims,
-            tokens=result.tokens if expose_tokens else None,
-        )
         return await on_success(context)
 
     return router
