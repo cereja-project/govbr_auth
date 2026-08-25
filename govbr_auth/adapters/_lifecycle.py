@@ -22,7 +22,12 @@ class RuntimeOwner:
         """Close an owned runtime exactly once."""
         if self._closed:
             return
+        run_sync(self.aclose)
+
+    async def aclose(self) -> None:
+        """Close an owned runtime from an async framework lifecycle."""
+        if self._closed:
+            return
         self._closed = True
         if self.owns_runtime:
-            run_sync(self.runtime.aclose)
-
+            await self.runtime.aclose()

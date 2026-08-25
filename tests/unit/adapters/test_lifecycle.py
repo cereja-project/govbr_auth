@@ -29,3 +29,17 @@ def test_borrowed_runtime_is_not_closed_by_adapter() -> None:
     owner.close()
 
     assert runtime.close_calls == 0
+
+
+def test_async_close_closes_owned_runtime_once() -> None:
+    import asyncio
+
+    from govbr_auth.adapters._lifecycle import RuntimeOwner
+
+    runtime = RuntimeStub()
+    owner = RuntimeOwner(runtime=runtime, owns_runtime=True)
+
+    asyncio.run(owner.aclose())
+    asyncio.run(owner.aclose())
+
+    assert runtime.close_calls == 1

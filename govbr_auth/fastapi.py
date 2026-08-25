@@ -3,12 +3,12 @@
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from functools import partial
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
+from govbr_auth.adapters._runtime import create_adapter_runtime
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import (
@@ -19,14 +19,9 @@ from govbr_auth.core.errors import (
     ProviderRejectedError,
     ProviderUnavailableError,
 )
-from govbr_auth.runtime import (
-    GovBrProvider,
-    GovBrRuntime,
-    GovBrRuntimeSettings,
-    _fake_callback_url,
-    _is_canonical_path_prefix,
-    create_govbr_runtime,
-)
+from govbr_auth.fake.http.transport import FakeGovHttpTransport
+from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
+from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
 if TYPE_CHECKING:
     from govbr_auth.fake.runtime import FakeUserRepository
@@ -105,35 +100,30 @@ class GovBrAuth:
         if settings is not None and runtime is not None:
             raise TypeError("settings and runtime are mutually exclusive")
         prefix = _validate_router_prefix(prefix)
-        if runtime is None:
-            resolved_settings = _settings_for_router_callback(
-                settings or GovBrRuntimeSettings.from_environment(),
-                prefix,
-            )
-            fake_transport_factory = None
-            if resolved_settings.provider is GovBrProvider.FAKE:
-                from govbr_auth.fake.fastapi import _fake_asgi_transport
-
-                fake_transport_factory = partial(_fake_asgi_transport, clock=clock)
-            runtime = create_govbr_runtime(
-                resolved_settings,
-                fake_transport_factory=fake_transport_factory,
+        owner = create_adapter_runtime(
+            settings=settings,
+            runtime=runtime,
+            prefix=prefix,
+            clock=clock,
+            user_repository=user_repository,
+            fake_transport_factory=lambda fake: FakeGovHttpTransport(
+                fake,
                 clock=clock,
-                user_repository=user_repository,
-            )
-        else:
-            _validate_runtime_callback(runtime, prefix)
-        self._runtime = runtime
+            ),
+        )
+        self._runtime = owner.runtime
 
         @asynccontextmanager
         async def lifespan(_: object):
-            async with runtime:
+            try:
                 yield
+            finally:
+                await owner.aclose()
 
         router = APIRouter(lifespan=lifespan)
         router.include_router(
             create_govbr_router(
-                client=runtime.client,
+                client=self._runtime.client,
                 on_success=on_success,
                 on_error=on_error,
                 expose_tokens=expose_tokens,
@@ -141,10 +131,12 @@ class GovBrAuth:
                 clock=clock,
             )
         )
-        if runtime.fake is not None:
+        if self._runtime.fake is not None:
             from govbr_auth.fake.fastapi import create_fake_govbr_router
 
-            router.include_router(create_fake_govbr_router(runtime.fake, clock=clock))
+            router.include_router(
+                create_fake_govbr_router(self._runtime.fake, clock=clock)
+            )
         self._router = router
 
     @property
@@ -185,38 +177,3 @@ def _validate_router_prefix(prefix: str) -> str:
     if not _is_canonical_path_prefix(prefix, allow_empty=True):
         raise ValueError("prefix must be an empty string or a canonical path")
     return prefix
-
-
-def _settings_for_router_callback(
-    settings: GovBrRuntimeSettings,
-    prefix: str,
-) -> GovBrRuntimeSettings:
-    if settings.provider is not GovBrProvider.FAKE:
-        return settings
-    expected = _fake_callback_url(settings.fake_host, settings.fake_port, prefix)
-    configured = (
-        None if settings.fake_redirect_uri is None else str(settings.fake_redirect_uri)
-    )
-    default = _fake_callback_url(
-        settings.fake_host,
-        settings.fake_port,
-        "/auth/govbr",
-    )
-    if configured is not None and configured not in {default, expected}:
-        raise ValueError("fake redirect URI does not match the router callback")
-    values = settings.model_dump()
-    values["fake_redirect_uri"] = expected
-    return GovBrRuntimeSettings.model_validate(values)
-
-
-def _validate_runtime_callback(runtime: GovBrRuntime, prefix: str) -> None:
-    if runtime.fake is None:
-        return
-    expected = _fake_callback_url(
-        runtime.settings.fake_host,
-        runtime.settings.fake_port,
-        prefix,
-    )
-    configured = str(runtime.fake.settings.clients[0].registered_redirect_uris[0])
-    if configured != expected:
-        raise ValueError("fake runtime redirect URI does not match the router callback")
