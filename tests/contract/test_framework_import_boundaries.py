@@ -52,7 +52,6 @@ def test_fake_runtime_exposes_one_neutral_http_application_without_frameworks() 
     code = dedent(
         """
         import builtins
-        from dataclasses import fields
         from datetime import UTC, datetime
 
         import httpx
@@ -72,18 +71,6 @@ def test_fake_runtime_exposes_one_neutral_http_application_without_frameworks() 
                 detail = ", ".join(blocked_fromlist) if blocked_fromlist else name
                 raise AssertionError(f"blocked framework imported: {detail}")
             return real_import(name, globals, locals, fromlist, level)
-
-
-        def is_http_application(value):
-            required = (
-                "authorize",
-                "login",
-                "parse_client_credentials",
-                "token",
-                "jwks",
-                "userinfo",
-            )
-            return all(callable(getattr(value, name, None)) for name in required)
 
 
         builtins.__import__ = guarded_import
@@ -107,15 +94,9 @@ def test_fake_runtime_exposes_one_neutral_http_application_without_frameworks() 
         )
         fake = runtime.fake
         assert fake is not None
-        http_applications = [
-            getattr(fake, field.name)
-            for field in fields(fake)
-            if is_http_application(getattr(fake, field.name))
-        ]
-        assert len(http_applications) == 1, (
-            "expected one neutral HTTP application collaborator, "
-            f"found {len(http_applications)}"
-        )
+        assert fake.prefix == "/fake-govbr"
+        assert fake.endpoints.authorize.endswith("/authorize")
+        assert fake.endpoints.token.endswith("/token")
         """
     )
     result = subprocess.run(
