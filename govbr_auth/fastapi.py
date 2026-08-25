@@ -8,16 +8,13 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
+from govbr_auth.adapters._errors import describe_auth_error
 from govbr_auth.adapters._runtime import create_adapter_runtime
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import (
     ExpiredTransactionError,
     GovBrAuthError,
-    InvalidIdTokenError,
-    InvalidStateError,
-    ProviderRejectedError,
-    ProviderUnavailableError,
 )
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
@@ -151,21 +148,10 @@ class GovBrAuth:
 
 
 def _auth_error_response(error: GovBrAuthError) -> JSONResponse:
-    if isinstance(error, (InvalidStateError, ExpiredTransactionError)):
-        status_code = 400
-        safe_message = "The authorization request is invalid or expired."
-    elif isinstance(error, ProviderRejectedError):
-        status_code = 502
-        safe_message = "Gov.br rejected the request."
-    elif isinstance(error, ProviderUnavailableError):
-        status_code = 503
-        safe_message = "Gov.br is temporarily unavailable."
-    else:
-        status_code = 502
-        safe_message = "Gov.br authentication failed."
+    description = describe_auth_error(error)
     return JSONResponse(
-        status_code=status_code,
-        content={"error": error.code, "message": safe_message},
+        status_code=description.status_code,
+        content={"error": error.code, "message": description.message},
     )
 
 

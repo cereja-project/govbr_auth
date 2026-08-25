@@ -292,30 +292,17 @@ def render_error(*, code: str, status_code: int) -> str:
     )
 
 
-def _render_credentials(credentials: tuple[PresentedCredential, ...]) -> str:
-    rows = "".join(
-        "<tr>"
-        f'<th scope="row">{escape(credential.name)}</th>'
-        f"<td><code>{_format_cpf(credential.cpf)}</code></td>"
-        f"<td><code>{escape(credential.password)}</code></td>"
-        "</tr>"
-        for credential in credentials
-    )
+def _render_credentials(_credentials: tuple[PresentedCredential, ...]) -> str:
+    """Explain the local credential boundary without rendering credential data."""
     return (
         '<section class="credentials" aria-labelledby="credentials-title">'
         '<p class="section-kicker">Pronto para testar</p>'
         '<h2 id="credentials-title">Credenciais da demo</h2>'
-        "<p>Use somente estes dados fictícios no provedor local.</p>"
-        '<div class="table-scroll"><table><thead><tr><th scope="col">Pessoa</th>'
-        '<th scope="col">CPF</th><th scope="col">Senha</th></tr></thead>'
-        f"<tbody>{rows}</tbody></table></div></section>"
+        "<p>Os dados de acesso são mantidos somente no runtime local e nunca são "
+        "exibidos nesta resposta. Use apenas credenciais fictícias configuradas "
+        "para o ambiente de desenvolvimento.</p>"
+        "</section>"
     )
-
-
-def _format_cpf(cpf: str) -> str:
-    if len(cpf) != 11 or not cpf.isascii() or not cpf.isdigit():
-        return escape(cpf)
-    return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
 
 
 def _mask_cpf(cpf: str) -> str:

@@ -182,8 +182,10 @@ def test_end_to_end_rejects_official_provider_before_runtime_allocation(
 
 
 @pytest.mark.asyncio
-async def test_end_to_end_home_exposes_credentials_and_provider_login_form() -> None:
-    """The interactive profile must preserve the current home and credential form."""
+async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form() -> (
+    None
+):
+    """The interactive profile must not disclose credentials in its home response."""
     app = create_fake_app(settings=end_to_end_settings(), clock=fixed_clock)
 
     async with app.router.lifespan_context(app):
@@ -200,7 +202,10 @@ async def test_end_to_end_home_exposes_credentials_and_provider_login_form() -> 
     assert home.status_code == 200
     assert home.headers["cache-control"] == "no-store"
     assert "SIMULAÇÃO LOCAL" in home.text
-    assert "Ana Demo" in home.text and "ana-demo" in home.text
+    assert "Credenciais da demo" in home.text
+    assert "Ana Demo" not in home.text
+    assert "ana-demo" not in home.text
+    assert "12345678901" not in home.text
     assert login.status_code == 302
     assert authorize.status_code == 200
     assert "Ana Demo" not in authorize.text

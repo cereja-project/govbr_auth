@@ -6,16 +6,14 @@ from typing import TYPE_CHECKING
 
 from flask import Blueprint, Flask, jsonify, redirect, request
 
+from govbr_auth.adapters._errors import (
+    INVALID_CALLBACK_MESSAGE,
+    describe_auth_error,
+)
 from govbr_auth.adapters._runtime import create_adapter_runtime
 from govbr_auth.adapters._sync import run_sync
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
-from govbr_auth.core.errors import (
-    ExpiredTransactionError,
-    GovBrAuthError,
-    InvalidStateError,
-    ProviderRejectedError,
-    ProviderUnavailableError,
-)
+from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.flask import create_fake_govbr_blueprint
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
@@ -116,7 +114,7 @@ class GovBrAuth:
                     jsonify(
                         {
                             "error": "invalid_callback",
-                            "message": "Callback parameters are invalid.",
+                            "message": INVALID_CALLBACK_MESSAGE,
                         }
                     ),
                     400,
@@ -141,16 +139,8 @@ class GovBrAuth:
 
 
 def _auth_error_response(error: GovBrAuthError):
-    if isinstance(error, (InvalidStateError, ExpiredTransactionError)):
-        status_code = 400
-        message = "The authorization request is invalid or expired."
-    elif isinstance(error, ProviderRejectedError):
-        status_code = 502
-        message = "Gov.br rejected the request."
-    elif isinstance(error, ProviderUnavailableError):
-        status_code = 503
-        message = "Gov.br is temporarily unavailable."
-    else:
-        status_code = 502
-        message = "Gov.br authentication failed."
-    return jsonify({"error": error.code, "message": message}), status_code
+    description = describe_auth_error(error)
+    return (
+        jsonify({"error": error.code, "message": description.message}),
+        description.status_code,
+    )

@@ -8,16 +8,14 @@ from django.http import HttpRequest, HttpResponse, JsonResponse, HttpResponseRed
 from django.urls import URLPattern, path
 from django.views.decorators.csrf import csrf_exempt
 
+from govbr_auth.adapters._errors import (
+    INVALID_CALLBACK_MESSAGE,
+    describe_auth_error,
+)
 from govbr_auth.adapters._runtime import create_adapter_runtime
 from govbr_auth.adapters._sync import run_sync
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
-from govbr_auth.core.errors import (
-    ExpiredTransactionError,
-    GovBrAuthError,
-    InvalidStateError,
-    ProviderRejectedError,
-    ProviderUnavailableError,
-)
+from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.django import create_fake_govbr_urlpatterns
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
 from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
@@ -110,12 +108,18 @@ class GovBrAuth:
     def _callback(self, request: HttpRequest) -> HttpResponse:
         code = request.POST.get("code") or request.GET.get("code")
         state = request.POST.get("state") or request.GET.get("state")
-        if not isinstance(code, str) or not code.strip() or not isinstance(state, str) or not state.strip():
+        if (
+            not isinstance(code, str)
+            or not code.strip()
+            or not isinstance(state, str)
+            or not state.strip()
+        ):
             return JsonResponse(
-                {"error": "invalid_callback", "message": "Callback parameters are invalid."},
+                {"error": "invalid_callback", "message": INVALID_CALLBACK_MESSAGE},
                 status=400,
             )
         try:
+
             async def authenticate():
                 return await self._service.authenticate(
                     code=code,
@@ -132,19 +136,8 @@ class GovBrAuth:
 
 
 def _auth_error_response(error: GovBrAuthError) -> JsonResponse:
-    if isinstance(error, (InvalidStateError, ExpiredTransactionError)):
-        status_code = 400
-        message = "The authorization request is invalid or expired."
-    elif isinstance(error, ProviderRejectedError):
-        status_code = 502
-        message = "Gov.br rejected the request."
-    elif isinstance(error, ProviderUnavailableError):
-        status_code = 503
-        message = "Gov.br is temporarily unavailable."
-    else:
-        status_code = 502
-        message = "Gov.br authentication failed."
+    description = describe_auth_error(error)
     return JsonResponse(
-        {"error": error.code, "message": message},
-        status=status_code,
+        {"error": error.code, "message": description.message},
+        status=description.status_code,
     )

@@ -181,17 +181,20 @@ def test_fake_credentials_journey_is_documented_in_every_entry_guide(
     )
 
 
-def test_user_docs_use_only_the_canonical_fastapi_surface() -> None:
+def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     source = "\n".join(
         document.read_text(encoding="utf-8")
         for document in _published_documents() | {PROJECT_ROOT / "README.md"}
     )
 
     assert "from govbr_auth.fastapi import AuthContext, GovBrAuth" in source
+    assert "from govbr_auth.django import GovBrAuth" in source
+    assert "from govbr_auth.flask import GovBrAuth" in source
     assert "GOVBR_PROVIDER=fake" in source
     assert "app.include_router(auth.router)" in source
+    assert "urlpatterns = auth.urlpatterns" in source
+    assert "auth.register(app)" in source
     assert "[demo]" not in source
     assert "govbr_auth.demo" not in source
     assert ".install(" not in source
     assert "from govbr_auth import AuthContext, GovBrAuth" not in source
-    assert '"subject": context.user.subject' not in source

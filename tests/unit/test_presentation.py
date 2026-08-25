@@ -98,7 +98,7 @@ def test_shared_presentation_components_expose_simulation_and_responsive_theme()
     assert "@media" in responsive_css()
 
 
-def test_home_renders_launcher_showcase_and_default_credentials() -> None:
+def test_home_does_not_render_credentials_in_the_launcher_response() -> None:
     page = render_home(
         credentials=(
             FakeLoginCredential(
@@ -116,7 +116,11 @@ def test_home_renders_launcher_showcase_and_default_credentials() -> None:
 
     assert "SIMULAÇÃO LOCAL" in page
     assert "Como funciona" in page
-    assert "123.456.789-01" in page and "ana-demo" in page
+    assert "Credenciais da demo" in page
+    assert "123.456.789-01" not in page
+    assert "ana-demo" not in page
+    assert "bruno-demo" not in page
+    assert "nunca são exibidos" in page
     assert 'href="/auth/govbr/login"' in page
     assert ">Entrar com Gov.br</a>" in page
     assert ":focus-visible" in page
