@@ -152,7 +152,7 @@ def test_top_level_has_no_legacy_or_fake_provider_symbol(symbol_name: str) -> No
     assert not hasattr(govbr_auth, symbol_name)
 
 
-def test_base_dependencies_are_exactly_fastapi_consumer_dependencies() -> None:
+def test_base_dependencies_are_exactly_framework_neutral() -> None:
     metadata = _project_metadata()
 
     dependency_names = {
@@ -161,7 +161,6 @@ def test_base_dependencies_are_exactly_fastapi_consumer_dependencies() -> None:
 
     assert dependency_names == {
         "cryptography",
-        "fastapi",
         "httpx",
         "pydantic",
         "pyjwt",
@@ -176,13 +175,16 @@ def test_project_version_is_static_without_importing_runtime_dependencies() -> N
     assert "dynamic" not in metadata
 
 
-def test_optional_dependencies_split_fake_and_development_tools() -> None:
+def test_optional_dependencies_expose_framework_and_development_tools() -> None:
     metadata = _project_metadata()
 
     optional_dependencies = metadata["optional-dependencies"]
 
-    assert set(optional_dependencies) == {"dev", "fake"}
-    assert optional_dependencies["fake"] == ["python-multipart", "uvicorn"]
+    assert set(optional_dependencies) == {"dev", "fake", "fastapi", "django", "flask"}
+    assert optional_dependencies["fastapi"] == ["fastapi", "python-multipart"]
+    assert optional_dependencies["django"] == ["Django", "asgiref"]
+    assert optional_dependencies["flask"] == ["Flask", "asgiref"]
+    assert optional_dependencies["fake"] == ["fastapi", "python-multipart", "uvicorn"]
     assert optional_dependencies["dev"] == [
         "uvicorn",
         "pytest",
@@ -202,18 +204,14 @@ def test_development_install_enables_fake_and_dev_extras() -> None:
     assert requirements.splitlines() == ["-e .[fake,dev]", "respx>=0.22,<1"]
 
 
-def test_project_metadata_mentions_only_fastapi_framework() -> None:
+def test_project_metadata_mentions_supported_frameworks() -> None:
     metadata = _project_metadata()
 
     description = metadata["description"].lower()
     keywords = tuple(keyword.lower() for keyword in metadata["keywords"])
 
-    assert "fastapi" in description
-    assert "flask" not in description
-    assert "django" not in description
-    assert "fastapi" in keywords
-    assert "flask" not in keywords
-    assert "django" not in keywords
+    assert all(framework in description for framework in ("fastapi", "django", "flask"))
+    assert all(framework in keywords for framework in ("fastapi", "django", "flask"))
 
 
 def test_built_distributions_exclude_legacy_and_cache_artifacts(

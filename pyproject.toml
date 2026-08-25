@@ -1,13 +1,13 @@
 [project]
 name = "govbr-auth"
 version = "1.0.0rc1"
-description = "Biblioteca assíncrona de autenticação com o Gov.br para FastAPI."
+description = "Engine de autenticação Gov.br com adapters opcionais para FastAPI, Django e Flask."
 authors = [
     { name="Joab Leite", email="leitejoab@gmail.com" }
 ]
 readme = "README.md"
 license = "MIT"
-keywords = ["gov.br", "autenticação", "fastapi", "oauth2", "openid-connect"]
+keywords = ["gov.br", "autenticação", "fastapi", "django", "flask", "oauth2", "openid-connect"]
 requires-python = ">=3.11"
 
 dependencies = [
@@ -15,12 +15,14 @@ dependencies = [
     "PyJWT>=2.13,<3",
     "cryptography",
     "python-dotenv",
-    "pydantic>=2,<3",
-    "fastapi"
+    "pydantic>=2,<3"
 ]
 
 [project.optional-dependencies]
-fake = ["python-multipart", "uvicorn"]
+fastapi = ["fastapi", "python-multipart"]
+django = ["Django", "asgiref"]
+flask = ["Flask", "asgiref"]
+fake = ["fastapi", "python-multipart", "uvicorn"]
 dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "flake8", "pytest-cov", "PyYAML"]
 
 [tool.setuptools]
