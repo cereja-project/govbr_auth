@@ -250,20 +250,18 @@ async def test_fake_facade_routes_and_transport_share_one_http_application(
     from govbr_auth.fake.http import routes as routes_module
     from govbr_auth.fake.http import transport as transport_module
 
-    applications: list[object] = []
-    runtimes: list[object] = []
+    application_calls: list[tuple[object, object]] = []
+    shared_application = object()
 
-    class RecordingApplication:
-        def __init__(self, runtime: object, *, clock: object) -> None:
-            del clock
-            applications.append(self)
-            runtimes.append(runtime)
+    def build_application(runtime: object, *, clock: object) -> object:
+        application_calls.append((runtime, clock))
+        return shared_application
 
-    monkeypatch.setattr(routes_module, "FakeGovHttpApplication", RecordingApplication)
+    monkeypatch.setattr(routes_module, "FakeGovHttpApplication", build_application)
     monkeypatch.setattr(
         transport_module,
         "FakeGovHttpApplication",
-        RecordingApplication,
+        build_application,
     )
 
     async def success_handler(context: object) -> Response:
@@ -273,9 +271,30 @@ async def test_fake_facade_routes_and_transport_share_one_http_application(
     auth = GovBrAuth(settings=fake_settings, on_success=success_handler)
 
     try:
-        assert len(applications) == 2
-        assert runtimes[0] is auth.runtime.fake
-        assert getattr(runtimes[1], "provider", None) is auth.runtime.fake.provider
-        assert applications[0] is applications[1]
+        transport_application = auth.runtime.client._http._transport._application
+        route_applications = [
+            value
+            for value in _router_closure_values(auth.router)
+            if value is shared_application
+        ]
+
+        assert transport_application is shared_application
+        assert route_applications != []
+        assert application_calls[0][0] is auth.runtime.fake
+        assert getattr(application_calls[1][0], "provider", None) is auth.runtime.fake.provider
+        assert len(application_calls) == 1
     finally:
         await auth.runtime.aclose()
+
+
+def _router_closure_values(router: object) -> list[object]:
+    values: list[object] = []
+    pending = list(getattr(router, "routes", ()))
+    while pending:
+        route = pending.pop()
+        included_router = getattr(route, "original_router", None)
+        if included_router is not None:
+            pending.extend(getattr(included_router, "routes", ()))
+        closure = getattr(getattr(route, "endpoint", None), "__closure__", None) or ()
+        values.extend(cell.cell_contents for cell in closure)
+    return values
