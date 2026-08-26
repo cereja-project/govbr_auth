@@ -1,3 +1,6 @@
 include README.md
 include .env.example
-recursive-include govbr_auth *
+recursive-include govbr_auth *.py
+recursive-include examples *.py
+global-exclude *.py[cod]
+global-exclude __pycache__

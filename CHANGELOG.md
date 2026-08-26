@@ -5,7 +5,28 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+## [1.0.0] - 2026-08-26
+
+### Added
+- Core OAuth 2.0/OpenID Connect assíncrono e independente de framework.
+- Adapters públicos para FastAPI, Django e Flask, instaláveis por extras.
+- FakeGov local opt-in com login por credenciais fictícias, launcher end-to-end e carregamento opcional de usuários via `GOVBR_FAKE_USERS_FILE`.
+- Contratos públicos `FakeCredentialAuthenticator`, `InMemoryFakeUserRepository` e `JsonFakeUserRepository`.
+- Documentação Sphinx, diagramas vetoriais e exemplos executáveis para os três frameworks.
+
+### Changed
+- A seleção de provedor agora ocorre por `GOVBR_PROVIDER=official|fake`; o código consumidor e as rotas do adapter permanecem iguais.
+- A API pública foi reduzida a módulos explícitos de core, adapter e FakeGov.
+- A matriz de CI cobre Python 3.11 a 3.14 em Linux, Windows e macOS.
+
+### Removed
+- Fachadas, módulos, exemplos e testes da implementação anterior à v1.
+- Formulário de compatibilidade que autenticava no FakeGov pela seleção direta de `subject`; fluxos interativos agora exigem CPF e senha fictícios.
+
+### Security
+- Validação de `state`, PKCE, nonce, assinatura RS256/JWKS, issuer, audience e subject.
+- Tokens e segredos permanecem fora das respostas e páginas demonstrativas.
+- O launcher local aceita somente hosts de loopback e o provedor oficial é o padrão fail-closed.
 
 ## [0.2.2] - 2026-06-19
 
@@ -109,6 +130,6 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## Links
 
 - [Repositório GitHub](https://github.com/cereja-project/govbr_auth)
-- [Documentação](https://github.com/cereja-project/govbr_auth#readme)
+- [Documentação](https://govbr-auth.readthedocs.io/)
 - [Issues](https://github.com/cereja-project/govbr_auth/issues)
 

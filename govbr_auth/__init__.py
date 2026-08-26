@@ -1,20 +1,8 @@
-from cereja.utils import get_version_pep440_compliant
+"""Framework-neutral public helpers for Gov.br authentication."""
 
-try:
-    from .core.config import GovBrConfig
-    from .core.govbr import GovBrAuthorize, GovBrIntegration, GovBrException, GovBrAuthenticationError
-    from .controller import GovBrConnector
-    from .utils import generate_cript_verifier_secret
-    from .fake_govbr import (
-        FakeUserData,
-        FakeGovBrService,
-        AuthorizationRequest,
-        render_fake_login_page,
-        process_fake_login,
-        create_default_fake_users
-    )
-except ImportError:
-    pass  # noqa: E402
+from govbr_auth.core.transactions import generate_transaction_secret
 
-VERSION = "0.2.2.final.0"
-__version__ = get_version_pep440_compliant(VERSION)
+__all__ = ("generate_transaction_secret",)
+
+VERSION = "1.0.0"
+__version__ = "1.0.0"

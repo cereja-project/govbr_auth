@@ -1,65 +1,49 @@
-GovBR Auth - Documentação
-=========================
+GovBR Auth
+==========
 
-.. image:: https://img.shields.io/badge/python-3.8%2B-blue
-   :target: https://www.python.org/downloads/
-   :alt: Python Version
+Engine de autenticação Gov.br com adapters opcionais para FastAPI, Django e
+Flask, usando OAuth 2.0, PKCE e OpenID Connect. O cliente valida ``state``, tokens RS256 por JWKS, ``issuer``,
+``audience``, ``nonce`` e o vínculo do ``subject``.
 
-.. image:: https://img.shields.io/badge/License-MIT-yellow.svg
-   :target: https://opensource.org/licenses/MIT
-   :alt: License: MIT
+O núcleo de composição é neutro de framework. Os adapters são instalados por
+extras e se acoplam à aplicação hospedeira.
 
-.. image:: https://img.shields.io/badge/FastAPI-compatible-green
-   :target: https://fastapi.tiangolo.com/
-   :alt: FastAPI compatible
+.. image:: media/fakegov-flow.svg
+   :alt: Jornada local do FakeGov, da instalação ao callback autenticado.
+   :align: center
 
-.. image:: https://img.shields.io/badge/Flask-compatible-green
-   :target: https://flask.palletsprojects.com/
-   :alt: Flask compatible
-
-.. image:: https://img.shields.io/badge/Django-compatible-green
-   :target: https://www.djangoproject.com/
-   :alt: Django compatible
-
-Autentique usuários com o Gov.br usando FastAPI, Flask, Django ou sua própria stack personalizada.
-
-🧪 **Novo!** Modo fake integrado para desenvolvimento sem necessidade de cadastro no Gov.br!
+O :doc:`guide/fake-mode` permite executar o fluxo completo localmente com
+usuários fictícios, sem alterar a fachada usada com o provedor oficial.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 📖 Guia de Início Rápido
+   :caption: Guia
 
    guide/quick-start
-   guide/configuration
-   guide/frameworks
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 🔒 Segurança e Boas Práticas
-
-   guide/security-practices
    guide/fake-mode
+   guide/communication-flow
+   guide/configuration
+   guide/troubleshooting
 
 .. toctree::
    :maxdepth: 2
-   :caption: 📚 Referência API
+   :caption: Referência da API
 
    api/core
-   api/controller
+   api/fastapi
+   api/django
+   api/flask
    api/fake-govbr
-   api/utils
 
 .. toctree::
    :maxdepth: 1
-   :caption: 📝 Adicional
+   :caption: Versões
 
-   guide/troubleshooting
-   guide/faq
    CHANGELOG
+   guide/releasing
 
-Índice e Busca
+Índice e busca
 ==============
 
 * :ref:`genindex`
 * :ref:`search`
-

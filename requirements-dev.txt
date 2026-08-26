@@ -1,1 +1,2 @@
--e .[full,dev]
+-e .[fake,dev,django,flask]
+respx>=0.22,<1

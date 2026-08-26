@@ -1,28 +1,37 @@
-🧪 Fake GovBr - Modo Desenvolvimento
-=====================================
+FakeGov avançado
+================
 
-FakeGovBrService
-----------------
+O provedor local é opcional e nunca é ativado pelo cliente oficial. Instale o
+extra ``govbr-auth[fake]``. No caminho comum, selecione ``GOVBR_PROVIDER=fake``
+e use ``GovBrAuth``; as factories abaixo atendem topologias avançadas.
 
-.. autoclass:: govbr_auth.fake_govbr.FakeGovBrService
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: govbr_auth.fake.FakeGovSimulator
 
-FakeUserData
------------
+.. autofunction:: govbr_auth.fake.create_fake_gov_simulator
 
-.. autoclass:: govbr_auth.fake_govbr.FakeUserData
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: govbr_auth.fake.FakeGovBrSettings
 
-Funções Auxiliares
-------------------
+.. autoclass:: govbr_auth.fake.FakeGovBrProvider
 
-.. autofunction:: govbr_auth.fake_govbr.create_default_fake_users
+.. autoclass:: govbr_auth.fake.FakeClient
 
-.. autofunction:: govbr_auth.fake_govbr.render_fake_login_page
+.. autoclass:: govbr_auth.fake.FakeUser
 
-.. autofunction:: govbr_auth.fake_govbr.process_fake_login
+.. autoclass:: govbr_auth.fake.InMemoryAuthorizationCodeReplayStore
 
+.. autoclass:: govbr_auth.fake.InMemoryFakeUserStore
+
+.. py:function:: create_fake_govbr_router(runtime, *, prefix=None, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)
+
+   Cria as rotas ASGI de um ``FakeGovSimulator`` ou ``FakeGovBrProvider``.
+   ``application`` aceita uma ``FakeGovHttpApplication`` já composta. Com
+   ``FakeGovSimulator``, omita esse argumento ou passe
+   ``runtime.http_application`` para reutilizar a fachada canônica do simulador.
+
+.. py:function:: create_fake_govbr_app(runtime, *, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)
+
+   Cria uma aplicação ASGI de provedor separado para uso avançado. Com
+   ``FakeGovBrProvider`` cru, passe ``credential_authenticator`` para login
+   interativo ou ``automatic_subject`` para automação. A composição falha sem
+   uma estratégia explícita. ``application`` permite fornecer uma fachada HTTP
+   própria sem recriar o provider.

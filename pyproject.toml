@@ -1,36 +1,51 @@
 [project]
 name = "govbr-auth"
-dynamic = ["version"]
-description = "Biblioteca de autenticação com o Gov.br para FastAPI, Flask e Django."
+version = "1.0.0"
+description = "Engine de autenticação Gov.br com adapters opcionais para FastAPI, Django e Flask."
 authors = [
     { name="Joab Leite", email="leitejoab@gmail.com" }
 ]
 readme = "README.md"
-license = { text = "MIT" }
-keywords = ["gov.br", "autenticação", "fastapi", "flask", "django"]
-requires-python = ">=3.8"
-
-# Dependências essenciais (núcleo)
-dependencies = [
-    "httpx",
-    "pyjwt",
-    "cryptography",
-    "python-dotenv",
-    "pydantic",
-    "cereja",
-    "python-multipart"
+license = "MIT"
+keywords = ["gov.br", "autenticação", "fastapi", "django", "flask", "oauth2", "openid-connect"]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Framework :: Django",
+    "Framework :: FastAPI",
+    "Framework :: Flask",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "govbr_auth.__version__"}
+dependencies = [
+    "httpx>=0.27,<1",
+    "PyJWT>=2.13,<3",
+    "cryptography>=42,<51",
+    "python-dotenv>=1,<2",
+    "pydantic>=2,<3"
+]
 
-# Extras opcionais por framework
 [project.optional-dependencies]
-fastapi = ["fastapi"]
-flask = ["flask"]
-django = ["django"]
-full = ["fastapi", "flask", "django"]
-dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black"]
+fastapi = ["fastapi>=0.115,<1", "python-multipart>=0.0.9,<1"]
+django = ["Django>=4.2,<7", "asgiref>=3.8,<4"]
+flask = ["Flask>=3,<4", "asgiref>=3.8,<4"]
+fake = ["fastapi>=0.115,<1", "python-multipart>=0.0.9,<1", "uvicorn>=0.30,<1"]
+dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "setuptools>=77", "wheel", "flake8", "pytest-cov", "PyYAML"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["govbr_auth*"]
+exclude = ["govbr_auth.__pycache__*", "govbr_auth.*.__pycache__*"]
 
 [project.urls]
 Homepage = "https://github.com/cereja-project/govbr_auth"
@@ -39,5 +54,8 @@ Documentation = "https://govbr-auth.readthedocs.io/"
 Issues = "https://github.com/cereja-project/govbr_auth/issues"
 
 [build-system]
-requires = ["setuptools", "wheel", "cereja"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.black]
+target-version = ["py311"]
