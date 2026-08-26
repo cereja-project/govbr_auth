@@ -9,7 +9,9 @@ de framework e adapters opcionais para FastAPI, Django e Flask.
 
 > [!IMPORTANT]
 > Este é um projeto comunitário, sem manutenção, homologação ou endosso do
-> Governo Federal. Não use credenciais ou dados pessoais reais no FakeGov.
+> Governo Federal. O FakeGov é um simulador local: use nele somente credenciais
+> e dados pessoais fictícios. Essa restrição é exclusiva ao FakeGov; para uma
+> integração real, configure a biblioteca com o provedor oficial.
 
 ## Teste a integração sem depender do Gov.br
 
