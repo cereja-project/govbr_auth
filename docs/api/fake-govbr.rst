@@ -5,9 +5,9 @@ O provedor local é opcional e nunca é ativado pelo cliente oficial. Instale o
 extra ``govbr-auth[fake]``. No caminho comum, selecione ``GOVBR_PROVIDER=fake``
 e use ``GovBrAuth``; as factories abaixo atendem topologias avançadas.
 
-.. autoclass:: govbr_auth.fake.FakeGovBrRuntime
+.. autoclass:: govbr_auth.fake.FakeGovSimulator
 
-.. autofunction:: govbr_auth.fake.create_fake_govbr_runtime
+.. autofunction:: govbr_auth.fake.create_fake_gov_simulator
 
 .. autoclass:: govbr_auth.fake.FakeGovBrSettings
 

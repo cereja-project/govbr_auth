@@ -17,7 +17,7 @@ from govbr_auth.runtime import (
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
 if TYPE_CHECKING:
-    from govbr_auth.fake.runtime import FakeGovBrRuntime, FakeUserRepository
+    from govbr_auth.fake.runtime import FakeGovSimulator, FakeUserRepository
 
 
 def create_adapter_runtime(
@@ -27,7 +27,7 @@ def create_adapter_runtime(
     prefix: str,
     clock: Callable[[], datetime],
     user_repository: "FakeUserRepository | None",
-    fake_transport_factory: Callable[["FakeGovBrRuntime"], httpx.AsyncBaseTransport],
+    fake_transport_factory: Callable[["FakeGovSimulator"], httpx.AsyncBaseTransport],
 ) -> RuntimeOwner:
     """Create or borrow one canonical runtime for a framework adapter."""
     if settings is not None and runtime is not None:
@@ -62,7 +62,9 @@ def _settings_for_fake_callback(
     prefix: str,
 ) -> GovBrRuntimeSettings:
     expected = _fake_callback_url(settings.fake_host, settings.fake_port, prefix)
-    configured = None if settings.fake_redirect_uri is None else str(settings.fake_redirect_uri)
+    configured = (
+        None if settings.fake_redirect_uri is None else str(settings.fake_redirect_uri)
+    )
     default = _fake_callback_url(
         settings.fake_host,
         settings.fake_port,
@@ -85,4 +87,6 @@ def _validate_runtime_callback(runtime: GovBrRuntime, prefix: str) -> None:
     )
     configured = str(runtime.fake.settings.clients[0].registered_redirect_uris[0])
     if configured != expected:
-        raise ValueError("fake runtime redirect URI does not match the adapter callback")
+        raise ValueError(
+            "fake runtime redirect URI does not match the adapter callback"
+        )

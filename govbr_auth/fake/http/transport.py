@@ -6,7 +6,10 @@ from urllib.parse import parse_qs
 
 import httpx
 
-from govbr_auth.fake.http.application import FakeGovHttpApplication, FakeHttpRuntime
+from govbr_auth.fake.http.application import (
+    FakeHttpRuntime,
+    resolve_fake_http_application,
+)
 from govbr_auth.fake.provider import FakeOAuthError
 
 _TOKEN_HEADERS = {
@@ -25,7 +28,7 @@ class FakeGovHttpTransport(httpx.AsyncBaseTransport):
         clock: Callable[[], datetime],
     ) -> None:
         self._prefix = runtime.prefix.rstrip("/")
-        self._application = FakeGovHttpApplication(runtime, clock=clock)
+        self._application = resolve_fake_http_application(runtime, clock=clock)
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         endpoint = request.url.path.removeprefix(self._prefix)
@@ -51,7 +54,9 @@ class FakeGovHttpTransport(httpx.AsyncBaseTransport):
                     request=request,
                 )
             if endpoint == "/jwk" and request.method == "GET":
-                return httpx.Response(200, json=dict(self._application.jwks()), request=request)
+                return httpx.Response(
+                    200, json=dict(self._application.jwks()), request=request
+                )
             if endpoint == "/userinfo" and request.method == "GET":
                 user = self._application.userinfo(request.headers.get("authorization"))
                 return httpx.Response(
@@ -81,7 +86,9 @@ def _oauth_error_response(
     headers: dict[str, str] = {}
     if error.error == "invalid_client":
         status_code = 401
-        headers.update(_TOKEN_HEADERS, **{"WWW-Authenticate": 'Basic realm="fake-govbr"'})
+        headers.update(
+            _TOKEN_HEADERS, **{"WWW-Authenticate": 'Basic realm="fake-govbr"'}
+        )
     elif error.error == "invalid_token":
         status_code = 401
         headers["WWW-Authenticate"] = "Bearer"
@@ -95,4 +102,3 @@ def _oauth_error_response(
         headers=headers,
         request=request,
     )
-

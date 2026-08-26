@@ -3,7 +3,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, cast
 
 from pydantic import SecretStr
 
@@ -183,3 +183,15 @@ class FakeGovHttpApplication:
         if credentials is None:
             raise FakeOAuthError(error="invalid_client", description=_CLIENT_INVALID)
         return credentials
+
+
+def resolve_fake_http_application(
+    runtime: FakeHttpRuntime,
+    *,
+    clock: Callable[[], datetime],
+) -> FakeGovHttpApplication:
+    """Return the runtime-owned HTTP facade when one exists."""
+    application = getattr(runtime, "http_application", None)
+    if application is not None:
+        return cast(FakeGovHttpApplication, application)
+    return FakeGovHttpApplication(runtime, clock=clock)

@@ -13,9 +13,9 @@ from govbr_auth.fake.http.routes import build_fake_govbr_routes
 from govbr_auth.fake.credentials import FakeCredentialAuthenticator
 from govbr_auth.fake.provider import FakeGovBrProvider
 from govbr_auth.fake.runtime import (
-    FakeGovBrRuntime,
+    FakeGovSimulator,
     FakeUserRepository,
-    create_fake_govbr_runtime,
+    create_fake_gov_simulator,
 )
 from govbr_auth.fastapi import utc_now
 from govbr_auth.fake.launcher import create_end_to_end_app
@@ -45,7 +45,7 @@ class _ProviderRuntimeAdapter:
 
 
 def create_fake_govbr_router(
-    runtime: FakeGovBrRuntime | FakeGovBrProvider,
+    runtime: FakeGovSimulator | FakeGovBrProvider,
     *,
     prefix: str | None = None,
     credential_authenticator: FakeCredentialAuthenticator | None = None,
@@ -66,7 +66,7 @@ def create_fake_govbr_router(
 
 
 def create_fake_govbr_app(
-    runtime: FakeGovBrRuntime | FakeGovBrProvider,
+    runtime: FakeGovSimulator | FakeGovBrProvider,
     *,
     credential_authenticator: FakeCredentialAuthenticator | None = None,
     automatic_subject: str | None = None,
@@ -76,7 +76,7 @@ def create_fake_govbr_app(
     application = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     runtime = _as_http_runtime(
         runtime,
-        prefix=None if isinstance(runtime, FakeGovBrRuntime) else "",
+        prefix=None if isinstance(runtime, FakeGovSimulator) else "",
         credential_authenticator=credential_authenticator,
     )
     application.include_router(
@@ -100,7 +100,7 @@ def create_fake_app(
     if resolved_settings.provider is not GovBrProvider.FAKE:
         raise ValueError("fake launcher requires the fake provider")
     if not resolved_settings.fake_end_to_end:
-        runtime = create_fake_govbr_runtime(
+        runtime = create_fake_gov_simulator(
             resolved_settings,
             clock=clock,
             user_repository=user_repository,
@@ -136,7 +136,7 @@ def run() -> None:
 
 
 def _fake_asgi_transport(
-    runtime: FakeGovBrRuntime,
+    runtime: FakeGovSimulator,
     *,
     clock: Callable[[], datetime],
 ) -> httpx.AsyncBaseTransport:
@@ -154,22 +154,20 @@ def _launcher_settings() -> GovBrRuntimeSettings:
 
 
 def _as_http_runtime(
-    runtime: FakeGovBrRuntime | FakeGovBrProvider,
+    runtime: FakeGovSimulator | FakeGovBrProvider,
     *,
     prefix: str | None,
     credential_authenticator: FakeCredentialAuthenticator | None,
 ) -> _FakeHttpRuntime:
-    if isinstance(runtime, FakeGovBrRuntime):
+    if isinstance(runtime, FakeGovSimulator):
         if prefix is not None and prefix != runtime.prefix:
             raise ValueError("prefix does not match runtime prefix")
 
+        if credential_authenticator is None:
+            return runtime
         return _ProviderRuntimeAdapter(
             provider=runtime.provider,
-            credential_authenticator=(
-                runtime.credential_authenticator
-                if credential_authenticator is None
-                else credential_authenticator
-            ),
+            credential_authenticator=credential_authenticator,
             prefix=runtime.prefix,
         )
     return _ProviderRuntimeAdapter(

@@ -267,14 +267,14 @@ def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> N
 async def test_router_consumes_canonical_fake_runtime() -> None:
     from fastapi import FastAPI
 
-    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
     from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
     settings = GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
         fake_end_to_end=True,
     )
-    runtime = create_fake_govbr_runtime(settings, clock=lambda: FIXED_NOW)
+    runtime = create_fake_gov_simulator(settings, clock=lambda: FIXED_NOW)
     application = FastAPI()
     application.include_router(
         create_fake_govbr_router(runtime, clock=lambda: FIXED_NOW)
@@ -300,10 +300,10 @@ async def test_router_consumes_canonical_fake_runtime() -> None:
 
 @pytest.mark.asyncio
 async def test_app_publishes_canonical_fake_runtime_endpoint() -> None:
-    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
     from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
-    runtime = create_fake_govbr_runtime(
+    runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
             fake_end_to_end=True,
@@ -330,10 +330,10 @@ async def test_app_publishes_canonical_fake_runtime_endpoint() -> None:
 
 
 def test_runtime_router_rejects_prefix_that_diverges_from_canonical_endpoints() -> None:
-    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
     from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
-    runtime = create_fake_govbr_runtime(
+    runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
             fake_end_to_end=True,

@@ -6,7 +6,10 @@ from datetime import datetime
 from flask import Blueprint, Response, jsonify, redirect, request
 
 from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
-from govbr_auth.fake.http.application import FakeGovHttpApplication, FakeHttpRuntime
+from govbr_auth.fake.http.application import (
+    FakeHttpRuntime,
+    resolve_fake_http_application,
+)
 from govbr_auth.fake.provider import FakeOAuthError
 
 _TOKEN_HEADERS = {"Cache-Control": "no-store", "Pragma": "no-cache"}
@@ -18,7 +21,7 @@ def create_fake_govbr_blueprint(
     clock: Callable[[], datetime],
 ) -> Blueprint:
     """Create a Flask provider blueprint from the neutral FakeGov application."""
-    application = FakeGovHttpApplication(runtime, clock=clock)
+    application = resolve_fake_http_application(runtime, clock=clock)
     blueprint = Blueprint("fake_govbr", __name__, url_prefix=runtime.prefix or "")
 
     @blueprint.get("/authorize")

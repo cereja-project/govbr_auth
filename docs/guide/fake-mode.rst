@@ -132,7 +132,7 @@ Uso avançado
 ------------
 
 ``GovBrRuntimeSettings`` e ``create_govbr_runtime`` formam o núcleo neutro de
-framework. ``create_fake_govbr_runtime`` cria o grafo canônico do simulador.
+framework. ``create_fake_gov_simulator`` cria o grafo canônico do simulador.
 As factories ``create_fake_govbr_router`` e ``create_fake_govbr_app`` atendem
 topologias ASGI avançadas.
 

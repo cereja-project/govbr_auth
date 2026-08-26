@@ -1,7 +1,7 @@
 """Canonical framework-independent composition for the local fake provider."""
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime
 from typing import Protocol
 
@@ -14,6 +14,7 @@ from govbr_auth.fake.credentials import (
     InMemoryFakeUserRepository,
     JsonFakeUserRepository,
 )
+from govbr_auth.fake.http.application import FakeGovHttpApplication
 from govbr_auth.fake.models import FakeClient, FakeUser
 from govbr_auth.fake.provider import FakeGovBrProvider
 from govbr_auth.fake.settings import FakeGovBrSettings
@@ -45,8 +46,8 @@ class FakeGovBrEndpoints:
 
 
 @dataclass(frozen=True, slots=True)
-class FakeGovBrRuntime:
-    """Own one internally consistent fake-provider object graph."""
+class FakeGovSimulator:
+    """Own one internally consistent fake-provider simulation graph."""
 
     settings: FakeGovBrSettings
     provider: FakeGovBrProvider
@@ -55,6 +56,15 @@ class FakeGovBrRuntime:
     credentials: tuple[FakeLoginCredential, ...] = field(repr=False)
     prefix: str
     endpoints: FakeGovBrEndpoints
+    clock: InitVar[Callable[[], datetime]] = field(repr=False)
+    http_application: FakeGovHttpApplication = field(init=False, repr=False)
+
+    def __post_init__(self, clock: Callable[[], datetime]) -> None:
+        object.__setattr__(
+            self,
+            "http_application",
+            FakeGovHttpApplication(self, clock=clock),
+        )
 
 
 _DEFAULT_USERS = (
@@ -79,18 +89,17 @@ _DEFAULT_USERS = (
 )
 
 
-def create_fake_govbr_runtime(
+def create_fake_gov_simulator(
     settings: GovBrRuntimeSettings,
     *,
     clock: Callable[[], datetime],
     user_repository: FakeUserRepository | None = None,
-) -> FakeGovBrRuntime:
+) -> FakeGovSimulator:
     """Compose one fake provider without importing an HTTP framework."""
     if settings.provider is not GovBrProvider.FAKE:
-        raise ValueError("fake runtime requires the fake provider")
+        raise ValueError("fake simulator requires the fake provider")
 
     settings = GovBrRuntimeSettings.model_validate(settings.model_dump())
-    del clock
     repository, credentials = _resolve_repository(settings, user_repository)
     prefix = settings.fake_provider_prefix if settings.fake_end_to_end else ""
     endpoints = _fake_endpoints(settings, prefix=prefix)
@@ -117,7 +126,7 @@ def create_fake_govbr_runtime(
         replay_store=InMemoryAuthorizationCodeReplayStore(),
         signing_key=FakeSigningKey.generate(kid="govbr-auth-local-key"),
     )
-    return FakeGovBrRuntime(
+    return FakeGovSimulator(
         settings=provider_settings,
         provider=provider,
         credential_authenticator=repository,
@@ -125,6 +134,7 @@ def create_fake_govbr_runtime(
         credentials=credentials,
         prefix=prefix,
         endpoints=endpoints,
+        clock=clock,
     )
 
 
