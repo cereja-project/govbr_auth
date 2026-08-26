@@ -138,6 +138,13 @@ def test_project_version_is_static_without_importing_runtime_dependencies() -> N
     assert "dynamic" not in metadata
 
 
+def test_release_candidate_metadata_does_not_claim_stable_maturity() -> None:
+    classifiers = _project_metadata()["classifiers"]
+
+    assert "Development Status :: 4 - Beta" in classifiers
+    assert "Development Status :: 5 - Production/Stable" not in classifiers
+
+
 def test_optional_dependencies_expose_framework_and_development_tools() -> None:
     metadata = _project_metadata()
 
