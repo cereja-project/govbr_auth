@@ -19,7 +19,7 @@ pip install "govbr-auth[fake]"         # launcher FakeGov
 ## Usar FakeGov no meu app
 
 ```bash
-pip install "govbr-auth[fake]"
+pip install "govbr-auth[fastapi]"
 ```
 
 ```python
@@ -36,14 +36,24 @@ auth = GovBrAuth(on_success=authenticated)
 app.include_router(auth.router)
 ```
 
+Com `GOVBR_PROVIDER=fake`, a aplicação mantém o mesmo runtime consumidor e a
+mesma fachada `GovBrAuth`: o modo fake troca apenas os endpoints do provedor e
+o transporte HTTP interno. Para composições avançadas, o simulador canônico é
+`govbr_auth.fake.FakeGovSimulator`, criado por
+`govbr_auth.fake.create_fake_gov_simulator`.
+
 No Django, inclua `auth.urlpatterns` no `urlpatterns` do projeto. No Flask,
 registre os dois blueprints condicionais com `auth.register(app)`. Em ambos os
-casos, `GovBrAuth` compõe a engine e o FakeGov somente quando o runtime está em
-modo fake.
+casos, o código do consumidor permanece o mesmo; só a configuração do provedor
+é alterada.
 
 Para iniciar os exemplos locais em modo fake:
 
 ```powershell
+# FastAPI
+$env:GOVBR_PROVIDER = "fake"
+uvicorn examples.example_fastapi:create_app --factory
+
 # Django
 $env:GOVBR_PROVIDER = "fake"
 $env:GOVBR_FAKE_END_TO_END = "true"
@@ -56,9 +66,9 @@ $env:GOVBR_FAKE_PORT = "5000"
 flask --app examples.example_flask:create_app run --port 5000
 ```
 
-No login FakeGov, use apenas credenciais fictícias do ambiente local, como
-CPF `12345678901` e senha `ana-demo`. A aplicação não exibe esses valores nas
-respostas.
+Abra `/auth/govbr/login` no app iniciado e conclua o callback autenticado com
+credenciais locais configuradas para o simulador. As respostas renderizadas não
+exibem CPF, senha, tokens ou segredos.
 ## Como a comunicação funciona
 
 A aplicação expõe `/auth/govbr/login` e `/auth/govbr/callback`. Depois do
@@ -67,8 +77,10 @@ valida o ID Token e consulta `userinfo` antes de chamar `on_success`.
 
 Com `GOVBR_PROVIDER=official`, essas chamadas vão para o Gov.br. Com
 `GOVBR_PROVIDER=fake`, as rotas FakeGov são montadas no mesmo router e o
-backend usa transporte ASGI em memória. O fluxo end-to-end do launcher também
-inclui a página inicial. O diagrama completo está em
+backend usa transporte ASGI em memória. Em outras palavras: é o mesmo runtime
+consumidor, e a configuração fake troca apenas os endpoints do provedor e o
+transporte HTTP interno. O fluxo end-to-end do launcher também inclui a página
+inicial. O diagrama completo está em
 [`docs/guide/communication-flow.rst`](docs/guide/communication-flow.rst).
 
 Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
@@ -103,7 +115,7 @@ O launcher escuta apenas em loopback.
 Defina `GOVBR_FAKE_USERS_FILE` com um JSON fora do Git:
 
 ```json
-{"users": [{"cpf": "12345678901", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
+{"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
 ```
 
 O arquivo substitui os usuários defaults, é validado na inicialização e fica

@@ -112,6 +112,27 @@ def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
     )
 
 
+def test_entry_docs_describe_fakegov_as_provider_facade_with_canonical_public_names() -> (
+    None
+):
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "api" / "django.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "api" / "flask.rst").read_text(encoding="utf-8"),
+    )
+    combined = re.sub(r"\s+", " ", "\n".join(sources))
+
+    assert "FakeGovSimulator" in combined
+    assert "create_fake_gov_simulator" in combined
+    assert "FakeGovBrRuntime" not in combined
+    assert "create_fake_govbr_runtime" not in combined
+    assert "mesmo runtime consumidor" in combined
+    assert (
+        "troca apenas os endpoints do provedor e o transporte HTTP interno" in combined
+    )
+
+
 def test_installable_fake_command_is_an_exact_line_in_every_instruction() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
@@ -196,9 +217,33 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "auth.register(app)" in source
     assert "python -m django runserver" in source
     assert "flask --app examples.example_flask:create_app run" in source
-    assert "12345678901" in source
-    assert "ana-demo" in source
     assert "[demo]" not in source
     assert "govbr_auth.demo" not in source
     assert ".install(" not in source
     assert "from govbr_auth import AuthContext, GovBrAuth" not in source
+
+
+def test_entry_docs_keep_fake_credentials_in_local_configuration_not_rendered_guides() -> (
+    None
+):
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+    )
+
+    assert tuple("GOVBR_FAKE_USERS_FILE" in source for source in sources) == (
+        True,
+        True,
+    )
+    assert tuple("12345678901" in source for source in sources) == (
+        False,
+        False,
+    )
+    assert tuple("ana-demo" in source for source in sources) == (
+        False,
+        False,
+    )
+    assert tuple("bruno-demo" in source for source in sources) == (
+        False,
+        False,
+    )

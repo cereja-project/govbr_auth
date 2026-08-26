@@ -8,9 +8,9 @@ oficiais configurados.
 Aplicação FastAPI
 -----------------
 
-Instale a biblioteca com o extra do FakeGov para desenvolvimento::
+Instale o adapter FastAPI::
 
-    pip install "govbr-auth[fake]"
+    pip install "govbr-auth[fastapi]"
 
 Monte a fachada pública e inclua o router na aplicação:
 
@@ -30,7 +30,12 @@ Monte a fachada pública e inclua o router na aplicação:
 
 Essa aplicação não cria um cliente OAuth, uma rota de callback ou uma factory
 do FakeGov manualmente. ``GovBrAuth`` compõe o runtime selecionado e publica
-as rotas ``/auth/govbr/login`` e ``/auth/govbr/callback``.
+as rotas ``/auth/govbr/login`` e ``/auth/govbr/callback``. Com
+``GOVBR_PROVIDER=fake``, o app continua usando o mesmo runtime consumidor; a
+configuração fake troca apenas os endpoints do provedor e o transporte HTTP
+interno. Para composição avançada, o simulador canônico é
+``govbr_auth.fake.FakeGovSimulator``, criado por
+``govbr_auth.fake.create_fake_gov_simulator``.
 
 Aplicação Django
 ----------------
@@ -84,8 +89,8 @@ Inicie o exemplo em modo fake::
     flask --app examples.example_flask:create_app run --port 5000
 
 No fluxo fake, use somente credenciais fictícias configuradas para o ambiente
-local; por exemplo, o usuário padrão ``12345678901`` com a senha
-``ana-demo``. Esses valores ficam na documentação, não nas respostas da API.
+local. As respostas públicas do app e do launcher não exibem CPF, senha,
+tokens ou segredos.
 
 Testar com FakeGov
 ------------------
@@ -100,12 +105,18 @@ Execute a sua aplicação com:
 No POSIX, use ``GOVBR_PROVIDER=fake uvicorn myapp:app --reload``. O navegador
 será redirecionado para as rotas FakeGov montadas na própria aplicação. O
 backend troca o código, busca JWKS e consulta ``userinfo`` usando transporte
-ASGI em memória. Veja :doc:`communication-flow` para o diagrama completo.
+ASGI em memória. Abra ``/auth/govbr/login``, conclua a autenticação local e
+verifique o callback autenticado no mesmo app. Veja :doc:`communication-flow`
+para o diagrama completo.
 
 Executar o launcher end-to-end
 ------------------------------
 
 Para experimentar página inicial, aplicação e FakeGov em um único processo:
+
+Instale o launcher::
+
+    pip install "govbr-auth[fake]"
 
 No POSIX::
 
@@ -118,7 +129,7 @@ No PowerShell::
 
 Abra ``http://localhost:8000``, clique em **Entrar com Gov.br** e informe um
 usuário fictício. O launcher é uma demonstração local; aplicações reais
-usam ``GovBrAuth`` diretamente.
+usam ``GovBrAuth`` diretamente e preservam o mesmo runtime consumidor.
 
 Para remover a variável da sessão após o teste no PowerShell::
 
@@ -149,6 +160,6 @@ Customizar usuários do FakeGov
 ------------------------------
 
 Defina ``GOVBR_FAKE_USERS_FILE`` com um JSON como
-``{"users": [{"cpf": "12345678901", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}``.
+``{"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}``.
 O arquivo substitui os defaults; não use credenciais reais e mantenha-o fora
 do Git. Veja :doc:`fake-mode` para validação e repositórios próprios.

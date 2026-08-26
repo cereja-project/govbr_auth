@@ -14,6 +14,7 @@ def test_boundary_error_response_returns_oauth_error_payload() -> None:
     assert response.body == (
         b'{"error":"invalid_request","error_description":"Request is invalid."}'
     )
+    assert response.headers["content-type"] == "application/json"
 
 
 def test_oauth_error_response_maps_authentication_headers_and_status() -> None:
@@ -25,6 +26,12 @@ def test_oauth_error_response_maps_authentication_headers_and_status() -> None:
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == 'Basic realm="fake-govbr"'
     assert response.headers["cache-control"] == "no-store"
+    assert response.body == (
+        b'{"error":"invalid_client","error_description":"Client is invalid."}'
+    )
+    assert b"client_secret" not in response.body
+    assert b"access_token" not in response.body
+    assert b"id_token" not in response.body
 
 
 def test_oauth_error_response_maps_access_denied() -> None:
@@ -33,3 +40,6 @@ def test_oauth_error_response_maps_access_denied() -> None:
     )
 
     assert response.status_code == 403
+    assert response.body == (
+        b'{"error":"access_denied","error_description":"Access denied."}'
+    )
