@@ -83,3 +83,21 @@ jobs:
       - run: python -m build
       - run: python -m twine check dist/*
       - run: python scripts/verify_distribution.py dist/*.whl
+
+  required:
+    if: ${{ always() }}
+    needs: [quality, test, minimum-dependencies, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI gate to succeed
+        shell: bash
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          MINIMUM_RESULT: ${{ needs.minimum-dependencies.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+        run: |
+          test "$QUALITY_RESULT" = "success"
+          test "$TEST_RESULT" = "success"
+          test "$MINIMUM_RESULT" = "success"
+          test "$PACKAGE_RESULT" = "success"
