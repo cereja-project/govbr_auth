@@ -237,6 +237,67 @@ def test_provider_uses_injected_protocol_rules_for_authorization_validation(
     )
 
 
+def test_provider_preserves_falsy_protocol_rules_injection(
+    settings: FakeGovBrSettings,
+    user: FakeUser,
+) -> None:
+    injected_client = FakeClient(
+        client_id="injected-client",
+        client_secret=SecretStr("injected-secret"),
+        registered_redirect_uris=("https://client.example/callback",),
+    )
+
+    class FalsyAuthorizationRules:
+        def __bool__(self) -> bool:
+            return False
+
+        def validate_authorization_request(
+            self, request: FakeAuthorizationRequest
+        ) -> FakeClient:
+            return injected_client
+
+        def authenticate_token_request(
+            self,
+            *,
+            credentials: FakeClientCredentials,
+            request: FakeTokenRequest,
+        ) -> FakeClient:
+            raise AssertionError("token exchange is outside this regression")
+
+        def validate_authorization_code_binding(
+            self,
+            *,
+            code: AuthorizationCodeArtifact,
+            client: FakeClient,
+            request: FakeTokenRequest,
+        ) -> None:
+            raise AssertionError("token exchange is outside this regression")
+
+        def consume_authorization_code(
+            self,
+            code: AuthorizationCodeArtifact,
+            *,
+            now: datetime,
+        ) -> None:
+            raise AssertionError("token exchange is outside this regression")
+
+    provider = FakeGovBrProvider(
+        settings=settings,
+        user_store=InMemoryFakeUserStore((user,)),
+        replay_store=InMemoryAuthorizationCodeReplayStore(),
+        signing_key=FakeSigningKey.generate(kid="fake-provider-key"),
+        protocol_rules=FalsyAuthorizationRules(),
+    )
+
+    session = provider.begin_authorization(_authorization_request(), now=NOW)
+
+    artifact = FakeArtifactCodec(settings.artifact_secret).decode_authorization_request(
+        session.request,
+        now=NOW,
+    )
+    assert artifact.client_id == "injected-client"
+
+
 def test_begin_authorization_returns_opaque_session_and_available_users(
     provider: FakeGovBrProvider,
     user: FakeUser,

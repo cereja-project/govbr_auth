@@ -113,9 +113,13 @@ class FakeGovBrProvider:
             issuer=str(settings.issuer),
         )
         self._clients = {client.client_id: client for client in settings.clients}
-        self._protocol_rules = protocol_rules or FakeOAuthProtocolRules(
-            clients=settings.clients,
-            replay_store=replay_store,
+        self._protocol_rules = (
+            protocol_rules
+            if protocol_rules is not None
+            else FakeOAuthProtocolRules(
+                clients=settings.clients,
+                replay_store=replay_store,
+            )
         )
         self._identifier_factory = identifier_factory or (
             lambda: secrets.token_urlsafe(32)
