@@ -33,26 +33,39 @@ def _path(location: str) -> str:
     return parsed.path + (f"?{parsed.query}" if parsed.query else "")
 
 
-def test_django_fake_runtime_completes_browser_authentication_flow() -> None:
+def test_django_fake_runtime_completes_browser_authentication_flow(monkeypatch) -> None:
+    import govbr_auth.fake.django as fake_django
+
+    def fail_if_routes_resolve_application(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("fake routes must receive the simulator HTTP facade")
+
+    monkeypatch.setattr(
+        fake_django,
+        "resolve_fake_http_application",
+        fail_if_routes_resolve_application,
+    )
     received: list[str] = []
 
     def authenticated(context, request):
         received.append(context.user.subject)
         return JsonResponse({"authenticated": True})
 
-    auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
-        on_success=authenticated,
-        clock=lambda: datetime(2026, 8, 25, 12, tzinfo=UTC),
-    )
-    global urlpatterns
-    urlpatterns = auth.urlpatterns
-    clear_url_caches()
+    auth = None
 
     try:
+        auth = GovBrAuth(
+            settings=GovBrRuntimeSettings(
+                provider=GovBrProvider.FAKE,
+                fake_end_to_end=True,
+            ),
+            on_success=authenticated,
+            clock=lambda: datetime(2026, 8, 25, 12, tzinfo=UTC),
+        )
+        global urlpatterns
+        urlpatterns = auth.urlpatterns
+        clear_url_caches()
+
         with override_settings(ROOT_URLCONF=__name__):
             client = Client()
             login = client.get("/auth/govbr/login")
@@ -77,6 +90,7 @@ def test_django_fake_runtime_completes_browser_authentication_flow() -> None:
         assert callback.json() == {"authenticated": True}
         assert received == ["12345678901"]
     finally:
-        auth.close()
+        if auth is not None:
+            auth.close()
         urlpatterns = []
         clear_url_caches()

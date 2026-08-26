@@ -1,4 +1,4 @@
-"""FastAPI consumer using the canonical govbr-auth facade."""
+"""FastAPI consumer that keeps the same runtime and swaps only the provider."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -18,7 +18,7 @@ def utc_now() -> datetime:
 
 
 def create_app(*, clock: Callable[[], datetime] = utc_now) -> FastAPI:
-    """Create the same consumer for the official or selected fake provider."""
+    """Create the same consumer runtime for the official or selected provider."""
     load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     application = FastAPI()
 

@@ -23,7 +23,7 @@ from govbr_auth.core.transactions import (
 )
 
 if TYPE_CHECKING:
-    from govbr_auth.fake.runtime import FakeGovBrRuntime, FakeUserRepository
+    from govbr_auth.fake.runtime import FakeGovSimulator, FakeUserRepository
 
 
 @dataclass(slots=True)
@@ -33,7 +33,7 @@ class GovBrRuntime:
     settings: GovBrRuntimeSettings
     client: GovBrClient
     provider: GovBrProvider
-    fake: "FakeGovBrRuntime | None"
+    fake: "FakeGovSimulator | None"
     _owned_http: httpx.AsyncClient | None
     _closed: bool = False
 
@@ -72,7 +72,7 @@ def create_govbr_runtime(
     *,
     http: httpx.AsyncClient | None = None,
     fake_transport_factory: (
-        Callable[["FakeGovBrRuntime"], httpx.AsyncBaseTransport] | None
+        Callable[["FakeGovSimulator"], httpx.AsyncBaseTransport] | None
     ) = None,
     clock: Callable[[], datetime] = utc_now,
     user_repository: "FakeUserRepository | None" = None,
@@ -108,7 +108,7 @@ def _create_fake_consumer_runtime(
     *,
     http: httpx.AsyncClient | None,
     fake_transport_factory: (
-        Callable[["FakeGovBrRuntime"], httpx.AsyncBaseTransport] | None
+        Callable[["FakeGovSimulator"], httpx.AsyncBaseTransport] | None
     ),
     clock: Callable[[], datetime],
     user_repository: "FakeUserRepository | None",
@@ -119,14 +119,14 @@ def _create_fake_consumer_runtime(
     if fake_transport_factory is None:
         raise ValueError("fake transport factory is required")
 
-    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
 
     effective_settings = settings
     if not settings.fake_end_to_end:
         values = settings.model_dump()
         values["fake_end_to_end"] = True
         effective_settings = GovBrRuntimeSettings.model_validate(values)
-    fake = create_fake_govbr_runtime(
+    fake = create_fake_gov_simulator(
         effective_settings,
         clock=clock,
         user_repository=user_repository,
@@ -146,7 +146,7 @@ def _create_fake_consumer_runtime(
     )
 
 
-def _fake_oauth_settings(fake: "FakeGovBrRuntime") -> GovBrSettings:
+def _fake_oauth_settings(fake: "FakeGovSimulator") -> GovBrSettings:
     """Derive consumer settings from the validated fake-provider graph."""
     client = fake.settings.clients[0]
     return GovBrSettings(

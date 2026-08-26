@@ -27,6 +27,7 @@ from govbr_auth.fake import (
     InMemoryAuthorizationCodeReplayStore,
     InMemoryFakeUserStore,
 )
+from govbr_auth.fake.protocol import FakeOAuthProtocolRules
 
 NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 VERIFIER = "provider-pkce-verifier-abcdefghijklmnopqrstuvwxyz0123456789"
@@ -122,7 +123,28 @@ def _authorization_code(
     subject: str = "12345678900",
     challenge: str = CHALLENGE,
 ) -> SecretStr:
-    artifact = AuthorizationCodeArtifact(
+    return FakeArtifactCodec(settings.artifact_secret).encode_authorization_code(
+        _authorization_code_artifact(
+            issued_at=issued_at,
+            expires_at=expires_at,
+            client_id=client_id,
+            redirect_uri=redirect_uri,
+            subject=subject,
+            challenge=challenge,
+        )
+    )
+
+
+def _authorization_code_artifact(
+    *,
+    issued_at: datetime = NOW,
+    expires_at: datetime = NOW + timedelta(minutes=1),
+    client_id: str = "client-123",
+    redirect_uri: str = "https://client.example/callback",
+    subject: str = "12345678900",
+    challenge: str = CHALLENGE,
+) -> AuthorizationCodeArtifact:
+    return AuthorizationCodeArtifact(
         jti="authorization-code-123",
         issued_at=issued_at,
         expires_at=expires_at,
@@ -133,9 +155,26 @@ def _authorization_code(
         code_challenge=challenge,
         subject=subject,
     )
-    return FakeArtifactCodec(settings.artifact_secret).encode_authorization_code(
-        artifact
+
+
+def _protocol_rules(settings: FakeGovBrSettings) -> FakeOAuthProtocolRules:
+    return FakeOAuthProtocolRules(
+        clients=settings.clients,
+        replay_store=InMemoryAuthorizationCodeReplayStore(),
     )
+
+
+def _assert_oauth_error(
+    error: FakeOAuthError,
+    *,
+    code: str,
+    description: str,
+    marker: str | None = None,
+) -> None:
+    assert error.error == code
+    assert error.description == description
+    if marker is not None:
+        _assert_sanitized(error, marker)
 
 
 def _assert_sanitized(error: BaseException, marker: str) -> None:
@@ -165,6 +204,98 @@ def _tamper(value: SecretStr) -> SecretStr:
 
 def test_provider_is_available_from_fake_package() -> None:
     assert FakeGovBrProvider.__module__ == "govbr_auth.fake.provider"
+
+
+def test_provider_uses_injected_protocol_rules_for_authorization_validation(
+    settings: FakeGovBrSettings,
+    user: FakeUser,
+) -> None:
+    class RejectingAuthorizationRules:
+        def validate_authorization_request(
+            self, request: FakeAuthorizationRequest
+        ) -> FakeClient:
+            raise FakeOAuthError(
+                error="invalid_request",
+                description="The authorization request is invalid.",
+            )
+
+    provider = FakeGovBrProvider(
+        settings=settings,
+        user_store=InMemoryFakeUserStore((user,)),
+        replay_store=InMemoryAuthorizationCodeReplayStore(),
+        signing_key=FakeSigningKey.generate(kid="fake-provider-key"),
+        protocol_rules=RejectingAuthorizationRules(),
+    )
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        provider.begin_authorization(_authorization_request(), now=NOW)
+
+    _assert_oauth_error(
+        error_info.value,
+        code="invalid_request",
+        description="The authorization request is invalid.",
+    )
+
+
+def test_provider_preserves_falsy_protocol_rules_injection(
+    settings: FakeGovBrSettings,
+    user: FakeUser,
+) -> None:
+    injected_client = FakeClient(
+        client_id="injected-client",
+        client_secret=SecretStr("injected-secret"),
+        registered_redirect_uris=("https://client.example/callback",),
+    )
+
+    class FalsyAuthorizationRules:
+        def __bool__(self) -> bool:
+            return False
+
+        def validate_authorization_request(
+            self, request: FakeAuthorizationRequest
+        ) -> FakeClient:
+            return injected_client
+
+        def authenticate_token_request(
+            self,
+            *,
+            credentials: FakeClientCredentials,
+            request: FakeTokenRequest,
+        ) -> FakeClient:
+            raise AssertionError("token exchange is outside this regression")
+
+        def validate_authorization_code_binding(
+            self,
+            *,
+            code: AuthorizationCodeArtifact,
+            client: FakeClient,
+            request: FakeTokenRequest,
+        ) -> None:
+            raise AssertionError("token exchange is outside this regression")
+
+        def consume_authorization_code(
+            self,
+            code: AuthorizationCodeArtifact,
+            *,
+            now: datetime,
+        ) -> None:
+            raise AssertionError("token exchange is outside this regression")
+
+    provider = FakeGovBrProvider(
+        settings=settings,
+        user_store=InMemoryFakeUserStore((user,)),
+        replay_store=InMemoryAuthorizationCodeReplayStore(),
+        signing_key=FakeSigningKey.generate(kid="fake-provider-key"),
+        protocol_rules=FalsyAuthorizationRules(),
+    )
+
+    session = provider.begin_authorization(_authorization_request(), now=NOW)
+
+    artifact = FakeArtifactCodec(settings.artifact_secret).decode_authorization_request(
+        session.request,
+        now=NOW,
+    )
+    assert artifact.client_id == "injected-client"
 
 
 def test_begin_authorization_returns_opaque_session_and_available_users(
@@ -234,6 +365,165 @@ def test_exchange_code_returns_bound_tokens(
     assert result.scope == "openid profile email"
     assert claims["sub"] == "12345678900"
     assert claims["nonce"] == "nonce-123"
+
+
+def test_protocol_rules_reject_unknown_authorization_client_with_safe_error(
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "unknown-client"
+    rules = _protocol_rules(settings)
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.validate_authorization_request(
+            _authorization_request(client_id=marker),
+        )
+
+    _assert_oauth_error(
+        error_info.value,
+        code="unauthorized_client",
+        description="The authorization request is invalid.",
+        marker=marker,
+    )
+
+
+def test_protocol_rules_reject_unregistered_redirect_uri_with_safe_error(
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "https://evil.example/callback"
+    rules = _protocol_rules(settings)
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.validate_authorization_request(
+            _authorization_request(redirect_uri=marker),
+        )
+
+    _assert_oauth_error(
+        error_info.value,
+        code="invalid_request",
+        description="The authorization request is invalid.",
+        marker=marker,
+    )
+
+
+def test_protocol_rules_reject_unsupported_scope_with_safe_error(
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "profile email"
+    rules = _protocol_rules(settings)
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.validate_authorization_request(
+            _authorization_request(scope=marker),
+        )
+
+    _assert_oauth_error(
+        error_info.value,
+        code="invalid_scope",
+        description="The requested scope is invalid.",
+        marker=marker,
+    )
+
+
+def test_protocol_rules_reject_invalid_client_credentials_with_safe_error(
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "wrong-secret"
+    rules = _protocol_rules(settings)
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.validate_token_request(
+            credentials=_client_credentials(client_secret=SecretStr(marker)),
+            request=_token_request(SecretStr("unread-code")),
+            code=_authorization_code_artifact(),
+        )
+
+    _assert_oauth_error(
+        error_info.value,
+        code="invalid_client",
+        description="Client authentication failed.",
+        marker=marker,
+    )
+
+
+def test_protocol_rules_reject_unsupported_grant_with_safe_error(
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "client_credentials"
+    rules = _protocol_rules(settings)
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.validate_token_request(
+            credentials=_client_credentials(),
+            request=_token_request(SecretStr("unread-code"), grant_type=marker),
+            code=_authorization_code_artifact(),
+        )
+
+    _assert_oauth_error(
+        error_info.value,
+        code="unsupported_grant_type",
+        description="The authorization grant type is not supported.",
+        marker=marker,
+    )
+
+
+def test_protocol_rules_reject_wrong_pkce_verifier_with_safe_error(
+    settings: FakeGovBrSettings,
+) -> None:
+    marker = "wrong-verifier"
+    rules = _protocol_rules(settings)
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.validate_token_request(
+            credentials=_client_credentials(),
+            request=_token_request(
+                SecretStr("unread-code"),
+                code_verifier=SecretStr(marker),
+            ),
+            code=_authorization_code_artifact(),
+        )
+
+    _assert_oauth_error(
+        error_info.value,
+        code="invalid_grant",
+        description="The authorization code is invalid or expired.",
+        marker=marker,
+    )
+
+
+def test_protocol_rules_reject_expired_authorization_code_before_replay_store(
+    settings: FakeGovBrSettings,
+) -> None:
+    rules = _protocol_rules(settings)
+    code = _authorization_code_artifact(
+        issued_at=NOW - timedelta(minutes=2),
+        expires_at=NOW - timedelta(minutes=1),
+    )
+
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.consume_authorization_code(code, now=NOW)
+
+    _assert_oauth_error(
+        error_info.value,
+        code="invalid_grant",
+        description="The authorization code is invalid or expired.",
+    )
+
+
+def test_protocol_rules_reject_replayed_authorization_code(
+    settings: FakeGovBrSettings,
+) -> None:
+    rules = _protocol_rules(settings)
+    code = _authorization_code_artifact()
+
+    rules.consume_authorization_code(code, now=NOW)
+    with pytest.raises(FakeOAuthError) as error_info:
+        rules.consume_authorization_code(code, now=NOW)
+
+    _assert_oauth_error(
+        error_info.value,
+        code="invalid_grant",
+        description="The authorization code is invalid or expired.",
+    )
 
 
 def test_jwks_returns_only_public_key_material(provider: FakeGovBrProvider) -> None:

@@ -112,6 +112,75 @@ def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
     )
 
 
+def test_fastapi_fake_quickstart_install_is_complete_for_uvicorn() -> None:
+    required_guidance = (
+        'pip install "govbr-auth[fastapi,fake]"',
+        "uvicorn myapp:app --reload",
+        "http://127.0.0.1:8000/auth/govbr/login",
+    )
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+    )
+
+    assert tuple(
+        tuple(guidance in source for guidance in required_guidance)
+        for source in sources
+    ) == (
+        (True, True, True),
+        (True, True, True),
+    )
+
+
+def test_entry_docs_describe_fakegov_as_provider_facade_with_canonical_public_names() -> (
+    None
+):
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "api" / "fastapi.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "api" / "django.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "api" / "flask.rst").read_text(encoding="utf-8"),
+    )
+    combined = re.sub(r"\s+", " ", "\n".join(sources))
+
+    assert "FakeGovSimulator" in combined
+    assert "create_fake_gov_simulator" in combined
+    assert "FakeGovBrRuntime" not in combined
+    assert "create_fake_govbr_runtime" not in combined
+    assert "mesmo runtime consumidor" in combined
+    assert (
+        "troca apenas os endpoints do provedor e o transporte HTTP interno" in combined
+    )
+    assert "FakeGovHttpTransport" in combined
+    assert "transporte ASGI em memória" not in combined
+    assert "ASGI in-memory transport" not in combined
+
+
+def test_fastapi_api_doc_describes_the_fakegov_provider_facade_surface() -> None:
+    source = re.sub(
+        r"\s+",
+        " ",
+        (DOCS_ROOT / "api" / "fastapi.rst").read_text(encoding="utf-8"),
+    )
+
+    assert "FakeGovSimulator" in source
+    assert "create_fake_gov_simulator" in source
+    assert "FakeGovBrRuntime" not in source
+    assert "create_fake_govbr_runtime" not in source
+    assert "mesmo runtime consumidor" in source
+    assert "troca apenas os endpoints do provedor e o transporte HTTP interno" in source
+
+
+def test_fake_mode_guide_documents_the_supported_installation_matrix() -> None:
+    source = (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8")
+
+    assert 'pip install "govbr-auth[fastapi,fake]"' in source
+    assert 'pip install "govbr-auth[django]"' in source
+    assert 'pip install "govbr-auth[flask]"' in source
+    assert 'pip install "govbr-auth[fake]"' not in source
+
+
 def test_installable_fake_command_is_an_exact_line_in_every_instruction() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
@@ -160,17 +229,21 @@ def test_fake_credentials_journey_is_documented_in_every_entry_guide(
 ) -> None:
     required_guidance = (
         "GOVBR_FAKE_USERS_FILE",
+        "fake-users.local.json",
         '"users"',
-        '"cpf"',
-        '"password"',
+        '"cpf": "11122233344"',
+        '"password": "senha-ficticia"',
+        'export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"',
+        '$env:GOVBR_FAKE_USERS_FILE = "$PWD\\fake-users.local.json"',
         "não use credenciais reais",
-        'pip install "govbr-auth[fake]"',
         "python -m govbr_auth.fake",
     )
 
     source = document.read_text(encoding="utf-8")
 
     assert tuple(guidance in source for guidance in required_guidance) == (
+        True,
+        True,
         True,
         True,
         True,
@@ -196,9 +269,64 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "auth.register(app)" in source
     assert "python -m django runserver" in source
     assert "flask --app examples.example_flask:create_app run" in source
-    assert "12345678901" in source
-    assert "ana-demo" in source
     assert "[demo]" not in source
     assert "govbr_auth.demo" not in source
     assert ".install(" not in source
     assert "from govbr_auth import AuthContext, GovBrAuth" not in source
+
+
+def test_entry_docs_use_explicit_local_credentials_not_built_in_defaults() -> (
+    None
+):
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+    )
+
+    assert tuple("GOVBR_FAKE_USERS_FILE" in source for source in sources) == (
+        True,
+        True,
+    )
+    assert tuple("11122233344" in source for source in sources) == (
+        True,
+        True,
+    )
+    assert tuple("senha-ficticia" in source for source in sources) == (
+        True,
+        True,
+    )
+    assert tuple("12345678901" in source for source in sources) == (
+        False,
+        False,
+    )
+    assert tuple("ana-demo" in source for source in sources) == (
+        False,
+        False,
+    )
+    assert tuple("bruno-demo" in source for source in sources) == (
+        False,
+        False,
+    )
+
+
+def test_advanced_fakegov_docs_match_application_argument_contract() -> None:
+    source = "\n".join(
+        (
+            (DOCS_ROOT / "api" / "fake-govbr.rst").read_text(encoding="utf-8"),
+            (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8"),
+        )
+    )
+    normalized = re.sub(r"\s+", " ", source)
+
+    assert (
+        "create_fake_govbr_router(runtime, *, prefix=None, application=None, "
+        "credential_authenticator=None, automatic_subject=None, clock=utc_now)"
+        in normalized
+    )
+    assert (
+        "create_fake_govbr_app(runtime, *, application=None, "
+        "credential_authenticator=None, automatic_subject=None, clock=utc_now)"
+        in normalized
+    )
+    assert "FakeGovHttpApplication" in normalized
+    assert "runtime.http_application" in normalized

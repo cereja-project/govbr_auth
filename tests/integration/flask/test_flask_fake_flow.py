@@ -17,7 +17,18 @@ def _path(location: str) -> str:
     return parsed.path + (f"?{parsed.query}" if parsed.query else "")
 
 
-def test_flask_fake_runtime_completes_browser_authentication_flow() -> None:
+def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -> None:
+    import govbr_auth.fake.flask as fake_flask
+
+    def fail_if_routes_resolve_application(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("fake routes must receive the simulator HTTP facade")
+
+    monkeypatch.setattr(
+        fake_flask,
+        "resolve_fake_http_application",
+        fail_if_routes_resolve_application,
+    )
     received: list[str] = []
     application = Flask(__name__)
 
@@ -25,17 +36,19 @@ def test_flask_fake_runtime_completes_browser_authentication_flow() -> None:
         received.append(context.user.subject)
         return jsonify({"authenticated": True})
 
-    auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
-        on_success=authenticated,
-        clock=lambda: FIXED_NOW,
-    )
-    auth.register(application)
+    auth = None
 
     try:
+        auth = GovBrAuth(
+            settings=GovBrRuntimeSettings(
+                provider=GovBrProvider.FAKE,
+                fake_end_to_end=True,
+            ),
+            on_success=authenticated,
+            clock=lambda: FIXED_NOW,
+        )
+        auth.register(application)
+
         client = application.test_client()
         login = client.get("/auth/govbr/login")
         authorize = client.get(_path(login.headers["Location"]))
@@ -59,4 +72,5 @@ def test_flask_fake_runtime_completes_browser_authentication_flow() -> None:
         assert callback.json == {"authenticated": True}
         assert received == ["12345678901"]
     finally:
-        auth.close()
+        if auth is not None:
+            auth.close()

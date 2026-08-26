@@ -8,7 +8,11 @@ from django.urls import URLPattern, path
 from django.views.decorators.csrf import csrf_exempt
 
 from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
-from govbr_auth.fake.http.application import FakeGovHttpApplication, FakeHttpRuntime
+from govbr_auth.fake.http.application import (
+    FakeGovHttpApplication,
+    FakeHttpRuntime,
+    resolve_fake_http_application,
+)
 from govbr_auth.fake.provider import FakeOAuthError
 
 _TOKEN_HEADERS = {"Cache-Control": "no-store", "Pragma": "no-cache"}
@@ -18,9 +22,11 @@ def create_fake_govbr_urlpatterns(
     runtime: FakeHttpRuntime,
     *,
     clock: Callable[[], datetime],
+    application: FakeGovHttpApplication | None = None,
 ) -> list[URLPattern]:
     """Create Django provider routes from the neutral FakeGov application."""
-    application = FakeGovHttpApplication(runtime, clock=clock)
+    if application is None:
+        application = resolve_fake_http_application(runtime, clock=clock)
     prefix = runtime.prefix.strip("/")
 
     def authorize(request: HttpRequest) -> HttpResponse:
@@ -95,7 +101,9 @@ def create_fake_govbr_urlpatterns(
     ]
 
 
-def _oauth_error(error: FakeOAuthError, *, token_response: bool = False) -> JsonResponse:
+def _oauth_error(
+    error: FakeOAuthError, *, token_response: bool = False
+) -> JsonResponse:
     status_code = 400
     headers = dict(_TOKEN_HEADERS) if token_response else {}
     if error.error == "invalid_client":
@@ -111,4 +119,3 @@ def _oauth_error(error: FakeOAuthError, *, token_response: bool = False) -> Json
         status=status_code,
         headers=headers,
     )
-

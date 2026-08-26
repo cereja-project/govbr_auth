@@ -206,10 +206,14 @@ async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form
     assert "Ana Demo" not in home.text
     assert "ana-demo" not in home.text
     assert "12345678901" not in home.text
+    assert "fake_client_secret" not in home.text
+    assert "govbr-auth-local-key" not in home.text
     assert login.status_code == 302
     assert authorize.status_code == 200
     assert "Ana Demo" not in authorize.text
     assert "Bruno Demo" not in authorize.text
+    assert "ana-demo" not in authorize.text
+    assert "bruno-demo" not in authorize.text
     assert form.cpf_name == "cpf"
     assert form.password_name == "password"
 
@@ -260,6 +264,8 @@ async def test_end_to_end_completes_credential_flow_without_exposing_secrets(
             "id_token",
             "code_verifier",
             "local-fake-only",
+            "fake_client_secret",
+            "govbr-auth-local-key",
         )
     )
 
@@ -466,6 +472,8 @@ async def test_end_to_end_internal_error_never_exposes_exception_text(mocker) ->
     assert "internal_error" in response.text
     assert response.headers["cache-control"] == "no-store"
     assert "sensitive internal" not in response.text
+    assert "Traceback" not in response.text
+    assert "RuntimeError" not in response.text
 
 
 def test_run_uses_validated_loopback_settings(mocker) -> None:

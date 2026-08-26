@@ -91,10 +91,12 @@ class GovBrAuth:
                 name="govbr-auth-callback",
             ),
         ]
-        if self._owner.runtime.fake is not None:
+        fake_runtime = self._owner.runtime.fake
+        if fake_runtime is not None:
             patterns.extend(
                 create_fake_govbr_urlpatterns(
-                    self._owner.runtime.fake,
+                    fake_runtime,
+                    application=fake_runtime.http_application,
                     clock=self._clock,
                 )
             )

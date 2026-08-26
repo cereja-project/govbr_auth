@@ -132,7 +132,11 @@ class GovBrAuth:
             from govbr_auth.fake.fastapi import create_fake_govbr_router
 
             router.include_router(
-                create_fake_govbr_router(self._runtime.fake, clock=clock)
+                create_fake_govbr_router(
+                    self._runtime.fake,
+                    application=self._runtime.fake.http_application,
+                    clock=clock,
+                )
             )
         self._router = router
 

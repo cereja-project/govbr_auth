@@ -217,6 +217,37 @@ def oauth_values(location: str) -> dict[str, list[str]]:
     return parse_qs(urlsplit(location).query)
 
 
+def simulator_with_marked_http_application(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Return a simulator whose owned HTTP application is externally observable."""
+    import govbr_auth.fake.http.application as application_module
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
+    from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+
+    runtime = create_fake_gov_simulator(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        clock=lambda: FIXED_NOW,
+    )
+
+    def marked_jwks() -> dict[str, object]:
+        return {"keys": [{"kid": "simulator-owned-application"}]}
+
+    def fail_second_application(*args: object, **kwargs: object) -> object:
+        raise AssertionError("canonical simulator HTTP application must be reused")
+
+    monkeypatch.setattr(runtime.http_application, "jwks", marked_jwks)
+    monkeypatch.setattr(
+        application_module,
+        "FakeGovHttpApplication",
+        fail_second_application,
+    )
+    return runtime
+
+
 def provider_route_paths(application: object) -> set[str]:
     """Return only the five fake-provider paths from an ASGI router or app."""
     paths: set[str] = set()
@@ -267,14 +298,14 @@ def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> N
 async def test_router_consumes_canonical_fake_runtime() -> None:
     from fastapi import FastAPI
 
-    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
     from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
     settings = GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
         fake_end_to_end=True,
     )
-    runtime = create_fake_govbr_runtime(settings, clock=lambda: FIXED_NOW)
+    runtime = create_fake_gov_simulator(settings, clock=lambda: FIXED_NOW)
     application = FastAPI()
     application.include_router(
         create_fake_govbr_router(runtime, clock=lambda: FIXED_NOW)
@@ -299,11 +330,37 @@ async def test_router_consumes_canonical_fake_runtime() -> None:
 
 
 @pytest.mark.asyncio
+async def test_router_reuses_simulator_http_application_with_explicit_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi import FastAPI
+
+    runtime = simulator_with_marked_http_application(monkeypatch)
+    application = FastAPI()
+    application.include_router(
+        create_fake_govbr_router(
+            runtime,
+            credential_authenticator=runtime.credential_authenticator,
+            clock=lambda: FIXED_NOW,
+        )
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://127.0.0.1:8000",
+    ) as http:
+        response = await http.get(runtime.endpoints.jwks)
+
+    assert response.status_code == 200
+    assert response.json() == {"keys": [{"kid": "simulator-owned-application"}]}
+
+
+@pytest.mark.asyncio
 async def test_app_publishes_canonical_fake_runtime_endpoint() -> None:
-    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
     from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
-    runtime = create_fake_govbr_runtime(
+    runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
             fake_end_to_end=True,
@@ -329,11 +386,32 @@ async def test_app_publishes_canonical_fake_runtime_endpoint() -> None:
     assert 'name="cpf"' in response.text
 
 
+@pytest.mark.asyncio
+async def test_app_reuses_simulator_http_application_with_explicit_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = simulator_with_marked_http_application(monkeypatch)
+    application = create_fake_govbr_app(
+        runtime,
+        credential_authenticator=runtime.credential_authenticator,
+        clock=lambda: FIXED_NOW,
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://127.0.0.1:8000",
+    ) as http:
+        response = await http.get(runtime.endpoints.jwks)
+
+    assert response.status_code == 200
+    assert response.json() == {"keys": [{"kid": "simulator-owned-application"}]}
+
+
 def test_runtime_router_rejects_prefix_that_diverges_from_canonical_endpoints() -> None:
-    from govbr_auth.fake.runtime import create_fake_govbr_runtime
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
     from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
-    runtime = create_fake_govbr_runtime(
+    runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
             fake_end_to_end=True,
@@ -343,6 +421,29 @@ def test_runtime_router_rejects_prefix_that_diverges_from_canonical_endpoints() 
 
     with pytest.raises(ValueError, match="runtime prefix"):
         create_fake_govbr_router(runtime, prefix="/different")
+
+
+@pytest.mark.parametrize(
+    "factory",
+    (
+        pytest.param(create_fake_govbr_router, id="router"),
+        pytest.param(create_fake_govbr_app, id="app"),
+    ),
+)
+def test_simulator_factories_reject_divergent_http_application(factory) -> None:
+    from govbr_auth.fake.runtime import create_fake_gov_simulator
+    from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+
+    runtime = create_fake_gov_simulator(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        clock=lambda: FIXED_NOW,
+    )
+
+    with pytest.raises(ValueError, match="runtime HTTP application"):
+        factory(runtime, application=object(), clock=lambda: FIXED_NOW)
 
 
 @pytest.mark.asyncio

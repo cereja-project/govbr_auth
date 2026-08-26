@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from collections.abc import Callable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -290,6 +291,11 @@ def _append_query(url: str, **values: str) -> str:
     )
 
 
+def _path(location: str) -> str:
+    parsed = urlsplit(location)
+    return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+
+
 def _json_response(
     response: httpx.Response,
     *,
@@ -547,6 +553,79 @@ async def test_fake_provider_environment_mounts_consumer_and_provider_on_same_ro
     )
     assert provider_authorize.status_code == 400
     assert provider_authorize.json()["error"] == "invalid_request"
+
+
+@pytest.mark.asyncio
+async def test_fake_provider_environment_uses_simulator_http_application_for_full_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import govbr_auth.fake.http.routes as fastapi_routes
+    from govbr_auth.fastapi import GovBrAuth
+
+    def fail_if_routes_resolve_application(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("fake routes must receive the simulator HTTP facade")
+
+    monkeypatch.setattr(
+        fastapi_routes,
+        "resolve_fake_http_application",
+        fail_if_routes_resolve_application,
+    )
+    monkeypatch.setenv("GOVBR_PROVIDER", "fake")
+    for name in (
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_USERINFO_URL",
+        "GOVBR_REDIRECT_URI",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    received: list[str] = []
+
+    async def on_success(context: AuthContext) -> Response:
+        received.append(context.user.subject)
+        return JSONResponse({"authenticated": True})
+
+    auth = GovBrAuth(on_success=on_success, clock=fixed_clock)
+    app = FastAPI()
+    app.include_router(auth.router)
+
+    try:
+        assert auth.runtime.fake is not None
+        async with app.router.lifespan_context(app):
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://127.0.0.1:8000",
+                follow_redirects=False,
+            ) as http:
+                login = await http.get("/auth/govbr/login")
+                authorize = await http.get(_path(login.headers["location"]))
+                request_match = re.search(
+                    r'name="request" value="([^"]+)"',
+                    authorize.text,
+                )
+                assert request_match is not None
+                fake_login = await http.post(
+                    "/fake-govbr/login",
+                    data={
+                        "request": request_match.group(1),
+                        "cpf": "12345678901",
+                        "password": "ana-demo",
+                    },
+                )
+                callback = await http.get(_path(fake_login.headers["location"]))
+
+        assert login.status_code == 302
+        assert authorize.status_code == 200
+        assert fake_login.status_code == 302
+        assert callback.status_code == 200
+        assert callback.json() == {"authenticated": True}
+        assert received == ["12345678901"]
+    finally:
+        if not auth.runtime.is_closed:
+            await auth.runtime.aclose()
 
 
 @pytest.mark.asyncio

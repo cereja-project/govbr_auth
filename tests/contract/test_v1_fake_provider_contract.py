@@ -13,7 +13,7 @@ from govbr_auth.fake import (
     FakeCredentialAuthenticator,
     FakeGovBrEndpoints,
     FakeGovBrProvider,
-    FakeGovBrRuntime,
+    FakeGovSimulator,
     FakeLoginCredential,
     FakeOAuthError,
     FakeUserRepository,
@@ -21,7 +21,7 @@ from govbr_auth.fake import (
     JsonFakeUserRepository,
     FakeTokenRequest,
     FakeTokenResponse,
-    create_fake_govbr_runtime,
+    create_fake_gov_simulator,
 )
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -109,7 +109,7 @@ def test_fake_package_exports_runtime_contract() -> None:
         "jwks",
         "issuer",
     )
-    assert tuple(field.name for field in fields(FakeGovBrRuntime)) == (
+    assert tuple(field.name for field in fields(FakeGovSimulator)) == (
         "settings",
         "provider",
         "credential_authenticator",
@@ -117,11 +117,28 @@ def test_fake_package_exports_runtime_contract() -> None:
         "credentials",
         "prefix",
         "endpoints",
+        "http_application",
     )
     assert fake.FakeLoginCredential is FakeLoginCredential
     assert fake.FakeGovBrEndpoints is FakeGovBrEndpoints
-    assert fake.FakeGovBrRuntime is FakeGovBrRuntime
-    assert fake.create_fake_govbr_runtime is create_fake_govbr_runtime
+    assert fake.FakeGovSimulator is FakeGovSimulator
+    assert fake.create_fake_gov_simulator is create_fake_gov_simulator
+
+
+def test_fake_package_exports_simulator_contract_without_runtime_aliases() -> None:
+    import govbr_auth.fake as fake
+    import govbr_auth.fake.runtime as runtime_module
+
+    assert hasattr(runtime_module, "FakeGovSimulator")
+    assert hasattr(runtime_module, "create_fake_gov_simulator")
+    assert fake.FakeGovSimulator is runtime_module.FakeGovSimulator
+    assert fake.create_fake_gov_simulator is runtime_module.create_fake_gov_simulator
+    assert "FakeGovSimulator" in fake.__all__
+    assert "create_fake_gov_simulator" in fake.__all__
+    assert "FakeGovBrRuntime" not in fake.__all__
+    assert "create_fake_govbr_runtime" not in fake.__all__
+    assert not hasattr(fake, "FakeGovBrRuntime")
+    assert not hasattr(fake, "create_fake_govbr_runtime")
 
 
 def test_neutral_modules_do_not_load_web_frameworks() -> None:

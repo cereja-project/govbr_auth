@@ -153,6 +153,44 @@ async def test_fake_facade_uses_the_fake_adapter_transport_factory(
 
 
 @pytest.mark.asyncio
+async def test_fake_facade_mounts_routes_with_simulator_http_application(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The FastAPI registrar must pass the simulator facade into fake routes."""
+    import govbr_auth.fake.fastapi as fake_fastapi
+    from govbr_auth.fastapi import GovBrAuth
+
+    mounted: list[tuple[object, object, object]] = []
+
+    def create_router(runtime, *, application, clock):
+        mounted.append((runtime, application, clock))
+        return APIRouter()
+
+    monkeypatch.setattr(fake_fastapi, "create_fake_govbr_router", create_router)
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    clock = lambda: FIXED_NOW
+    auth = GovBrAuth(
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        on_success=success_handler,
+        clock=clock,
+    )
+
+    try:
+        assert auth.runtime.fake is not None
+        assert mounted == [
+            (auth.runtime.fake, auth.runtime.fake.http_application, clock)
+        ]
+    finally:
+        await auth.runtime.aclose()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("prefix", "expected_message"),
     (

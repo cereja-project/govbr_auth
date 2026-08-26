@@ -37,6 +37,19 @@ class ProviderStub:
         return self.user
 
 
+def test_transport_reuses_runtime_http_application() -> None:
+    """Transport calls must share the simulator-owned neutral HTTP application."""
+    from govbr_auth.fake.http.application import FakeGovHttpApplication
+    from govbr_auth.fake.http.transport import FakeGovHttpTransport
+
+    runtime = ProviderStub()
+    runtime.http_application = FakeGovHttpApplication(runtime, clock=lambda: FIXED_NOW)
+
+    transport = FakeGovHttpTransport(runtime, clock=lambda: FIXED_NOW)
+
+    assert transport._application is runtime.http_application
+
+
 @pytest.mark.asyncio
 async def test_transport_serves_token_jwks_and_userinfo_without_fastapi() -> None:
     from govbr_auth.fake.http.transport import FakeGovHttpTransport

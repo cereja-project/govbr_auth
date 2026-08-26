@@ -135,3 +135,40 @@ def test_flask_fake_runtime_adds_provider_routes() -> None:
         } <= paths
     finally:
         auth.close()
+
+
+def test_flask_fake_runtime_passes_simulator_http_application_to_provider_blueprint(
+    monkeypatch,
+) -> None:
+    import govbr_auth.flask as flask_adapter
+    from govbr_auth.flask import GovBrAuth
+
+    mounted: list[tuple[object, object, object]] = []
+
+    def create_blueprint(runtime, *, application, clock):
+        mounted.append((runtime, application, clock))
+        from flask import Blueprint
+
+        return Blueprint("fake_govbr", __name__)
+
+    monkeypatch.setattr(
+        flask_adapter,
+        "create_fake_govbr_blueprint",
+        create_blueprint,
+    )
+
+    auth = GovBrAuth(
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        on_success=lambda context, request: ("", 204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    try:
+        runtime = auth._owner.runtime.fake
+        assert runtime is not None
+        assert mounted == [(runtime, runtime.http_application, auth._clock)]
+    finally:
+        auth.close()

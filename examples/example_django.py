@@ -1,4 +1,4 @@
-"""Django URL configuration using the synchronous govbr-auth adapter."""
+"""Django example that keeps the same consumer runtime across providers."""
 
 from django.http import JsonResponse
 
@@ -11,5 +11,6 @@ def authenticated(context, request):
     return JsonResponse({"authenticated": True})
 
 
+# The Django consumer stays the same; fake mode changes only provider wiring.
 auth = GovBrAuth(on_success=authenticated, settings=runtime_settings())
 urlpatterns = auth.urlpatterns
