@@ -1,9 +1,14 @@
 """Django example that keeps the same consumer runtime across providers."""
 
+from pathlib import Path
+
+from dotenv import load_dotenv
 from django.http import JsonResponse
 
 from examples.example_settings import runtime_settings
 from govbr_auth.django import GovBrAuth
+
+load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
 
 
 def authenticated(context, request):

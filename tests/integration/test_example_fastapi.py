@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+import dotenv
 
 FIXED_NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 
@@ -82,3 +83,45 @@ async def test_example_selects_complete_fake_graph_from_environment(
         "/fake-govbr/token",
         "/fake-govbr/userinfo",
     }.issubset(application.openapi()["paths"])
+
+
+def test_flask_example_loads_provider_from_working_directory_env(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    example = importlib.import_module("examples.example_flask")
+    loaded: dict[str, object] = {}
+
+    def record_load_dotenv(*, dotenv_path: Path, override: bool) -> bool:
+        loaded.update(dotenv_path=dotenv_path, override=override)
+        return False
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(example, "load_dotenv", record_load_dotenv, raising=False)
+    monkeypatch.setenv("GOVBR_PROVIDER", "fake")
+
+    example.create_app()
+
+    assert loaded == {"dotenv_path": tmp_path / ".env", "override": False}
+
+
+def test_django_example_loads_provider_from_working_directory_env(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    loaded: dict[str, object] = {}
+
+    def record_load_dotenv(*, dotenv_path: Path, override: bool) -> bool:
+        loaded.update(dotenv_path=dotenv_path, override=override)
+        return False
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(dotenv, "load_dotenv", record_load_dotenv)
+    monkeypatch.setenv("GOVBR_PROVIDER", "fake")
+    example = importlib.reload(importlib.import_module("examples.example_django"))
+
+    try:
+        assert example.auth._owner.runtime.settings.provider.value == "fake"
+        assert loaded == {"dotenv_path": tmp_path / ".env", "override": False}
+    finally:
+        example.auth.close()
