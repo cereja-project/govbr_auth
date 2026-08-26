@@ -168,6 +168,7 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
         "pytest-mock",
         "black",
         "build",
+        "wheel",
         "flake8",
         "pytest-cov",
         "PyYAML",

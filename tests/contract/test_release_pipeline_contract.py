@@ -105,6 +105,13 @@ def test_ci_covers_supported_pythons_and_major_operating_systems() -> None:
     assert matrix["os"] == ["ubuntu-latest", "windows-latest", "macos-latest"]
 
 
+def test_ci_does_not_duplicate_branch_and_pull_request_runs() -> None:
+    workflow = _load_workflow("pythonpackage.yml")
+
+    assert workflow["on"]["push"] == {"branches": ["main"]}
+    assert workflow["on"]["pull_request"] == {}
+
+
 def test_ci_enforces_formatting_coverage_and_distribution_validation() -> None:
     workflow = _load_workflow("pythonpackage.yml")
     jobs = workflow["jobs"]
