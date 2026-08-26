@@ -9,6 +9,7 @@ armazenamento compartilhado, desde que todos usem a mesma secret
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)](LICENSE)
+[![Core](https://img.shields.io/badge/Core-async%20OAuth%2FOIDC-0f766e.svg)](#instalação)
 [![FakeGov](https://img.shields.io/badge/FakeGov-local-0f766e.svg)](#teste-a-integração-sem-depender-do-govbr)
 
 > [!IMPORTANT]
