@@ -16,7 +16,7 @@ from govbr_auth.runtime_settings import (
 )
 from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import (
-    InMemoryTransactionStore,
+    EncryptedTransactionCodec,
     generate_transaction_secret,
 )
 
@@ -165,7 +165,7 @@ def _create_client(
     settings: GovBrSettings,
 ) -> Callable[[httpx.AsyncClient], GovBrClient]:
     """Prepare the common OAuth client composition used by each provider."""
-    transactions = InMemoryTransactionStore(settings.transaction_secret)
+    transactions = EncryptedTransactionCodec(settings.transaction_secret)
     validator = IdTokenValidator(settings=settings)
 
     def create(http: httpx.AsyncClient) -> GovBrClient:

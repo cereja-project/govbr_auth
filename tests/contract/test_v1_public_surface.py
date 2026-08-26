@@ -61,12 +61,12 @@ def test_core_exports_exact_async_v1_surface() -> None:
         "GovBrSettings",
         "GovBrUser",
         "IdTokenValidator",
-        "InMemoryTransactionStore",
+        "EncryptedTransactionCodec",
         "InvalidIdTokenError",
         "InvalidStateError",
         "ProviderEnvironment",
         "TokenSet",
-        "TransactionStore",
+        "TransactionCodec",
     )
 
 
@@ -125,9 +125,9 @@ def test_base_dependencies_are_exactly_framework_neutral() -> None:
     assert set(metadata["dependencies"]) == {
         "httpx>=0.27,<1",
         "PyJWT>=2.13,<3",
-        "cryptography>=42,<51",
-        "python-dotenv>=1,<2",
-        "pydantic>=2,<3",
+        "cryptography>=50.0.0,<51",
+        "python-dotenv>=1.2.3,<2",
+        "pydantic>=2.13.4,<3",
     }
 
 
@@ -145,21 +145,21 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
 
     assert set(optional_dependencies) == {"dev", "fake", "fastapi", "django", "flask"}
     assert optional_dependencies["fastapi"] == [
-        "fastapi>=0.115,<1",
-        "python-multipart>=0.0.9,<1",
+        "fastapi>=0.141.1,<1",
+        "python-multipart>=0.0.32,<1",
     ]
     assert optional_dependencies["django"] == [
-        "Django>=4.2,<7",
-        "asgiref>=3.8,<4",
+        "Django>=5.2.17,<7",
+        "asgiref>=3.8.1,<4",
     ]
     assert optional_dependencies["flask"] == [
-        "Flask>=3,<4",
-        "asgiref>=3.8,<4",
+        "Flask>=3.1.3,<4",
+        "asgiref>=3.8.1,<4",
     ]
     assert optional_dependencies["fake"] == [
-        "fastapi>=0.115,<1",
-        "python-multipart>=0.0.9,<1",
-        "uvicorn>=0.30,<1",
+        "fastapi>=0.141.1,<1",
+        "python-multipart>=0.0.32,<1",
+        "uvicorn>=0.52.4,<1",
     ]
     assert optional_dependencies["dev"] == [
         "uvicorn",

@@ -17,12 +17,12 @@ FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
 
 
 @dataclass
-class RecordingTransactionStore:
-    """Return a deterministic transaction and retain the create call result."""
+class RecordingTransactionCodec:
+    """Return a deterministic transaction and retain the issue call result."""
 
     created: AuthTransaction | None = None
 
-    def create(self, *, now: datetime) -> tuple[str, AuthTransaction]:
+    def issue(self, *, now: datetime) -> tuple[str, AuthTransaction]:
         transaction = AuthTransaction(
             transaction_id="transaction-123",
             code_verifier=SecretStr("pkce-verifier-for-authorization-test"),
@@ -51,32 +51,32 @@ def settings() -> GovBrSettings:
 
 
 @pytest.fixture
-def recording_transaction_store() -> RecordingTransactionStore:
-    """Provide an isolated transaction-store test double."""
-    return RecordingTransactionStore()
+def recording_transaction_codec() -> RecordingTransactionCodec:
+    """Provide an isolated transaction-codec test double."""
+    return RecordingTransactionCodec()
 
 
 def test_build_binds_state_nonce_and_pkce_to_created_transaction(
     settings: GovBrSettings,
-    recording_transaction_store: RecordingTransactionStore,
+    recording_transaction_codec: RecordingTransactionCodec,
 ) -> None:
     authorization = import_module("govbr_auth.core.authorization")
-    builder = authorization.AuthorizationBuilder(settings, recording_transaction_store)
+    builder = authorization.AuthorizationBuilder(settings, recording_transaction_codec)
 
     request = builder.build(now=FIXED_NOW)
 
     query = parse_qs(urlsplit(request.url).query, strict_parsing=True)
 
-    assert recording_transaction_store.created is not None
+    assert recording_transaction_codec.created is not None
     assert request.state == "opaque-sensitive-state"
     assert query["state"] == [request.state]
     assert query["nonce"] == [
-        recording_transaction_store.created.nonce.get_secret_value()
+        recording_transaction_codec.created.nonce.get_secret_value()
     ]
     expected_challenge = (
         base64.urlsafe_b64encode(
             hashlib.sha256(
-                recording_transaction_store.created.code_verifier.get_secret_value().encode(
+                recording_transaction_codec.created.code_verifier.get_secret_value().encode(
                     "ascii"
                 )
             ).digest()

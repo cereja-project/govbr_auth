@@ -8,6 +8,12 @@ Flask, usando OAuth 2.0, PKCE e OpenID Connect. O cliente valida ``state``, toke
 O núcleo de composição é neutro de framework. Os adapters são instalados por
 extras e se acoplam à aplicação hospedeira.
 
+As transações OAuth são stateless: múltiplos workers processam callbacks sem
+armazenamento compartilhado quando recebem a mesma secret
+``GOVBR_TRANSACTION_SECRET``. O envelope Fernet tem TTL e carrega os vínculos
+de PKCE e nonce. O ``state`` não é um registro de uso único; o replay é
+rejeitado pelo authorization code de uso único no provedor.
+
 .. image:: media/fakegov-flow.svg
    :alt: Jornada local do FakeGov, da instalação ao callback autenticado.
    :align: center

@@ -25,12 +25,12 @@ AUTHORIZATION_PARAMETERS = {
 
 
 @dataclass
-class RecordingTransactionStore:
+class RecordingTransactionCodec:
     """Return a deterministic transaction for contract verification."""
 
     created: AuthTransaction | None = None
 
-    def create(self, *, now: datetime) -> tuple[str, AuthTransaction]:
+    def issue(self, *, now: datetime) -> tuple[str, AuthTransaction]:
         transaction = AuthTransaction(
             transaction_id="contract-transaction-123",
             code_verifier=SecretStr("pkce-verifier-for-contract-test"),
@@ -62,7 +62,7 @@ def test_build_emits_the_required_authorization_parameters(
     settings: GovBrSettings,
 ) -> None:
     authorization = import_module("govbr_auth.core.authorization")
-    builder = authorization.AuthorizationBuilder(settings, RecordingTransactionStore())
+    builder = authorization.AuthorizationBuilder(settings, RecordingTransactionCodec())
 
     request = builder.build(now=FIXED_NOW)
 

@@ -51,6 +51,27 @@ jobs:
           --basetemp="${{ runner.temp }}/govbr-auth-pytest"
           -o cache_dir="${{ runner.temp }}/govbr-auth-cache"
 
+  minimum-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install --no-deps -e .
+      - run: python -m pip install -r requirements-min.txt
+      - name: Install test tools
+        run: >-
+          python -m pip install pytest pytest-asyncio pytest-mock pytest-cov
+          PyYAML build "setuptools>=77" wheel
+      - run: python -m pip check
+      - name: Test minimum supported dependencies
+        run: >-
+          python -m pytest --tb=short --disable-warnings -q
+          --basetemp="${{ runner.temp }}/govbr-auth-pytest"
+          -o cache_dir="${{ runner.temp }}/govbr-auth-cache"
+
   package:
     runs-on: ubuntu-latest
     steps:
@@ -62,3 +83,21 @@ jobs:
       - run: python -m build
       - run: python -m twine check dist/*
       - run: python scripts/verify_distribution.py dist/*.whl
+
+  required:
+    if: ${{ always() }}
+    needs: [quality, test, minimum-dependencies, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI gate to succeed
+        shell: bash
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          MINIMUM_RESULT: ${{ needs.minimum-dependencies.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+        run: |
+          test "$QUALITY_RESULT" = "success"
+          test "$TEST_RESULT" = "success"
+          test "$MINIMUM_RESULT" = "success"
+          test "$PACKAGE_RESULT" = "success"

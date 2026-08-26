@@ -7,7 +7,7 @@ from datetime import datetime
 from urllib.parse import urlencode
 
 from govbr_auth.core.settings import GovBrSettings
-from govbr_auth.core.transactions import TransactionStore
+from govbr_auth.core.transactions import TransactionCodec
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,16 +19,16 @@ class AuthorizationRequest:
 
 
 class AuthorizationBuilder:
-    """Build Gov.br OAuth authorization requests bound to stored transactions."""
+    """Build Gov.br OAuth authorization requests bound to protected transactions."""
 
-    def __init__(self, settings: GovBrSettings, transactions: TransactionStore) -> None:
+    def __init__(self, settings: GovBrSettings, transactions: TransactionCodec) -> None:
         """Store the validated provider configuration and transaction collaborator."""
         self._settings = settings
         self._transactions = transactions
 
     def build(self, *, now: datetime) -> AuthorizationRequest:
         """Create a transaction and encode its nonce and PKCE challenge in the redirect URL."""
-        state, transaction = self._transactions.create(now=now)
+        state, transaction = self._transactions.issue(now=now)
         verifier = transaction.code_verifier.get_secret_value().encode("ascii")
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier).digest())
         code_challenge = challenge.rstrip(b"=").decode("ascii")

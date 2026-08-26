@@ -129,6 +129,35 @@ def test_ci_enforces_formatting_coverage_and_distribution_validation() -> None:
     assert "python scripts/verify_distribution.py" in package_commands
 
 
+def test_ci_exposes_one_stable_required_status_for_branch_protection() -> None:
+    workflow = _load_workflow("pythonpackage.yml")
+    required_job = workflow["jobs"]["required"]
+
+    assert required_job["if"] == "${{ always() }}"
+    assert required_job["needs"] == [
+        "quality",
+        "test",
+        "minimum-dependencies",
+        "package",
+    ]
+    step = required_job["steps"][0]
+    assert step["env"] == {
+        "QUALITY_RESULT": "${{ needs.quality.result }}",
+        "TEST_RESULT": "${{ needs.test.result }}",
+        "MINIMUM_RESULT": "${{ needs.minimum-dependencies.result }}",
+        "PACKAGE_RESULT": "${{ needs.package.result }}",
+    }
+    assert all(
+        f'test "${variable}" = "success"' in step["run"]
+        for variable in (
+            "QUALITY_RESULT",
+            "TEST_RESULT",
+            "MINIMUM_RESULT",
+            "PACKAGE_RESULT",
+        )
+    )
+
+
 def test_release_uses_oidc_trusted_publishing_without_static_credentials() -> None:
     workflow = _load_workflow("pythonpublish.yml")
     publish_job = workflow["jobs"]["publish"]

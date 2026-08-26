@@ -15,7 +15,7 @@
     <g stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6 7"><path d="M195 112V700"/><path d="M600 112V700"/><path d="M1005 112V700"/></g>
     <g font-size="15" fill="#334155">
       <path d="M195 142H590" stroke="#167a72" stroke-width="2.5" marker-end="url(#arrow)"/><text x="392" y="132" text-anchor="middle">1. GET /auth/govbr/login</text>
-      <rect x="486" y="166" width="228" height="58" rx="12" fill="#e6fffb" stroke="#5eead4"/><text x="600" y="190" text-anchor="middle" font-weight="700">state + nonce + PKCE</text><text x="600" y="211" text-anchor="middle">armazenados no backend</text>
+      <rect x="486" y="166" width="228" height="58" rx="12" fill="#e6fffb" stroke="#5eead4"/><text x="600" y="190" text-anchor="middle" font-weight="700">state + nonce + PKCE</text><text x="600" y="211" text-anchor="middle">cifrados no state</text>
       <path d="M590 252H205" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrowBack)"/><text x="398" y="242" text-anchor="middle">2. redirect /authorize</text>
       <path d="M195 290H995" stroke="#167a72" stroke-width="2.5" marker-end="url(#arrow)"/><text x="440" y="280" text-anchor="middle">3. login e consentimento</text>
       <path d="M995 326H205" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrowBack)"/><text x="750" y="316" text-anchor="middle">4. 302 Location: callback</text>
