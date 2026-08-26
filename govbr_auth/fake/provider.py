@@ -65,10 +65,9 @@ class FakeTokenRequest:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FakeAuthorizationSession:
-    """Return an opaque authorization request and selectable fake users."""
+    """Return the opaque authorization request carried by the browser."""
 
     request: SecretStr
-    users: tuple[FakeUser, ...]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -147,17 +146,16 @@ class FakeGovBrProvider:
         )
         return FakeAuthorizationSession(
             request=self._codec.encode_authorization_request(artifact),
-            users=self._user_store.list(),
         )
 
     def complete_authorization(
         self,
         *,
         session: FakeAuthorizationSession,
-        subject: str | None,
+        subject: str,
         now: datetime,
     ) -> FakeAuthorizationRedirect:
-        """Select a fake user and redirect the client with a short-lived code."""
+        """Complete authorization for one authenticated fake user."""
         request = self._decode_authorization_request(session.request, now=now)
         user = self._select_user(subject)
         code_artifact = AuthorizationCodeArtifact(
@@ -288,12 +286,7 @@ class FakeGovBrProvider:
             pass
         raise _oauth_error("invalid_token", _TOKEN_INVALID)
 
-    def _select_user(self, subject: str | None) -> FakeUser:
-        if subject is None:
-            users = self._user_store.list()
-            if len(users) != 1:
-                raise _oauth_error("invalid_request", _AUTHORIZATION_REQUEST_INVALID)
-            return users[0]
+    def _select_user(self, subject: str) -> FakeUser:
         user = self._user_store.get(subject)
         if user is None:
             raise _oauth_error("access_denied", _USER_DENIED)

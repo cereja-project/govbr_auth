@@ -2,7 +2,6 @@
 
 import json
 from datetime import UTC, datetime
-from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -31,23 +30,6 @@ from govbr_auth.fake import (
 FIXED_NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 
 
-class OpaqueRequestParser(HTMLParser):
-    """Extract the opaque authorization request from fake login HTML."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.request_artifact: str | None = None
-
-    def handle_starttag(
-        self,
-        tag: str,
-        attrs: list[tuple[str, str | None]],
-    ) -> None:
-        attributes = dict(attrs)
-        if tag == "input" and attributes.get("name") == "request":
-            self.request_artifact = attributes.get("value")
-
-
 def build_provider(
     *,
     settings: FakeGovBrSettings,
@@ -61,13 +43,6 @@ def build_provider(
         replay_store=InMemoryAuthorizationCodeReplayStore(),
         signing_key=signing_key,
     )
-
-
-def parse_request_artifact(document: str) -> str | None:
-    """Return the opaque browser request carried by the login form."""
-    parser = OpaqueRequestParser()
-    parser.feed(document)
-    return parser.request_artifact
 
 
 def oauth_values(location: str) -> dict[str, list[str]]:
@@ -134,9 +109,21 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
         clock_skew_seconds=0,
     )
     transactions = InMemoryTransactionStore(transaction_secret)
-    application_a = create_fake_govbr_app(provider_a, clock=lambda: FIXED_NOW)
-    application_b = create_fake_govbr_app(provider_b, clock=lambda: FIXED_NOW)
-    application_c = create_fake_govbr_app(provider_c, clock=lambda: FIXED_NOW)
+    application_a = create_fake_govbr_app(
+        provider_a,
+        automatic_subject=user.sub,
+        clock=lambda: FIXED_NOW,
+    )
+    application_b = create_fake_govbr_app(
+        provider_b,
+        automatic_subject=user.sub,
+        clock=lambda: FIXED_NOW,
+    )
+    application_c = create_fake_govbr_app(
+        provider_c,
+        automatic_subject=user.sub,
+        clock=lambda: FIXED_NOW,
+    )
 
     async with (
         httpx.AsyncClient(
@@ -165,12 +152,7 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
             .decode("utf-8")
         )
         authorize_response = await http_a.get(authorization.url)
-        request_artifact = parse_request_artifact(authorize_response.text)
-        login_response = await http_b.post(
-            "/login",
-            data={"request": request_artifact, "subject": user.sub},
-        )
-        redirect_values = oauth_values(login_response.headers["location"])
+        redirect_values = oauth_values(authorize_response.headers["location"])
         code = redirect_values["code"][0]
         result = await client.exchange_code(
             code=code,
@@ -198,8 +180,7 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
             data=token_form,
         )
 
-    assert authorize_response.status_code == 200
-    assert login_response.status_code == 302
+    assert authorize_response.status_code == 302
     assert result.id_token_claims["sub"] == user.sub
     assert result.id_token_claims["nonce"] == transaction_payload["nonce"]
     assert resolved_user.model_dump() == user.model_dump()

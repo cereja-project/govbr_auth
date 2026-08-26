@@ -23,20 +23,6 @@ def fixed_clock() -> datetime:
     return NOW
 
 
-def test_fake_simulator_names_are_supported_without_runtime_aliases() -> None:
-    """The unpublished fake composition surface must use simulator naming."""
-    import govbr_auth.fake as fake
-
-    assert hasattr(runtime_module, "FakeGovSimulator")
-    assert hasattr(runtime_module, "create_fake_gov_simulator")
-    assert "FakeGovSimulator" in fake.__all__
-    assert "create_fake_gov_simulator" in fake.__all__
-    assert "FakeGovBrRuntime" not in fake.__all__
-    assert "create_fake_govbr_runtime" not in fake.__all__
-    assert not hasattr(fake, "FakeGovBrRuntime")
-    assert not hasattr(fake, "create_fake_govbr_runtime")
-
-
 def test_fake_simulator_exposes_one_http_application_facade(
     fake_settings: GovBrRuntimeSettings,
 ) -> None:

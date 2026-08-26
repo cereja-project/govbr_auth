@@ -31,5 +31,7 @@ e use ``GovBrAuth``; as factories abaixo atendem topologias avançadas.
 .. py:function:: create_fake_govbr_app(runtime, *, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)
 
    Cria uma aplicação ASGI de provedor separado para uso avançado. Com
-   ``FakeGovBrProvider`` cru, ``credential_authenticator`` e ``application``
-   permitem composições manuais sem recriar o provider.
+   ``FakeGovBrProvider`` cru, passe ``credential_authenticator`` para login
+   interativo ou ``automatic_subject`` para automação. A composição falha sem
+   uma estratégia explícita. ``application`` permite fornecer uma fachada HTTP
+   própria sem recriar o provider.

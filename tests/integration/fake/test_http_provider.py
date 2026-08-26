@@ -2,7 +2,6 @@
 
 import base64
 import hashlib
-import html
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlsplit
@@ -37,13 +36,12 @@ CHALLENGE = (
 
 
 class LoginFormParser(HTMLParser):
-    """Extract the opaque request and selectable subjects from fake login HTML."""
+    """Extract the form action and opaque request from fake login HTML."""
 
     def __init__(self) -> None:
         super().__init__()
         self.action: str | None = None
         self.request_artifact: str | None = None
-        self.subjects: list[str] = []
 
     def handle_starttag(
         self,
@@ -55,10 +53,6 @@ class LoginFormParser(HTMLParser):
             self.action = attributes.get("action")
         if tag == "input" and attributes.get("name") == "request":
             self.request_artifact = attributes.get("value")
-        if tag == "button" and attributes.get("name") == "subject":
-            subject = attributes.get("value")
-            if subject is not None:
-                self.subjects.append(subject)
 
 
 class HiddenInputParser(HTMLParser):
@@ -155,15 +149,22 @@ def provider_factory(
     )
 
 
-def credential_repository() -> InMemoryFakeUserRepository:
+def credential_repository(
+    *,
+    subject: str = "12345678901",
+    name: str = "Ana Demo",
+    email: str = "ana@example.test",
+    email_verified: bool | None = None,
+) -> InMemoryFakeUserRepository:
     """Build a fake-user repository with Ana's local demo credentials."""
     return InMemoryFakeUserRepository(
         (
             (
                 FakeUser(
-                    sub="12345678901",
-                    name="Ana Demo",
-                    email="ana@example.test",
+                    sub=subject,
+                    name=name,
+                    email=email,
+                    email_verified=email_verified,
                 ),
                 SecretStr("ana-demo"),
             ),
@@ -275,8 +276,15 @@ def test_fake_fastapi_module_exposes_explicit_factories() -> None:
 def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> None:
     provider = provider_factory()
 
-    router = create_fake_govbr_router(provider, prefix="/local-provider")
-    application = create_fake_govbr_app(provider)
+    router = create_fake_govbr_router(
+        provider,
+        prefix="/local-provider",
+        automatic_subject="12345678900",
+    )
+    application = create_fake_govbr_app(
+        provider,
+        automatic_subject="12345678900",
+    )
 
     assert provider_route_paths(router) == {
         "/local-provider/authorize",
@@ -291,6 +299,56 @@ def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> N
         "/token",
         "/jwk",
         "/userinfo",
+    }
+
+
+@pytest.mark.parametrize(
+    "factory",
+    (
+        pytest.param(create_fake_govbr_router, id="router"),
+        pytest.param(create_fake_govbr_app, id="app"),
+    ),
+)
+def test_advanced_provider_requires_an_explicit_login_strategy(factory) -> None:
+    with pytest.raises(
+        ValueError, match="credential_authenticator or automatic_subject"
+    ):
+        factory(provider_factory())
+
+
+@pytest.mark.asyncio
+async def test_subject_only_login_is_not_an_interactive_authentication_strategy() -> (
+    None
+):
+    from govbr_auth.fake.provider import FakeAuthorizationRequest
+
+    provider = provider_factory()
+    application = create_fake_govbr_app(
+        provider,
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
+    session = provider.begin_authorization(
+        FakeAuthorizationRequest(**authorization_params()),
+        now=FIXED_NOW,
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://localhost",
+    ) as http:
+        response = await http.post(
+            "/login",
+            data={
+                "request": session.request.get_secret_value(),
+                "subject": "12345678900",
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "invalid_request",
+        "error_description": "The authorization request is invalid.",
     }
 
 
@@ -450,12 +508,14 @@ def test_simulator_factories_reject_divergent_http_application(factory) -> None:
 async def test_mounted_router_completes_http_flow_with_prefix_and_root_path() -> None:
     from fastapi import FastAPI
 
-    provider = provider_factory()
+    repository = credential_repository(subject="12345678900")
+    provider = provider_factory(user_store=repository)
     application = FastAPI(root_path="/gateway")
     application.include_router(
         create_fake_govbr_router(
             provider,
             prefix="/local-provider",
+            credential_authenticator=repository,
             clock=lambda: FIXED_NOW,
         )
     )
@@ -473,7 +533,8 @@ async def test_mounted_router_completes_http_flow_with_prefix_and_root_path() ->
             login_form.action.removeprefix("/gateway"),
             data={
                 "request": login_form.request_artifact,
-                "subject": "12345678900",
+                "cpf": "123.456.789-00",
+                "password": "ana-demo",
             },
         )
         redirect_values = oauth_values(login_response.headers["location"])
@@ -500,13 +561,16 @@ async def test_mounted_router_completes_http_flow_with_prefix_and_root_path() ->
 async def test_second_mounted_router_posts_authorization_to_its_own_provider() -> None:
     from fastapi import FastAPI
 
-    first_provider = provider_factory()
-    second_provider = provider_factory()
+    first_repository = credential_repository(subject="12345678900")
+    second_repository = credential_repository(subject="12345678900")
+    first_provider = provider_factory(user_store=first_repository)
+    second_provider = provider_factory(user_store=second_repository)
     application = FastAPI(root_path="/gateway")
     application.include_router(
         create_fake_govbr_router(
             first_provider,
             prefix="/first-provider",
+            credential_authenticator=first_repository,
             clock=lambda: FIXED_NOW,
         )
     )
@@ -514,6 +578,7 @@ async def test_second_mounted_router_posts_authorization_to_its_own_provider() -
         create_fake_govbr_router(
             second_provider,
             prefix="/second-provider",
+            credential_authenticator=second_repository,
             clock=lambda: FIXED_NOW,
         )
     )
@@ -531,7 +596,8 @@ async def test_second_mounted_router_posts_authorization_to_its_own_provider() -
             login_form.action.removeprefix("/gateway"),
             data={
                 "request": login_form.request_artifact,
-                "subject": "12345678900",
+                "cpf": "123.456.789-00",
+                "password": "ana-demo",
             },
         )
 
@@ -539,39 +605,6 @@ async def test_second_mounted_router_posts_authorization_to_its_own_provider() -
     assert login_form.action == "/gateway/second-provider/login"
     assert login_response.status_code == 302
     assert oauth_values(login_response.headers["location"])["state"] == ["state-123"]
-
-
-@pytest.mark.asyncio
-async def test_omitting_credential_authenticator_renders_escaped_subject_buttons() -> (
-    None
-):
-    malicious_subject = 'subject-<svg onload="alert(1)">'
-    malicious_name = 'Maria <img src=x onerror="alert(2)"> & "Teste"'
-    user = FakeUser(
-        sub=malicious_subject,
-        name=malicious_name,
-        email="maria@example.test",
-    )
-    application = create_fake_govbr_app(
-        provider_factory(user=user), clock=lambda: FIXED_NOW
-    )
-
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=application),
-        base_url="http://localhost",
-    ) as http:
-        response = await http.get("/authorize", params=authorization_params())
-
-    login_form = parse_login_form(response.text)
-    assert response.status_code == 200
-    assert "FAKE / SIMULAÇÃO" in response.text
-    assert html.escape(malicious_name, quote=True) in response.text
-    assert html.escape(malicious_subject, quote=True) in response.text
-    assert malicious_name not in response.text
-    assert malicious_subject not in response.text
-    assert "client-secret-marker" not in response.text
-    assert login_form.request_artifact is not None
-    assert login_form.subjects == [user.sub]
 
 
 @pytest.mark.asyncio
@@ -663,8 +696,18 @@ async def test_credential_login_returns_uniform_safe_401(
 
 @pytest.mark.asyncio
 async def test_interactive_flow_returns_exact_oauth_and_userinfo_contract() -> None:
-    provider = provider_factory()
-    application = create_fake_govbr_app(provider, clock=lambda: FIXED_NOW)
+    repository = credential_repository(
+        subject="12345678900",
+        name="Maria da Silva",
+        email="maria@example.test",
+        email_verified=True,
+    )
+    provider = provider_factory(user_store=repository)
+    application = create_fake_govbr_app(
+        provider,
+        credential_authenticator=repository,
+        clock=lambda: FIXED_NOW,
+    )
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=application),
@@ -676,7 +719,8 @@ async def test_interactive_flow_returns_exact_oauth_and_userinfo_contract() -> N
             "/login",
             data={
                 "request": login_form.request_artifact,
-                "subject": "12345678900",
+                "cpf": "123.456.789-00",
+                "password": "ana-demo",
             },
         )
         redirect_values = oauth_values(login_response.headers["location"])
@@ -802,7 +846,11 @@ async def test_automatic_flow_returns_same_oauth_and_userinfo_contract() -> None
 async def test_token_rejects_malformed_basic_without_echoing_header(
     authorization: str | None,
 ) -> None:
-    application = create_fake_govbr_app(provider_factory(), clock=lambda: FIXED_NOW)
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
     headers = {} if authorization is None else {"Authorization": authorization}
     sensitive_header = authorization or "absent-basic-header-marker"
 
@@ -847,7 +895,11 @@ async def test_token_rejects_malformed_basic_without_echoing_header(
 async def test_userinfo_rejects_malformed_bearer_without_echoing_header(
     authorization: str | None,
 ) -> None:
-    application = create_fake_govbr_app(provider_factory(), clock=lambda: FIXED_NOW)
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
     headers = {} if authorization is None else {"Authorization": authorization}
     sensitive_header = authorization or "absent-bearer-header-marker"
 
@@ -867,7 +919,11 @@ async def test_userinfo_rejects_malformed_bearer_without_echoing_header(
 
 @pytest.mark.asyncio
 async def test_missing_query_fields_return_safe_invalid_request() -> None:
-    application = create_fake_govbr_app(provider_factory(), clock=lambda: FIXED_NOW)
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=application),
@@ -889,7 +945,11 @@ async def test_missing_query_fields_return_safe_invalid_request() -> None:
 
 @pytest.mark.asyncio
 async def test_missing_form_fields_return_safe_invalid_request() -> None:
-    application = create_fake_govbr_app(provider_factory(), clock=lambda: FIXED_NOW)
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=application),
@@ -897,7 +957,7 @@ async def test_missing_form_fields_return_safe_invalid_request() -> None:
     ) as http:
         form_response = await http.post(
             "/login",
-            data={"subject": "sensitive-subject-marker"},
+            data={"cpf": "sensitive-cpf-marker"},
         )
 
     expected = {
@@ -906,12 +966,16 @@ async def test_missing_form_fields_return_safe_invalid_request() -> None:
     }
     assert form_response.status_code == 400
     assert form_response.json() == expected
-    assert "sensitive-subject-marker" not in form_response.text
+    assert "sensitive-cpf-marker" not in form_response.text
 
 
 @pytest.mark.asyncio
 async def test_authorize_provider_error_keeps_oauth_status_and_removes_values() -> None:
-    application = create_fake_govbr_app(provider_factory(), clock=lambda: FIXED_NOW)
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=application),
@@ -936,7 +1000,11 @@ async def test_authorize_provider_error_keeps_oauth_status_and_removes_values() 
 
 @pytest.mark.asyncio
 async def test_token_provider_error_keeps_oauth_status_and_removes_values() -> None:
-    application = create_fake_govbr_app(provider_factory(), clock=lambda: FIXED_NOW)
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=application),

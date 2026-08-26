@@ -106,42 +106,33 @@ class FakeGovHttpApplication:
 
     def login(self, values: Mapping[str, object]) -> LoginResult:
         if self._credential_authenticator is None:
-            parsed = required_text_values(values, ("request", "subject"))
-            if parsed is None:
-                raise FakeOAuthError(
-                    error="invalid_request",
-                    description=_AUTHORIZATION_REQUEST_INVALID,
-                )
-            subject = parsed["subject"]
-            request = parsed["request"]
-        else:
-            parsed = required_text_values(values, ("request", "cpf", "password"))
-            if parsed is None:
-                raise FakeOAuthError(
-                    error="invalid_request",
-                    description=_AUTHORIZATION_REQUEST_INVALID,
-                )
-            user = self._credential_authenticator.authenticate(
-                cpf=parsed["cpf"],
-                password=SecretStr(parsed["password"]),
+            raise FakeOAuthError(
+                error="invalid_request",
+                description=_AUTHORIZATION_REQUEST_INVALID,
             )
-            session = FakeAuthorizationSession(
-                request=SecretStr(parsed["request"]),
-                users=(),
+        parsed = required_text_values(values, ("request", "cpf", "password"))
+        if parsed is None:
+            raise FakeOAuthError(
+                error="invalid_request",
+                description=_AUTHORIZATION_REQUEST_INVALID,
             )
-            if user is None:
-                return LoginResult(
-                    session=session,
-                    redirect=None,
-                    invalid_credentials=True,
-                )
-            subject = user.sub
-            request = parsed["request"]
+        user = self._credential_authenticator.authenticate(
+            cpf=parsed["cpf"],
+            password=SecretStr(parsed["password"]),
+        )
+        session = FakeAuthorizationSession(
+            request=SecretStr(parsed["request"]),
+        )
+        if user is None:
+            return LoginResult(
+                session=session,
+                redirect=None,
+                invalid_credentials=True,
+            )
 
-        session = FakeAuthorizationSession(request=SecretStr(request), users=())
         redirect = self._provider.complete_authorization(
             session=session,
-            subject=subject,
+            subject=user.sub,
             now=self._clock(),
         )
         return LoginResult(session=session, redirect=redirect)

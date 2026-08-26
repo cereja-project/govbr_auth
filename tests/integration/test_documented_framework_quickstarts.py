@@ -49,7 +49,6 @@ def test_documented_framework_quickstart_is_executable(
     )
     environment = {
         **os.environ,
-        "GOVBR_FAKE_END_TO_END": "true",
         "GOVBR_FAKE_USERS_FILE": str(users),
         "GOVBR_PROVIDER": "fake",
         "PYTHONPATH": str(PROJECT_ROOT),

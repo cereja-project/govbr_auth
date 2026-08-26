@@ -7,7 +7,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonRes
 from django.urls import URLPattern, path
 from django.views.decorators.csrf import csrf_exempt
 
-from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
+from govbr_auth.fake._html import render_fake_login
 from govbr_auth.fake.http.application import (
     FakeGovHttpApplication,
     FakeHttpRuntime,
@@ -37,11 +37,10 @@ def create_fake_govbr_urlpatterns(
         if result.redirect is not None:
             return HttpResponseRedirect(result.redirect.redirect_uri)
         login_action = f"/{prefix}/login" if prefix else "/login"
-        if runtime.credential_authenticator is not None:
-            body = render_fake_login(result.session, login_action=login_action)
-        else:
-            body = render_fake_user_selection(result.session, login_action=login_action)
-        return HttpResponse(body, headers={"Cache-Control": "no-store"})
+        return HttpResponse(
+            render_fake_login(result.session, login_action=login_action),
+            headers={"Cache-Control": "no-store"},
+        )
 
     @csrf_exempt
     def login(request: HttpRequest) -> HttpResponse:

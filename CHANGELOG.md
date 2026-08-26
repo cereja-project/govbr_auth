@@ -21,6 +21,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Removed
 - Fachadas, módulos, exemplos e testes da implementação anterior à v1.
+- Formulário de compatibilidade que autenticava no FakeGov pela seleção direta de `subject`; fluxos interativos agora exigem CPF e senha fictícios.
 
 ### Security
 - Validação de `state`, PKCE, nonce, assinatura RS256/JWKS, issuer, audience e subject.

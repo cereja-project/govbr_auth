@@ -3,64 +3,31 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import tempfile
+import textwrap
 import venv
 
-_PROBE = r"""
+_FASTAPI_PROBE = r"""
 import asyncio
 from importlib.metadata import version
 from pathlib import Path
 import sys
 
 import httpx
-from django.conf import settings as django_settings
-from flask import Flask, jsonify
 
 import govbr_auth
-from govbr_auth.django import GovBrAuth as DjangoGovBrAuth
 from govbr_auth.fake.fastapi import create_fake_app
-from govbr_auth.flask import GovBrAuth as FlaskGovBrAuth
 from myapp import app as fastapi_app
 
 
 assert Path(govbr_auth.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
 assert govbr_auth.__version__ == version("govbr-auth")
-if not django_settings.configured:
-    django_settings.configure(
-        ALLOWED_HOSTS=["testserver"],
-        DEBUG=True,
-        ROOT_URLCONF=__name__,
-        SECRET_KEY="fake-local-only",
-    )
-import django
-django.setup()
-
-
-def django_success(context, request):
-    from django.http import JsonResponse
-    return JsonResponse({"authenticated": True})
-
-
-django_auth = DjangoGovBrAuth(on_success=django_success)
-urlpatterns = django_auth.urlpatterns
-assert urlpatterns
-
-
-flask_app = Flask(__name__)
-
-
-def flask_success(context, request):
-    return jsonify({"authenticated": True})
-
-
-flask_auth = FlaskGovBrAuth(on_success=flask_success)
-flask_auth.register(flask_app)
-assert any(rule.rule == "/auth/govbr/login" for rule in flask_app.url_map.iter_rules())
 
 
 async def verify_http_boundaries():
@@ -83,10 +50,25 @@ async def verify_http_boundaries():
 
 
 asyncio.run(verify_http_boundaries())
-django_auth.close()
-flask_auth.close()
 print(f"verified govbr-auth {govbr_auth.__version__} from {govbr_auth.__file__}")
 """
+
+
+@dataclass(frozen=True, slots=True)
+class DistributionProfile:
+    """Describe one documented installation that must work by itself."""
+
+    name: str
+    extras: tuple[str, ...]
+
+
+def distribution_profiles() -> tuple[DistributionProfile, ...]:
+    """Return the independently installed public adapter profiles."""
+    return (
+        DistributionProfile("fastapi", ("fastapi", "fake")),
+        DistributionProfile("django", ("django",)),
+        DistributionProfile("flask", ("flask",)),
+    )
 
 
 def _python_path(environment: Path) -> Path:
@@ -95,37 +77,58 @@ def _python_path(environment: Path) -> Path:
     return environment / "bin" / "python"
 
 
-def verify_distribution(wheel: Path, readme: Path) -> None:
-    """Install ``wheel`` with every adapter and execute consumer smokes."""
-    resolved_wheel = wheel.resolve(strict=True)
-    readme_source = readme.resolve(strict=True).read_text(encoding="utf-8")
-    quickstart = re.search(
+def _markdown_quickstart(source: str) -> str:
+    match = re.search(
         r"<!-- quickstart-fastapi:start -->\s*```python\s*(.*?)\s*```\s*"
         r"<!-- quickstart-fastapi:end -->",
-        readme_source,
+        source,
         re.DOTALL,
     )
-    if quickstart is None:
+    if match is None:
         raise ValueError("README FastAPI quickstart markers are missing")
+    return match.group(1).strip() + "\n"
+
+
+def _rst_quickstart(source: str, name: str) -> str:
+    start = f".. quickstart-{name}:start"
+    end = f".. quickstart-{name}:end"
+    if start not in source or end not in source:
+        raise ValueError(f"guide {name} quickstart markers are missing")
+    block = source.split(start, maxsplit=1)[1].split(end, maxsplit=1)[0]
+    if ".. code-block:: python" not in block:
+        raise ValueError(f"guide {name} quickstart code block is missing")
+    code = block.split(".. code-block:: python", maxsplit=1)[1]
+    return textwrap.dedent(code).strip() + "\n"
+
+
+def _install_profile(python: Path, wheel: Path, profile: DistributionProfile) -> None:
+    extras = ",".join(profile.extras)
+    subprocess.run(
+        [
+            str(python),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            f"{wheel}[{extras}]",
+        ],
+        check=True,
+    )
+    subprocess.run([str(python), "-m", "pip", "check"], check=True)
+
+
+def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
+    """Install each documented extra in isolation and execute its quickstart."""
+    resolved_wheel = wheel.resolve(strict=True)
+    readme_source = readme.resolve(strict=True).read_text(encoding="utf-8")
+    guide_source = guide.resolve(strict=True).read_text(encoding="utf-8")
+    snippets = {
+        "fastapi": _markdown_quickstart(readme_source),
+        "django": _rst_quickstart(guide_source, "django"),
+        "flask": _rst_quickstart(guide_source, "flask"),
+    }
     with tempfile.TemporaryDirectory(prefix="govbr-auth-wheel-") as directory:
         root = Path(directory)
-        environment = root / "venv"
-        venv.EnvBuilder(with_pip=True, clear=True).create(environment)
-        python = _python_path(environment)
-        subprocess.run(
-            [
-                str(python),
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                f"{resolved_wheel}[fastapi,django,flask,fake]",
-            ],
-            cwd=root,
-            check=True,
-        )
-        subprocess.run([str(python), "-m", "pip", "check"], cwd=root, check=True)
-
         users_file = root / "fake-users.json"
         users_file.write_text(
             json.dumps(
@@ -143,9 +146,6 @@ def verify_distribution(wheel: Path, readme: Path) -> None:
             ),
             encoding="utf-8",
         )
-        probe = root / "probe.py"
-        probe.write_text(_PROBE, encoding="utf-8")
-        (root / "myapp.py").write_text(quickstart.group(1), encoding="utf-8")
         child_environment = {
             **os.environ,
             "GOVBR_FAKE_END_TO_END": "true",
@@ -155,20 +155,59 @@ def verify_distribution(wheel: Path, readme: Path) -> None:
             "PYTHONPATH": "",
             "PYTHONUTF8": "1",
         }
-        subprocess.run(
-            [str(python), str(probe)],
-            cwd=root,
-            env=child_environment,
-            check=True,
-        )
+        for profile in distribution_profiles():
+            profile_root = root / profile.name
+            profile_root.mkdir()
+            environment = profile_root / "venv"
+            venv.EnvBuilder(with_pip=True, clear=True).create(environment)
+            python = _python_path(environment)
+            _install_profile(python, resolved_wheel, profile)
+            module_name = (
+                "myapp.py" if profile.name == "fastapi" else f"{profile.name}_app.py"
+            )
+            (profile_root / module_name).write_text(
+                snippets[profile.name],
+                encoding="utf-8",
+            )
+            if profile.name == "fastapi":
+                probe = profile_root / "probe.py"
+                probe.write_text(_FASTAPI_PROBE, encoding="utf-8")
+                command = (str(python), str(probe))
+            elif profile.name == "django":
+                command = (
+                    str(python),
+                    "-m",
+                    "django",
+                    "check",
+                    "--settings=django_app",
+                )
+            else:
+                command = (
+                    str(python),
+                    "-c",
+                    "from flask_app import app; "
+                    "assert any(rule.rule == '/auth/govbr/login' "
+                    "for rule in app.url_map.iter_rules())",
+                )
+            subprocess.run(
+                command,
+                cwd=profile_root,
+                env=child_environment,
+                check=True,
+            )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("wheel", type=Path)
     parser.add_argument("--readme", type=Path, default=Path("README.md"))
+    parser.add_argument(
+        "--guide",
+        type=Path,
+        default=Path("docs/guide/quick-start.rst"),
+    )
     arguments = parser.parse_args()
-    verify_distribution(arguments.wheel, arguments.readme)
+    verify_distribution(arguments.wheel, arguments.readme, arguments.guide)
 
 
 if __name__ == "__main__":

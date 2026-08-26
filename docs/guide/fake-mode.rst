@@ -156,8 +156,12 @@ topologias ASGI avançadas:
 O argumento ``application`` aceita uma ``FakeGovHttpApplication`` já composta.
 Com ``FakeGovSimulator``, omita esse argumento ou passe
 ``runtime.http_application`` para preservar a fachada canônica do simulador.
-Com ``FakeGovBrProvider`` cru, use ``credential_authenticator`` e
-``application`` para composições manuais.
+Com ``FakeGovBrProvider`` cru, declare a estratégia de login: passe
+``credential_authenticator`` para o fluxo interativo por CPF e senha, ou
+``automatic_subject`` somente para automação. A factory rejeita composições
+sem uma dessas estratégias. O argumento ``application`` permite substituir a
+fachada HTTP, mas não reativa o antigo formulário de seleção direta por
+``subject``.
 
 Os adapters públicos desta versão são FastAPI, Django e Flask. O store em memória rejeita replay
 de authorization code apenas na mesma instância; distribuição entre

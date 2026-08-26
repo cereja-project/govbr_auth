@@ -297,13 +297,11 @@ def test_provider_preserves_falsy_protocol_rules_injection(
     assert artifact.client_id == "injected-client"
 
 
-def test_begin_authorization_returns_opaque_session_and_available_users(
+def test_begin_authorization_returns_only_an_opaque_session(
     provider: FakeGovBrProvider,
-    user: FakeUser,
 ) -> None:
     result = provider.begin_authorization(_authorization_request(), now=NOW)
 
-    assert result.users == (user,)
     assert isinstance(result.request, SecretStr)
     assert result.request.get_secret_value() != "state-123"
 
@@ -327,16 +325,6 @@ def test_complete_authorization_returns_redirect_with_code_and_original_state(
         "code": [result.code.get_secret_value()],
         "state": ["state-123"],
     }
-
-
-def test_complete_authorization_selects_sole_user_automatically(
-    provider: FakeGovBrProvider,
-) -> None:
-    session = provider.begin_authorization(_authorization_request(), now=NOW)
-
-    result = provider.complete_authorization(session=session, subject=None, now=NOW)
-
-    assert isinstance(result.code, SecretStr)
 
 
 def test_exchange_code_returns_bound_tokens(

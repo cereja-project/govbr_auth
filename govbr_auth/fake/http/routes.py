@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException
 
-from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
+from govbr_auth.fake._html import render_fake_login
 from govbr_auth.fake.http.application import (
     FakeGovHttpApplication,
     FakeHttpRuntime,
@@ -33,7 +33,6 @@ def build_fake_govbr_routes(
     """Build the five protocol routes from a narrow runtime view."""
     if application is None:
         application = resolve_fake_http_application(runtime, clock=clock)
-    credential_authenticator = runtime.credential_authenticator
     router = APIRouter(prefix=runtime.prefix)
     login_route_name = f"fake_govbr_login_{id(router):x}"
 
@@ -50,13 +49,8 @@ def build_fake_govbr_routes(
             return RedirectResponse(result.redirect.redirect_uri, status_code=302)
 
         login_action = request.url_for(login_route_name).path
-        page = (
-            render_fake_login(result.session, login_action=login_action)
-            if credential_authenticator is not None
-            else render_fake_user_selection(result.session, login_action=login_action)
-        )
         return HTMLResponse(
-            page,
+            render_fake_login(result.session, login_action=login_action),
             headers={"Cache-Control": "no-store"},
         )
 

@@ -40,9 +40,9 @@ interno (``FakeGovHttpTransport``). Para composição avançada, o simulador can
 Aplicação Django
 ----------------
 
-Instale o adapter, o FakeGov e o servidor local::
+Instale o adapter Django; o provedor embutido não exige o launcher ASGI::
 
-    pip install "govbr-auth[django,fake]"
+    pip install "govbr-auth[django]"
 
 Salve ``django_app.py`` em um diretório vazio:
 
@@ -69,16 +69,15 @@ Salve ``django_app.py`` em um diretório vazio:
 Depois de criar ``fake-users.local.json`` como indicado abaixo, execute::
 
     $env:GOVBR_PROVIDER = "fake"
-    $env:GOVBR_FAKE_END_TO_END = "true"
     $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     python -m django runserver 127.0.0.1:8000 --settings=django_app
 
 Aplicação Flask
 ---------------
 
-Instale o adapter e o FakeGov::
+Instale o adapter Flask; o provedor embutido não exige o launcher ASGI::
 
-    pip install "govbr-auth[flask,fake]"
+    pip install "govbr-auth[flask]"
 
 Salve ``flask_app.py`` em um diretório vazio:
 
@@ -102,7 +101,6 @@ Salve ``flask_app.py`` em um diretório vazio:
 Depois de criar ``fake-users.local.json``, execute::
 
     $env:GOVBR_PROVIDER = "fake"
-    $env:GOVBR_FAKE_END_TO_END = "true"
     $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     $env:GOVBR_FAKE_PORT = "5000"
     flask --app flask_app:app run --port 5000

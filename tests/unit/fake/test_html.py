@@ -6,7 +6,7 @@ from govbr_auth.fake.provider import FakeAuthorizationSession
 
 def test_fake_login_has_accessible_native_fields_and_warning() -> None:
     page = render_fake_login(
-        FakeAuthorizationSession(request=SecretStr("opaque-request"), users=()),
+        FakeAuthorizationSession(request=SecretStr("opaque-request")),
         login_action="/fake-govbr/login",
     )
 
@@ -26,7 +26,7 @@ def test_fake_login_has_accessible_native_fields_and_warning() -> None:
 
 def test_fake_login_escapes_action_and_never_renders_password() -> None:
     page = render_fake_login(
-        FakeAuthorizationSession(request=SecretStr("opaque-request"), users=()),
+        FakeAuthorizationSession(request=SecretStr("opaque-request")),
         login_action='"><script>alert(1)</script>',
         invalid_credentials=True,
     )

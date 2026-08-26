@@ -5,7 +5,7 @@ from datetime import datetime
 
 from flask import Blueprint, Response, jsonify, redirect, request
 
-from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
+from govbr_auth.fake._html import render_fake_login
 from govbr_auth.fake.http.application import (
     FakeGovHttpApplication,
     FakeHttpRuntime,
@@ -36,11 +36,10 @@ def create_fake_govbr_blueprint(
         if result.redirect is not None:
             return redirect(result.redirect.redirect_uri)
         login_action = f"{runtime.prefix}/login" if runtime.prefix else "/login"
-        if runtime.credential_authenticator is not None:
-            body = render_fake_login(result.session, login_action=login_action)
-        else:
-            body = render_fake_user_selection(result.session, login_action=login_action)
-        return Response(body, headers={"Cache-Control": "no-store"})
+        return Response(
+            render_fake_login(result.session, login_action=login_action),
+            headers={"Cache-Control": "no-store"},
+        )
 
     @blueprint.post("/login")
     def login():

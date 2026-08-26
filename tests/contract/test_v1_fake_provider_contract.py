@@ -53,7 +53,6 @@ def test_fake_provider_request_field_names_are_stable() -> None:
 def test_fake_provider_result_field_names_are_stable() -> None:
     assert tuple(field.name for field in fields(FakeAuthorizationSession)) == (
         "request",
-        "users",
     )
     assert tuple(field.name for field in fields(FakeAuthorizationRedirect)) == (
         "redirect_uri",

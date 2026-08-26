@@ -64,6 +64,7 @@ def create_fake_govbr_router(
         prefix=prefix,
         credential_authenticator=credential_authenticator,
     )
+    _require_login_strategy(runtime, automatic_subject=automatic_subject)
     application = _resolve_http_application(
         runtime,
         application=application,
@@ -92,6 +93,7 @@ def create_fake_govbr_app(
         prefix=None if isinstance(runtime, FakeGovSimulator) else "",
         credential_authenticator=credential_authenticator,
     )
+    _require_login_strategy(runtime, automatic_subject=automatic_subject)
     http_application = _resolve_http_application(
         runtime,
         application=application,
@@ -204,3 +206,15 @@ def _resolve_http_application(
             raise ValueError("application does not match runtime HTTP application")
         return application
     return resolve_fake_http_application(runtime, clock=clock)
+
+
+def _require_login_strategy(
+    runtime: _FakeHttpRuntime,
+    *,
+    automatic_subject: str | None,
+) -> None:
+    if runtime.credential_authenticator is None and automatic_subject is None:
+        raise ValueError(
+            "advanced fake provider requires credential_authenticator or "
+            "automatic_subject"
+        )

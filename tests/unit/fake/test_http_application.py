@@ -24,7 +24,6 @@ class ProviderStub:
         self.user = FakeUser(sub="12345678900", name="Fake user", email="fake@test")
         self.session = FakeAuthorizationSession(
             request=SecretStr("opaque-request"),
-            users=(self.user,),
         )
 
     def begin_authorization(
@@ -36,7 +35,7 @@ class ProviderStub:
         self,
         *,
         session: FakeAuthorizationSession,
-        subject: str | None,
+        subject: str,
         now: datetime,
     ) -> FakeAuthorizationRedirect:
         return FakeAuthorizationRedirect(

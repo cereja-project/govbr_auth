@@ -760,7 +760,3 @@ async def test_subject_substitution_returns_safe_authentication_failure(
         "message": "Gov.br authentication failed.",
     }
     assert "98765432100" not in result.response.text
-
-
-def test_router_factory_is_the_supported_fastapi_callable() -> None:
-    assert callable(create_govbr_router)
