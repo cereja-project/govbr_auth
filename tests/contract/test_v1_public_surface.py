@@ -134,7 +134,7 @@ def test_base_dependencies_are_exactly_framework_neutral() -> None:
 def test_project_version_is_static_without_importing_runtime_dependencies() -> None:
     metadata = _project_metadata()
 
-    assert metadata["version"] == "1.0.0"
+    assert metadata["version"] == "1.0.0rc1"
     assert "dynamic" not in metadata
 
 
@@ -230,4 +230,4 @@ def test_built_distributions_contain_only_publishable_package_artifacts(
     wheel_roots = {entry.split("/", 1)[0] for entry in wheel_entries}
 
     assert invalid_entries == []
-    assert wheel_roots == {"govbr_auth", "govbr_auth-1.0.0.dist-info"}
+    assert wheel_roots == {"govbr_auth", "govbr_auth-1.0.0rc1.dist-info"}
