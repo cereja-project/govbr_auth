@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
 from govbr_auth.fake.http.application import (
+    FakeGovHttpApplication,
     FakeHttpRuntime,
     resolve_fake_http_application,
 )
@@ -21,9 +22,11 @@ def create_fake_govbr_urlpatterns(
     runtime: FakeHttpRuntime,
     *,
     clock: Callable[[], datetime],
+    application: FakeGovHttpApplication | None = None,
 ) -> list[URLPattern]:
     """Create Django provider routes from the neutral FakeGov application."""
-    application = resolve_fake_http_application(runtime, clock=clock)
+    if application is None:
+        application = resolve_fake_http_application(runtime, clock=clock)
     prefix = runtime.prefix.strip("/")
 
     def authorize(request: HttpRequest) -> HttpResponse:

@@ -7,6 +7,7 @@ from flask import Blueprint, Response, jsonify, redirect, request
 
 from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
 from govbr_auth.fake.http.application import (
+    FakeGovHttpApplication,
     FakeHttpRuntime,
     resolve_fake_http_application,
 )
@@ -19,9 +20,11 @@ def create_fake_govbr_blueprint(
     runtime: FakeHttpRuntime,
     *,
     clock: Callable[[], datetime],
+    application: FakeGovHttpApplication | None = None,
 ) -> Blueprint:
     """Create a Flask provider blueprint from the neutral FakeGov application."""
-    application = resolve_fake_http_application(runtime, clock=clock)
+    if application is None:
+        application = resolve_fake_http_application(runtime, clock=clock)
     blueprint = Blueprint("fake_govbr", __name__, url_prefix=runtime.prefix or "")
 
     @blueprint.get("/authorize")

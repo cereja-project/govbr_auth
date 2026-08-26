@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from datetime import UTC, datetime
 
+import pytest
 from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory
@@ -163,5 +164,40 @@ def test_django_fake_runtime_adds_provider_patterns_without_fastapi() -> None:
             "fake-govbr/jwk",
             "fake-govbr/userinfo",
         } <= paths
+    finally:
+        auth.close()
+
+
+def test_django_fake_runtime_passes_simulator_http_application_to_provider_patterns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import govbr_auth.django as django_adapter
+    from govbr_auth.django import GovBrAuth
+
+    mounted: list[tuple[object, object, object]] = []
+
+    def create_patterns(runtime, *, application, clock):
+        mounted.append((runtime, application, clock))
+        return []
+
+    monkeypatch.setattr(
+        django_adapter,
+        "create_fake_govbr_urlpatterns",
+        create_patterns,
+    )
+
+    auth = GovBrAuth(
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    try:
+        runtime = auth._owner.runtime.fake
+        assert runtime is not None
+        assert mounted == [(runtime, runtime.http_application, auth._clock)]
     finally:
         auth.close()

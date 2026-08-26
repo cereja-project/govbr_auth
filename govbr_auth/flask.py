@@ -68,12 +68,14 @@ class GovBrAuth:
             expose_tokens=expose_tokens,
         )
         self._blueprint = self._build_blueprint(prefix)
+        fake_runtime = self._owner.runtime.fake
         self._fake_blueprint = (
             create_fake_govbr_blueprint(
-                self._owner.runtime.fake,
+                fake_runtime,
+                application=fake_runtime.http_application,
                 clock=self._clock,
             )
-            if self._owner.runtime.fake is not None
+            if fake_runtime is not None
             else None
         )
 

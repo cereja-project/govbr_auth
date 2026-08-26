@@ -10,6 +10,7 @@ from starlette.formparsers import MultiPartException
 
 from govbr_auth.fake._html import render_fake_login, render_fake_user_selection
 from govbr_auth.fake.http.application import (
+    FakeGovHttpApplication,
     FakeHttpRuntime,
     resolve_fake_http_application,
 )
@@ -27,9 +28,11 @@ def build_fake_govbr_routes(
     *,
     automatic_subject: str | None,
     clock: Callable[[], datetime],
+    application: FakeGovHttpApplication | None = None,
 ) -> APIRouter:
     """Build the five protocol routes from a narrow runtime view."""
-    application = resolve_fake_http_application(runtime, clock=clock)
+    if application is None:
+        application = resolve_fake_http_application(runtime, clock=clock)
     credential_authenticator = runtime.credential_authenticator
     router = APIRouter(prefix=runtime.prefix)
     login_route_name = f"fake_govbr_login_{id(router):x}"

@@ -10,6 +10,11 @@ import httpx
 from fastapi import APIRouter, FastAPI
 
 from govbr_auth.fake.http.routes import build_fake_govbr_routes
+from govbr_auth.fake.http.application import (
+    FakeGovHttpApplication,
+    resolve_fake_http_application,
+)
+from govbr_auth.fake.http.transport import FakeGovHttpTransport
 from govbr_auth.fake.credentials import FakeCredentialAuthenticator
 from govbr_auth.fake.provider import FakeGovBrProvider
 from govbr_auth.fake.runtime import (
@@ -48,6 +53,7 @@ def create_fake_govbr_router(
     runtime: FakeGovSimulator | FakeGovBrProvider,
     *,
     prefix: str | None = None,
+    application: FakeGovHttpApplication | None = None,
     credential_authenticator: FakeCredentialAuthenticator | None = None,
     automatic_subject: str | None = None,
     clock: Callable[[], datetime] = utc_now,
@@ -58,35 +64,48 @@ def create_fake_govbr_router(
         prefix=prefix,
         credential_authenticator=credential_authenticator,
     )
+    application = _resolve_http_application(
+        runtime,
+        application=application,
+        clock=clock,
+    )
     return build_fake_govbr_routes(
         runtime,
         automatic_subject=automatic_subject,
         clock=clock,
+        application=application,
     )
 
 
 def create_fake_govbr_app(
     runtime: FakeGovSimulator | FakeGovBrProvider,
     *,
+    application: FakeGovHttpApplication | None = None,
     credential_authenticator: FakeCredentialAuthenticator | None = None,
     automatic_subject: str | None = None,
     clock: Callable[[], datetime] = utc_now,
 ) -> FastAPI:
     """Create a standalone ASGI fake provider with routes at the application root."""
-    application = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    fastapi_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     runtime = _as_http_runtime(
         runtime,
         prefix=None if isinstance(runtime, FakeGovSimulator) else "",
         credential_authenticator=credential_authenticator,
     )
-    application.include_router(
+    http_application = _resolve_http_application(
+        runtime,
+        application=application,
+        clock=clock,
+    )
+    fastapi_app.include_router(
         build_fake_govbr_routes(
             runtime,
             automatic_subject=automatic_subject,
             clock=clock,
+            application=http_application,
         )
     )
-    return application
+    return fastapi_app
 
 
 def create_fake_app(
@@ -105,7 +124,11 @@ def create_fake_app(
             clock=clock,
             user_repository=user_repository,
         )
-        return create_fake_govbr_app(runtime, clock=clock)
+        return create_fake_govbr_app(
+            runtime,
+            application=runtime.http_application,
+            clock=clock,
+        )
 
     runtime = create_govbr_runtime(
         resolved_settings,
@@ -140,10 +163,8 @@ def _fake_asgi_transport(
     *,
     clock: Callable[[], datetime],
 ) -> httpx.AsyncBaseTransport:
-    """Host the exact mounted provider routes used by the consumer runtime."""
-    provider_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    provider_app.include_router(create_fake_govbr_router(runtime, clock=clock))
-    return httpx.ASGITransport(app=provider_app)
+    """Serve provider calls through the simulator-owned neutral facade."""
+    return FakeGovHttpTransport(runtime, clock=clock)
 
 
 def _launcher_settings() -> GovBrRuntimeSettings:
@@ -175,3 +196,14 @@ def _as_http_runtime(
         credential_authenticator=credential_authenticator,
         prefix="/fake-govbr" if prefix is None else prefix,
     )
+
+
+def _resolve_http_application(
+    runtime: _FakeHttpRuntime,
+    *,
+    application: FakeGovHttpApplication | None,
+    clock: Callable[[], datetime],
+) -> FakeGovHttpApplication:
+    if application is not None:
+        return application
+    return resolve_fake_http_application(runtime, clock=clock)
