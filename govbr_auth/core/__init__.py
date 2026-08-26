@@ -11,7 +11,7 @@ from govbr_auth.core.errors import (
 from govbr_auth.core.models import AuthTransaction, GovBrAddress, GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
 from govbr_auth.core.token_validation import IdTokenValidator
-from govbr_auth.core.transactions import InMemoryTransactionStore, TransactionStore
+from govbr_auth.core.transactions import EncryptedTransactionCodec, TransactionCodec
 
 __all__ = (
     "AuthenticationResult",
@@ -25,10 +25,10 @@ __all__ = (
     "GovBrSettings",
     "GovBrUser",
     "IdTokenValidator",
-    "InMemoryTransactionStore",
+    "EncryptedTransactionCodec",
     "InvalidIdTokenError",
     "InvalidStateError",
     "ProviderEnvironment",
     "TokenSet",
-    "TransactionStore",
+    "TransactionCodec",
 )

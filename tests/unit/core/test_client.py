@@ -39,13 +39,13 @@ class RecordingTransactionStore:
             issued_at=FIXED_NOW,
             expires_at=FIXED_NOW + timedelta(minutes=5),
         )
-        self.consume_calls: list[tuple[str, datetime]] = []
+        self.decode_calls: list[tuple[str, datetime]] = []
 
-    def create(self, *, now: datetime) -> tuple[str, AuthTransaction]:
+    def issue(self, *, now: datetime) -> tuple[str, AuthTransaction]:
         return SENSITIVE_STATE, self.transaction
 
-    def consume(self, state: str, *, now: datetime) -> AuthTransaction:
-        self.consume_calls.append((state, now))
+    def decode(self, state: str, *, now: datetime) -> AuthTransaction:
+        self.decode_calls.append((state, now))
         return self.transaction
 
 
@@ -144,7 +144,7 @@ def _assert_safe_cause(
 
 
 @pytest.mark.asyncio
-async def test_exchange_code_returns_tokens_and_claims_after_single_state_consumption(
+async def test_exchange_code_returns_tokens_and_claims_after_state_decoding(
     settings: GovBrSettings,
 ) -> None:
     requests: list[httpx.Request] = []
@@ -172,7 +172,7 @@ async def test_exchange_code_returns_tokens_and_claims_after_single_state_consum
         "sub": "12345678900",
         "nonce": "sensitive-expected-nonce",
     }
-    assert transactions.consume_calls == [(SENSITIVE_STATE, FIXED_NOW)]
+    assert transactions.decode_calls == [(SENSITIVE_STATE, FIXED_NOW)]
     validated_token, validated_nonce, validated_jwks, validated_now = validator.calls[0]
     assert validated_token.get_secret_value() == SENSITIVE_ID_TOKEN
     assert validated_nonce.get_secret_value() == "sensitive-expected-nonce"
@@ -868,7 +868,7 @@ async def test_exchange_code_rejects_missing_token_fields(
 
 
 @pytest.mark.asyncio
-async def test_exchange_code_propagates_invalid_id_token_after_consuming_state_once(
+async def test_exchange_code_propagates_invalid_id_token_after_state_decoding(
     settings: GovBrSettings,
 ) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
@@ -893,5 +893,5 @@ async def test_exchange_code_propagates_invalid_id_token_after_consuming_state_o
                 now=FIXED_NOW,
             )
 
-    assert transactions.consume_calls == [(SENSITIVE_STATE, FIXED_NOW)]
+    assert transactions.decode_calls == [(SENSITIVE_STATE, FIXED_NOW)]
     _assert_error_is_sanitized(error.value)

@@ -11,7 +11,7 @@ from govbr_auth.authentication import AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.core.token_validation import IdTokenValidator
-from govbr_auth.core.transactions import InMemoryTransactionStore
+from govbr_auth.core.transactions import EncryptedTransactionCodec
 from govbr_auth.fastapi import create_govbr_router
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings, create_govbr_runtime
 
@@ -40,8 +40,8 @@ def test_official_and_fake_runtime_share_the_same_consumer_stack() -> None:
 
     assert type(official.client) is GovBrClient
     assert type(fake.client) is GovBrClient
-    assert type(official.client._transactions) is InMemoryTransactionStore
-    assert type(fake.client._transactions) is InMemoryTransactionStore
+    assert type(official.client._transactions) is EncryptedTransactionCodec
+    assert type(fake.client._transactions) is EncryptedTransactionCodec
     assert type(official.client._validator) is IdTokenValidator
     assert type(fake.client._validator) is IdTokenValidator
     assert len(official_service) == 1

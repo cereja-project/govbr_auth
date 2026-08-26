@@ -61,12 +61,12 @@ def test_core_exports_exact_async_v1_surface() -> None:
         "GovBrSettings",
         "GovBrUser",
         "IdTokenValidator",
-        "InMemoryTransactionStore",
+        "EncryptedTransactionCodec",
         "InvalidIdTokenError",
         "InvalidStateError",
         "ProviderEnvironment",
         "TokenSet",
-        "TransactionStore",
+        "TransactionCodec",
     )
 
 

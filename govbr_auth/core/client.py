@@ -19,7 +19,7 @@ from govbr_auth.core.decoders import decode_jwks, decode_tokens, decode_userinfo
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.core.token_validation import IdTokenValidator
-from govbr_auth.core.transactions import TransactionStore
+from govbr_auth.core.transactions import TransactionCodec
 from govbr_auth.core.transport import GovBrHttpTransport
 
 _OAUTH_REJECTION_MESSAGE = "Gov.br rejected the authorization code"
@@ -54,7 +54,7 @@ class GovBrClient:
     def __init__(
         self,
         settings: GovBrSettings,
-        transactions: TransactionStore,
+        transactions: TransactionCodec,
         validator: IdTokenValidator,
         http: httpx.AsyncClient,
     ) -> None:
@@ -67,7 +67,7 @@ class GovBrClient:
         self._authorization = AuthorizationBuilder(settings, transactions)
 
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
-        """Create an authorization request bound to a stored transaction."""
+        """Create an authorization request bound to a protected transaction."""
         return self._authorization.build(now=now)
 
     async def exchange_code(
@@ -78,7 +78,7 @@ class GovBrClient:
         now: datetime,
     ) -> AuthenticationResult:
         """Exchange a one-time authorization transaction for validated tokens."""
-        transaction = self._transactions.consume(state, now=now)
+        transaction = self._transactions.decode(state, now=now)
         form = {
             "grant_type": "authorization_code",
             "code": code,

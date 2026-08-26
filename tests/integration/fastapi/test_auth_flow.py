@@ -26,7 +26,7 @@ from govbr_auth.core import (
     GovBrClient,
     GovBrSettings,
     IdTokenValidator,
-    InMemoryTransactionStore,
+    EncryptedTransactionCodec,
     ProviderEnvironment,
 )
 from govbr_auth.fake import (
@@ -75,7 +75,7 @@ def build_runtime(
     http = httpx.AsyncClient(transport=transport)
     client = GovBrClient(
         settings,
-        InMemoryTransactionStore(settings.transaction_secret),
+        EncryptedTransactionCodec(settings.transaction_secret),
         IdTokenValidator(settings=settings),
         http,
     )
@@ -697,16 +697,18 @@ async def test_expired_state_returns_safe_bad_request(
 
 
 @pytest.mark.asyncio
-async def test_state_replay_returns_safe_bad_request(browser: OAuthBrowser) -> None:
+async def test_authorization_code_replay_returns_safe_provider_rejection(
+    browser: OAuthBrowser,
+) -> None:
     result = await browser.authenticate()
 
     replay_response = await browser.callback(result.callback_location)
 
     assert result.response.status_code == 200
-    assert replay_response.status_code == 400
+    assert replay_response.status_code == 502
     assert replay_response.json() == {
-        "error": "invalid_state",
-        "message": "The authorization request is invalid or expired.",
+        "error": "provider_rejected",
+        "message": "Gov.br rejected the request.",
     }
     replayed_state = parse_qs(urlsplit(result.callback_location).query)["state"][0]
     assert replayed_state not in replay_response.text

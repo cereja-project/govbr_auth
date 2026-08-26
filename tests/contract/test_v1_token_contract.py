@@ -15,13 +15,13 @@ from govbr_auth.core.settings import GovBrSettings
 FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 
 
-class ContractTransactionStore:
+class ContractTransactionCodec:
     """Expose fixed PKCE and nonce inputs for the token request contract."""
 
-    def create(self, *, now: datetime) -> tuple[str, AuthTransaction]:
+    def issue(self, *, now: datetime) -> tuple[str, AuthTransaction]:
         return "contract-state", self._transaction(now)
 
-    def consume(self, state: str, *, now: datetime) -> AuthTransaction:
+    def decode(self, state: str, *, now: datetime) -> AuthTransaction:
         return self._transaction(now)
 
     @staticmethod
@@ -82,7 +82,7 @@ async def test_exchange_code_preserves_token_wire_contract() -> None:
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
         client = GovBrClient(
             settings,
-            ContractTransactionStore(),
+            ContractTransactionCodec(),
             ContractIdTokenValidator(),
             http,
         )

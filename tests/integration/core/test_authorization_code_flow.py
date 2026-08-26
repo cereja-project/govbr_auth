@@ -17,7 +17,7 @@ from govbr_auth.core import (
     GovBrClient,
     GovBrSettings,
     IdTokenValidator,
-    InMemoryTransactionStore,
+    EncryptedTransactionCodec,
     InvalidIdTokenError,
     ProviderEnvironment,
 )
@@ -64,7 +64,7 @@ async def core_client(
         base_url=provider.base_url,
     ) as http:
         validator = IdTokenValidator(settings=settings)
-        transactions = InMemoryTransactionStore(settings.transaction_secret)
+        transactions = EncryptedTransactionCodec(settings.transaction_secret)
         yield GovBrClient(settings, transactions, validator, http)
 
 
@@ -187,10 +187,10 @@ def test_core_exports_exact_async_v1_public_api() -> None:
         "GovBrSettings",
         "GovBrUser",
         "IdTokenValidator",
-        "InMemoryTransactionStore",
+        "EncryptedTransactionCodec",
         "InvalidIdTokenError",
         "InvalidStateError",
         "ProviderEnvironment",
         "TokenSet",
-        "TransactionStore",
+        "TransactionCodec",
     )

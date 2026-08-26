@@ -13,7 +13,7 @@ from govbr_auth.core import (
     GovBrClient,
     GovBrSettings,
     IdTokenValidator,
-    InMemoryTransactionStore,
+    EncryptedTransactionCodec,
     ProviderEnvironment,
 )
 from govbr_auth.fake import (
@@ -51,10 +51,10 @@ def oauth_values(location: str) -> dict[str, list[str]]:
 
 
 @pytest.mark.asyncio
-async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_documented_fake_only_replay_limitation() -> (
+async def test_distributed_flow_uses_independent_consumers_and_documents_fake_provider_replay_limitation() -> (
     None
 ):
-    """Document that fake cross-instance replay is not shared without a replay store."""
+    """Complete a cross-instance consumer flow and document fake replay limits."""
     artifact_secret = SecretStr(Fernet.generate_key().decode("ascii"))
     signing_key = FakeSigningKey.generate(kid="shared-fake-provider-key")
     user = FakeUser(
@@ -108,7 +108,6 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
         jwks_url="http://localhost/jwk",
         clock_skew_seconds=0,
     )
-    transactions = InMemoryTransactionStore(transaction_secret)
     application_a = create_fake_govbr_app(
         provider_a,
         automatic_subject=user.sub,
@@ -139,13 +138,19 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
             base_url="http://localhost",
         ) as http_c,
     ):
-        client = GovBrClient(
+        issuer_client = GovBrClient(
             consumer_settings,
-            transactions,
+            EncryptedTransactionCodec(transaction_secret),
+            IdTokenValidator(settings=consumer_settings),
+            http_a,
+        )
+        callback_client = GovBrClient(
+            consumer_settings,
+            EncryptedTransactionCodec(transaction_secret),
             IdTokenValidator(settings=consumer_settings),
             http_b,
         )
-        authorization = client.authorization_url(now=FIXED_NOW)
+        authorization = issuer_client.authorization_url(now=FIXED_NOW)
         transaction_payload = json.loads(
             Fernet(transaction_secret.get_secret_value().encode("ascii"))
             .decrypt(authorization.state.encode("ascii"))
@@ -154,12 +159,12 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
         authorize_response = await http_a.get(authorization.url)
         redirect_values = oauth_values(authorize_response.headers["location"])
         code = redirect_values["code"][0]
-        result = await client.exchange_code(
+        result = await callback_client.exchange_code(
             code=code,
             state=redirect_values["state"][0],
             now=FIXED_NOW,
         )
-        resolved_user = await client.userinfo(
+        resolved_user = await callback_client.userinfo(
             result.tokens.access_token,
             expected_subject=result.id_token_claims["sub"],
         )
@@ -167,7 +172,7 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": "http://localhost/callback",
-            "code_verifier": transaction_payload["code_verifier"],
+            "code_verifier": transaction_payload["transaction"]["code_verifier"],
         }
         replay_on_b = await http_b.post(
             "/token",
@@ -182,7 +187,9 @@ async def test_distributed_flow_accepts_consumed_code_on_fresh_provider_due_to_d
 
     assert authorize_response.status_code == 302
     assert result.id_token_claims["sub"] == user.sub
-    assert result.id_token_claims["nonce"] == transaction_payload["nonce"]
+    assert (
+        result.id_token_claims["nonce"] == transaction_payload["transaction"]["nonce"]
+    )
     assert resolved_user.model_dump() == user.model_dump()
     assert replay_on_b.status_code == 400
     assert replay_on_b.json() == {

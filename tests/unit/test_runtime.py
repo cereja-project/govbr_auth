@@ -13,7 +13,7 @@ import govbr_auth.runtime as runtime_module
 from govbr_auth.authentication import AuthenticationService
 from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.core.token_validation import IdTokenValidator
-from govbr_auth.core.transactions import InMemoryTransactionStore
+from govbr_auth.core.transactions import EncryptedTransactionCodec
 from govbr_auth.fastapi import create_govbr_router
 from govbr_auth.runtime import (
     GovBrClient,
@@ -291,7 +291,7 @@ def test_official_runtime_keeps_one_consumer_authentication_stack(
     services = _route_authentication_services(router)
 
     assert type(runtime.client) is GovBrClient
-    assert type(runtime.client._transactions) is InMemoryTransactionStore
+    assert type(runtime.client._transactions) is EncryptedTransactionCodec
     assert type(runtime.client._validator) is IdTokenValidator
     assert len(services) == 1
     assert type(services[0]) is AuthenticationService
