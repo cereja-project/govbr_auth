@@ -17,9 +17,11 @@ somente a composição selecionada pela configuração muda.
 Usar FakeGov no meu app
 -----------------------
 
-Instale::
+Instale o extra exato para o adapter e o fluxo que você vai executar::
 
-    pip install "govbr-auth[fake]"
+    pip install "govbr-auth[fastapi,fake]"   # FastAPI com rotas fake locais e launcher
+    pip install "govbr-auth[django]"         # Django com provedor fake montado no app
+    pip install "govbr-auth[flask]"          # Flask com provedor fake montado no app
 
 Monte a fachada do adaptador na API:
 
@@ -39,7 +41,15 @@ Monte a fachada do adaptador na API:
 Inicie a API com ``GOVBR_PROVIDER=fake``. O frontend da aplicação continua
 chamando a API normalmente. A biblioteca monta as rotas do FakeGov junto ao
 adaptador e usa transporte ASGI em memória para as chamadas de backend; o
-código da aplicação não precisa criar factories do provedor.
+código da aplicação não precisa criar factories do provedor. O app continua no
+mesmo runtime consumidor; a configuração fake troca apenas os endpoints do
+provedor e o transporte HTTP interno.
+
+Para os adapters síncronos suportados, mantenha a mesma lógica de consumo e
+troque apenas o extra de instalação e a montagem do adapter:
+
+- Django: ``from govbr_auth.django import GovBrAuth`` e ``urlpatterns = auth.urlpatterns``
+- Flask: ``from govbr_auth.flask import GovBrAuth`` e ``auth.register(app)``
 
 O fluxo completo entre frontend, API, FakeGov e runtime está em
 :doc:`communication-flow`.

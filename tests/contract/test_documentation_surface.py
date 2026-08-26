@@ -118,6 +118,7 @@ def test_entry_docs_describe_fakegov_as_provider_facade_with_canonical_public_na
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "api" / "fastapi.rst").read_text(encoding="utf-8"),
         (DOCS_ROOT / "api" / "django.rst").read_text(encoding="utf-8"),
         (DOCS_ROOT / "api" / "flask.rst").read_text(encoding="utf-8"),
     )
@@ -131,6 +132,30 @@ def test_entry_docs_describe_fakegov_as_provider_facade_with_canonical_public_na
     assert (
         "troca apenas os endpoints do provedor e o transporte HTTP interno" in combined
     )
+
+
+def test_fastapi_api_doc_describes_the_fakegov_provider_facade_surface() -> None:
+    source = re.sub(
+        r"\s+",
+        " ",
+        (DOCS_ROOT / "api" / "fastapi.rst").read_text(encoding="utf-8"),
+    )
+
+    assert "FakeGovSimulator" in source
+    assert "create_fake_gov_simulator" in source
+    assert "FakeGovBrRuntime" not in source
+    assert "create_fake_govbr_runtime" not in source
+    assert "mesmo runtime consumidor" in source
+    assert "troca apenas os endpoints do provedor e o transporte HTTP interno" in source
+
+
+def test_fake_mode_guide_documents_the_supported_installation_matrix() -> None:
+    source = (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8")
+
+    assert 'pip install "govbr-auth[fastapi,fake]"' in source
+    assert 'pip install "govbr-auth[django]"' in source
+    assert 'pip install "govbr-auth[flask]"' in source
+    assert 'pip install "govbr-auth[fake]"' not in source
 
 
 def test_installable_fake_command_is_an_exact_line_in_every_instruction() -> None:
@@ -185,14 +210,12 @@ def test_fake_credentials_journey_is_documented_in_every_entry_guide(
         '"cpf"',
         '"password"',
         "não use credenciais reais",
-        'pip install "govbr-auth[fake]"',
         "python -m govbr_auth.fake",
     )
 
     source = document.read_text(encoding="utf-8")
 
     assert tuple(guidance in source for guidance in required_guidance) == (
-        True,
         True,
         True,
         True,

@@ -14,7 +14,12 @@ Uso comum:
 
    Fachada que compõe o runtime selecionado e expõe ``router`` para montagem.
    ``settings`` e ``runtime`` são mutuamente exclusivos. ``user_repository``
-   aceita um ``govbr_auth.fake.FakeUserRepository`` com o provedor fake.
+   aceita um ``govbr_auth.fake.FakeUserRepository`` com o provedor fake. Em
+   modo fake, o consumidor continua no mesmo runtime consumidor; a
+   configuração troca apenas os endpoints do provedor e o transporte HTTP
+   interno. Para composição avançada, o simulador canônico é
+   ``govbr_auth.fake.FakeGovSimulator``, criado por
+   ``govbr_auth.fake.create_fake_gov_simulator``.
 
 .. py:class:: AuthContext
 
