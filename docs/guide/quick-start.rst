@@ -40,14 +40,23 @@ interno (``FakeGovHttpTransport``). Para composição avançada, o simulador can
 Aplicação Django
 ----------------
 
-Instale o adapter correspondente e inclua as URLs na aplicação Django::
+Instale o adapter, o FakeGov e o servidor local::
 
-    pip install "govbr-auth[django]"
+    pip install "govbr-auth[django,fake]"
+
+Salve ``django_app.py`` em um diretório vazio:
+
+.. quickstart-django:start
 
 .. code-block:: python
 
     from django.http import JsonResponse
     from govbr_auth.django import GovBrAuth
+
+    SECRET_KEY = "fake-local-only"
+    DEBUG = True
+    ALLOWED_HOSTS = ["127.0.0.1"]
+    ROOT_URLCONF = __name__
 
     def authenticated(context, request):
         return JsonResponse({"authenticated": True})
@@ -55,18 +64,25 @@ Instale o adapter correspondente e inclua as URLs na aplicação Django::
     auth = GovBrAuth(on_success=authenticated)
     urlpatterns = auth.urlpatterns
 
-Para iniciar este exemplo em modo fake, a partir da raiz do repositório::
+.. quickstart-django:end
+
+Depois de criar ``fake-users.local.json`` como indicado abaixo, execute::
 
     $env:GOVBR_PROVIDER = "fake"
     $env:GOVBR_FAKE_END_TO_END = "true"
-    python -m django runserver 127.0.0.1:8000 --settings=examples.django_settings
+    $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
+    python -m django runserver 127.0.0.1:8000 --settings=django_app
 
 Aplicação Flask
 ---------------
 
-No Flask, registre o adapter na aplicação hospedeira::
+Instale o adapter e o FakeGov::
 
-    pip install "govbr-auth[flask]"
+    pip install "govbr-auth[flask,fake]"
+
+Salve ``flask_app.py`` em um diretório vazio:
+
+.. quickstart-flask:start
 
 .. code-block:: python
 
@@ -81,12 +97,15 @@ No Flask, registre o adapter na aplicação hospedeira::
     auth = GovBrAuth(on_success=authenticated)
     auth.register(app)
 
-Inicie o exemplo em modo fake::
+.. quickstart-flask:end
+
+Depois de criar ``fake-users.local.json``, execute::
 
     $env:GOVBR_PROVIDER = "fake"
     $env:GOVBR_FAKE_END_TO_END = "true"
+    $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     $env:GOVBR_FAKE_PORT = "5000"
-    flask --app examples.example_flask:create_app run --port 5000
+    flask --app flask_app:app run --port 5000
 
 No fluxo fake, use somente credenciais fictícias configuradas para o ambiente
 local. As respostas públicas do app e do launcher não exibem CPF, senha,

@@ -15,4 +15,3 @@ def run_sync(factory: Callable[[], Awaitable[T]]) -> T:
     loop, which prevents a synchronous adapter from silently blocking it.
     """
     return async_to_sync(factory)()
-

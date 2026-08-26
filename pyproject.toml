@@ -1,6 +1,6 @@
 [project]
 name = "govbr-auth"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "Engine de autenticação Gov.br com adapters opcionais para FastAPI, Django e Flask."
 authors = [
     { name="Joab Leite", email="leitejoab@gmail.com" }
@@ -9,20 +9,35 @@ readme = "README.md"
 license = "MIT"
 keywords = ["gov.br", "autenticação", "fastapi", "django", "flask", "oauth2", "openid-connect"]
 requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Framework :: Django",
+    "Framework :: FastAPI",
+    "Framework :: Flask",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security",
+]
 
 dependencies = [
-    "httpx",
+    "httpx>=0.27,<1",
     "PyJWT>=2.13,<3",
-    "cryptography",
-    "python-dotenv",
+    "cryptography>=42,<51",
+    "python-dotenv>=1,<2",
     "pydantic>=2,<3"
 ]
 
 [project.optional-dependencies]
-fastapi = ["fastapi", "python-multipart"]
-django = ["Django", "asgiref"]
-flask = ["Flask", "asgiref"]
-fake = ["fastapi", "python-multipart", "uvicorn"]
+fastapi = ["fastapi>=0.115,<1", "python-multipart>=0.0.9,<1"]
+django = ["Django>=4.2,<7", "asgiref>=3.8,<4"]
+flask = ["Flask>=3,<4", "asgiref>=3.8,<4"]
+fake = ["fastapi>=0.115,<1", "python-multipart>=0.0.9,<1", "uvicorn>=0.30,<1"]
 dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "flake8", "pytest-cov", "PyYAML"]
 
 [tool.setuptools]
@@ -41,3 +56,6 @@ Issues = "https://github.com/cereja-project/govbr_auth/issues"
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.black]
+target-version = ["py311"]

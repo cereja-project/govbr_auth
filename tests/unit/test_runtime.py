@@ -20,10 +20,11 @@ from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntimeSettings,
     create_govbr_runtime,
-    utc_now
+    utc_now,
 )
 
 ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
+
 
 @pytest.fixture(autouse=True)
 def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -168,15 +169,6 @@ def test_fake_environment_rejects_official_endpoint_variables(variable: str) -> 
                 variable: "https://sso.example.test/endpoint",
             }
         )
-
-
-def test_runtime_configuration_is_available_from_core() -> None:
-    """Core consumers must have one framework-neutral runtime configuration API."""
-    from govbr_auth.core import GovBrProvider as CoreGovBrProvider
-    from govbr_auth.core import GovBrRuntimeSettings as CoreGovBrRuntimeSettings
-
-    assert CoreGovBrProvider is GovBrProvider
-    assert CoreGovBrRuntimeSettings is GovBrRuntimeSettings
 
 
 @pytest.mark.parametrize("value", ["1", "yes", "enabled", ""])

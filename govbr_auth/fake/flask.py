@@ -58,7 +58,8 @@ def create_fake_govbr_blueprint(
                 status=401,
                 headers={"Cache-Control": "no-store"},
             )
-        assert result.redirect is not None
+        if result.redirect is None:
+            raise RuntimeError("successful fake login must include a redirect")
         return redirect(result.redirect.redirect_uri)
 
     @blueprint.post("/token")

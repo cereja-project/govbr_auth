@@ -5,13 +5,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).parents[2]
 
 
 def test_neutral_modules_import_with_frameworks_blocked() -> None:
-    code = dedent(
-        """
+    code = dedent("""
         import builtins
 
         blocked = {"fastapi", "django", "flask", "starlette", "werkzeug", "asgiref"}
@@ -35,8 +33,7 @@ def test_neutral_modules_import_with_frameworks_blocked() -> None:
         import govbr_auth.core.client
         import govbr_auth.runtime
         import govbr_auth.fake.runtime
-        """
-    )
+        """)
     result = subprocess.run(
         [sys.executable, "-c", code],
         cwd=PROJECT_ROOT,
@@ -49,8 +46,7 @@ def test_neutral_modules_import_with_frameworks_blocked() -> None:
 
 
 def test_fake_runtime_exposes_one_neutral_http_application_without_frameworks() -> None:
-    code = dedent(
-        """
+    code = dedent("""
         import builtins
         from datetime import UTC, datetime
 
@@ -97,8 +93,7 @@ def test_fake_runtime_exposes_one_neutral_http_application_without_frameworks() 
         assert fake.prefix == "/fake-govbr"
         assert fake.endpoints.authorize.endswith("/authorize")
         assert fake.endpoints.token.endswith("/token")
-        """
-    )
+        """)
     result = subprocess.run(
         [sys.executable, "-c", code],
         cwd=PROJECT_ROOT,

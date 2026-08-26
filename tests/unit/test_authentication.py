@@ -59,7 +59,9 @@ def test_authorization_url_delegates_to_the_core_client() -> None:
 
 
 @pytest.mark.asyncio
-async def test_authenticate_returns_immutable_context_without_tokens_by_default() -> None:
+async def test_authenticate_returns_immutable_context_without_tokens_by_default() -> (
+    None
+):
     from govbr_auth.authentication import AuthenticationService
 
     claims = {"sub": "subject", "role": "citizen"}

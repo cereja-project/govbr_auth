@@ -1,7 +1,0 @@
-{
-  "access_token": "sanitized-access-token",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "scope": "openid profile email",
-  "id_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzYW5pdGl6ZWQtc3ViamVjdCIsImlzcyI6Imh0dHBzOi8vc3NvLmV4YW1wbGUudGVzdCIsImV4cCI6NDEwMjQ0NDgwMCwiaWF0IjoxNzA0MDY3MjAwLCJub25jZSI6InNhbml0aXplZC1ub25jZSJ9.gCscxICo4Yr9Xj7aE7nBH5gu3-DLx3KSABadSM3UwqU"
-}

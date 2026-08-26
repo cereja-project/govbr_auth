@@ -77,7 +77,8 @@ def build_fake_govbr_routes(
                 status_code=401,
                 headers={"Cache-Control": "no-store"},
             )
-        assert result.redirect is not None
+        if result.redirect is None:
+            raise RuntimeError("successful fake login must include a redirect")
         return RedirectResponse(result.redirect.redirect_uri, status_code=302)
 
     @router.post("/token")

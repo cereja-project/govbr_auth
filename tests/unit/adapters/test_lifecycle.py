@@ -1,5 +1,6 @@
 """Tests for explicit runtime ownership in synchronous adapters."""
 
+
 class RuntimeStub:
     def __init__(self) -> None:
         self.close_calls = 0

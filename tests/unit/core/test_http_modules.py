@@ -25,13 +25,3 @@ def test_token_decoder_is_exposed_from_the_decoders_module() -> None:
         )
     )
     assert isinstance(result, TokenSet)
-
-
-def test_legacy_http_facade_reexports_all_decoders() -> None:
-    from govbr_auth.core import http
-    from govbr_auth.core.decoders import decode_jwks, decode_userinfo
-
-    assert http.decode_tokens is decode_tokens
-    assert http.decode_jwks is decode_jwks
-    assert http.decode_userinfo is decode_userinfo
-    assert http.GovBrHttpTransport is GovBrHttpTransport

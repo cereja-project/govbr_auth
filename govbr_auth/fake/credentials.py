@@ -135,7 +135,7 @@ class JsonFakeUserRepository:
             ValueError: If the source is unavailable or its structure is invalid.
         """
         try:
-            source = Path(path).read_text(encoding="utf-8")
+            source = Path(path).read_text(encoding="utf-8-sig")
         except UnicodeDecodeError:
             raise ValueError("fake user JSON is invalid") from None
         except OSError as error:

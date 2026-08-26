@@ -3,7 +3,6 @@
 from pathlib import Path
 import tomllib
 
-
 PROJECT_ROOT = Path(__file__).parents[2]
 
 
@@ -23,4 +22,3 @@ def test_base_dependencies_do_not_include_web_frameworks() -> None:
         for framework in ("fastapi", "django", "flask")
     )
     assert {"fastapi", "django", "flask"} <= optional_dependencies
-

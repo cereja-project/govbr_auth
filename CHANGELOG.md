@@ -5,24 +5,27 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+## [1.0.0] - 2026-08-26
 
 ### Added
-- Adicionados autenticação local por CPF e senha e carregamento opcional de usuários fictícios via ``GOVBR_FAKE_USERS_FILE``.
-- Adicionados os contratos públicos ``FakeCredentialAuthenticator``, ``InMemoryFakeUserRepository`` e ``JsonFakeUserRepository``.
+- Core OAuth 2.0/OpenID Connect assíncrono e independente de framework.
+- Adapters públicos para FastAPI, Django e Flask, instaláveis por extras.
+- FakeGov local opt-in com login por credenciais fictícias, launcher end-to-end e carregamento opcional de usuários via `GOVBR_FAKE_USERS_FILE`.
+- Contratos públicos `FakeCredentialAuthenticator`, `InMemoryFakeUserRepository` e `JsonFakeUserRepository`.
+- Documentação Sphinx, diagramas vetoriais e exemplos executáveis para os três frameworks.
 
 ### Changed
-- Atualizada a demonstração instalável com uma interface responsiva e um fluxo de login por credenciais fictícias.
+- A seleção de provedor agora ocorre por `GOVBR_PROVIDER=official|fake`; o código consumidor e as rotas do adapter permanecem iguais.
+- A API pública foi reduzida a módulos explícitos de core, adapter e FakeGov.
+- A matriz de CI cobre Python 3.11 a 3.14 em Linux, Windows e macOS.
+
+### Removed
+- Fachadas, módulos, exemplos e testes da implementação anterior à v1.
 
 ### Security
-- Arquivos externos substituem os usuários padrão sem listar as credenciais na página inicial, e falhas de CPF ou senha usam uma resposta uniforme.
-
-## [1.0.0-rc1] - 2026-08-13
-
-### Added
-- Adicionada demonstração local instalável com ``pip install "govbr-auth[demo]"`` e executável por ``python -m govbr_auth.demo``.
-- Adicionadas documentação de início rápido e publicação estática no GitHub Pages, com validação HTML e de links no CI.
-- Adicionado handler de erro opcional ``on_error`` para consumidores que escolherem tratar falhas de autenticação no adaptador FastAPI.
+- Validação de `state`, PKCE, nonce, assinatura RS256/JWKS, issuer, audience e subject.
+- Tokens e segredos permanecem fora das respostas e páginas demonstrativas.
+- O launcher local aceita somente hosts de loopback e o provedor oficial é o padrão fail-closed.
 
 ## [0.2.2] - 2026-06-19
 

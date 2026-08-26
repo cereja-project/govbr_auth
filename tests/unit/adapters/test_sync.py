@@ -25,4 +25,3 @@ def test_run_sync_fails_closed_inside_an_active_event_loop() -> None:
             run_sync(operation)
 
     asyncio.run(caller())
-

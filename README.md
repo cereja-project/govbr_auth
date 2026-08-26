@@ -1,23 +1,58 @@
 # govbr-auth
 
-Engine de autenticação Gov.br independente de framework, com adapters oficiais
-opcionais para FastAPI, Django e Flask. Instale somente o extra do framework
-usado pela aplicação.
+Autenticação Gov.br para Python com um core OAuth 2.0/OpenID Connect independente
+de framework e adapters opcionais para FastAPI, Django e Flask.
 
-Projeto comunitário, sem manutenção, homologação ou endosso do Governo Federal.
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)](LICENSE)
+[![FakeGov](https://img.shields.io/badge/FakeGov-local-0f766e.svg)](#teste-a-integração-sem-depender-do-govbr)
 
-## Instalação
+> [!IMPORTANT]
+> Este é um projeto comunitário, sem manutenção, homologação ou endosso do
+> Governo Federal. Não use credenciais ou dados pessoais reais no FakeGov.
 
-```bash
-pip install govbr-auth                 # somente a engine
-pip install "govbr-auth[fastapi]"      # adapter FastAPI
-pip install "govbr-auth[fastapi,fake]" # FastAPI + FakeGov local + uvicorn
-pip install "govbr-auth[django]"       # adapter Django
-pip install "govbr-auth[flask]"        # adapter Flask
-pip install "govbr-auth[fake]"         # launcher FakeGov
+## Teste a integração sem depender do Gov.br
+
+**FakeGov** é um provedor OAuth/OIDC local incluído na biblioteca. Ele permite
+desenvolver, demonstrar e testar o fluxo completo sem credenciais oficiais, sem
+acesso à internet e sem alterar o código consumidor.
+
+![Instalar, iniciar, entrar e concluir o fluxo local com FakeGov](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/fakegov-flow.svg)
+
+**Instalar → Iniciar → Entrar → Concluir.** O caminho demonstrativo exercita
+o mesmo core de autenticação usado pelos adapters.
+
+### Experimente localmente
+
+No POSIX:
+
+```sh
+pip install "govbr-auth[fake]"
+cat > fake-users.local.json <<'JSON'
+{"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
+JSON
+GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json" GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
 ```
 
-## Usar FakeGov no meu app
+No PowerShell:
+
+```powershell
+pip install "govbr-auth[fake]"
+@'
+{"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
+'@ | Set-Content -Encoding UTF8 .\fake-users.local.json
+$env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
+$env:GOVBR_FAKE_END_TO_END = "true"
+python -m govbr_auth.fake
+```
+
+Abra `http://localhost:8000`, clique em **Entrar com Gov.br** e use o CPF
+`11122233344` com a senha `senha-ficticia`. O launcher escuta apenas em loopback e
+não exibe CPF, senha, tokens ou segredos nas respostas.
+
+## Use FakeGov na sua aplicação
+
+O exemplo abaixo é copiável e executável em um diretório vazio.
 
 ```bash
 pip install "govbr-auth[fastapi,fake]"
@@ -25,6 +60,7 @@ pip install "govbr-auth[fastapi,fake]"
 
 Crie `myapp.py`:
 
+<!-- quickstart-fastapi:start -->
 ```python
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -38,6 +74,7 @@ async def authenticated(context: AuthContext):
 auth = GovBrAuth(on_success=authenticated)
 app.include_router(auth.router)
 ```
+<!-- quickstart-fastapi:end -->
 
 Crie usuários locais fictícios fora do Git:
 
@@ -77,28 +114,23 @@ registre os dois blueprints condicionais com `auth.register(app)`. Em ambos os
 casos, o código do consumidor permanece o mesmo; só a configuração do provedor
 é alterada.
 
-Para iniciar os exemplos locais em modo fake:
+Os exemplos completos de FastAPI, Django e Flask no
+[guia de início rápido](https://govbr-auth.readthedocs.io/en/latest/guide/quick-start.html)
+criam os arquivos da aplicação no diretório do usuário e funcionam após a
+instalação do extra correspondente; não dependem de um checkout deste repositório.
 
-```powershell
-# FastAPI
-$env:GOVBR_PROVIDER = "fake"
-uvicorn examples.example_fastapi:create_app --factory
+## Instalação
 
-# Django
-$env:GOVBR_PROVIDER = "fake"
-$env:GOVBR_FAKE_END_TO_END = "true"
-python -m django runserver 127.0.0.1:8000 --settings=examples.django_settings
+Instale somente o core ou o extra correspondente à aplicação:
 
-# Flask
-$env:GOVBR_PROVIDER = "fake"
-$env:GOVBR_FAKE_END_TO_END = "true"
-$env:GOVBR_FAKE_PORT = "5000"
-flask --app examples.example_flask:create_app run --port 5000
+```bash
+pip install govbr-auth                 # somente o core
+pip install "govbr-auth[fastapi]"      # adapter FastAPI
+pip install "govbr-auth[fastapi,fake]" # FastAPI + FakeGov + uvicorn
+pip install "govbr-auth[django]"       # adapter Django
+pip install "govbr-auth[flask]"        # adapter Flask
+pip install "govbr-auth[fake]"         # launcher FakeGov
 ```
-
-Abra `/auth/govbr/login` no app iniciado e conclua o callback autenticado com
-credenciais locais configuradas para o simulador. As respostas renderizadas não
-exibem CPF, senha, tokens ou segredos.
 
 ## Como a comunicação funciona
 
@@ -118,28 +150,12 @@ Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
 fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente
 a composição selecionada pela configuração muda.
 
-## Executar end-to-end
+## Somente o provedor FakeGov
 
-Para experimentar frontend, backend e login FakeGov no mesmo processo:
-
-No POSIX:
-
-```sh
-pip install "govbr-auth[fake]"
-GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
-```
-
-No PowerShell:
-
-```powershell
-pip install "govbr-auth[fake]"
-$env:GOVBR_FAKE_END_TO_END = "true"
-python -m govbr_auth.fake
-```
-
-Abra `http://localhost:8000`. Sem `GOVBR_FAKE_END_TO_END=true`, o mesmo comando
-`python -m govbr_auth.fake` inicia somente o provedor/login, sem página inicial.
-O launcher escuta apenas em loopback.
+Sem `GOVBR_FAKE_END_TO_END=true`, `python -m govbr_auth.fake` inicia apenas o
+provedor/login, sem a página inicial demonstrativa. Esse modo atende uma
+aplicação local executada em outro processo; o servidor continua restrito a
+loopback.
 
 ## Customizar usuários
 
@@ -185,7 +201,7 @@ Mantenha o valor secreto e use o mesmo valor em todas as instâncias. Não gere
 uma chave nova a cada inicialização. Execute o exemplo com:
 
 ```bash
-uvicorn examples.example_fastapi:create_app --factory
+uvicorn myapp:app --reload
 ```
 
 Consulte a [documentação](docs/index.rst) para configuração completa, solução

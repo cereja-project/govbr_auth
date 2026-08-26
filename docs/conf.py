@@ -1,18 +1,11 @@
 # Configuration file for the Sphinx documentation builder.
 
-import os
-import sys
-from datetime import datetime
-
-# Add parent directory to path to import govbr_auth
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 # Project information
 project = 'GovBR Auth'
 author = 'Joab Leite'
-copyright = f'{datetime.now().year}, {author}'
+copyright = f'2026, {author}'
 version = '1.0'  # short version
-release = '1.0.0rc1'  # full version
+release = '1.0.0'  # full version
 
 # General configuration
 extensions = [

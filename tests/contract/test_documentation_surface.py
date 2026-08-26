@@ -8,12 +8,32 @@ import pytest
 
 DOCS_ROOT = Path(__file__).parents[2] / "docs"
 PROJECT_ROOT = DOCS_ROOT.parent
-TOCTREE_ENTRY = re.compile(r"^\s{3}([\w./-]+)\s*$", re.MULTILINE)
 INCLUDE_DIRECTIVE = re.compile(r"^\.\. include::\s+(.+?)\s*$", re.MULTILINE)
 AUTODOC_DIRECTIVE = re.compile(
     r"^\.\. auto(?:class|function|method|module)::\s+([\w.]+)\s*$",
     re.MULTILINE,
 )
+
+
+def _toctree_entries(source: str) -> tuple[str, ...]:
+    entries: list[str] = []
+    lines = source.splitlines()
+    index = 0
+    while index < len(lines):
+        if lines[index] != ".. toctree::":
+            index += 1
+            continue
+        index += 1
+        while index < len(lines):
+            child_line = lines[index]
+            if not child_line.strip() or child_line.startswith("   :"):
+                index += 1
+                continue
+            if not child_line.startswith("   "):
+                break
+            entries.append(child_line.strip())
+            index += 1
+    return tuple(entries)
 
 
 def _published_documents() -> set[Path]:
@@ -25,7 +45,7 @@ def _published_documents() -> set[Path]:
             continue
         published.add(document)
         source = document.read_text(encoding="utf-8")
-        for target in TOCTREE_ENTRY.findall(source):
+        for target in _toctree_entries(source):
             child = (document.parent / target).with_suffix(".rst").resolve()
             assert child.is_file(), f"missing toctree document: {child}"
             pending.append(child)
@@ -130,6 +150,30 @@ def test_fastapi_fake_quickstart_install_is_complete_for_uvicorn() -> None:
         (True, True, True),
         (True, True, True),
     )
+
+
+def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    first_section = next(line for line in source.splitlines() if line.startswith("## "))
+
+    assert first_section == "## Teste a integração sem depender do Gov.br"
+    assert "docs/media/fakegov-flow.svg" in source
+    assert "**FakeGov**" in source
+    assert "Instalar" in source
+    assert "Iniciar" in source
+    assert "Entrar" in source
+    assert "Concluir" in source
+
+
+def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
+    source = (DOCS_ROOT / "guide" / "communication-flow.rst").read_text(
+        encoding="utf-8"
+    )
+
+    assert "../media/provider-switch.svg" in source
+    assert "../media/authentication-sequence.svg" in source
+    assert "Frontend       API + govbr-auth" not in source
+    assert "Frontend       API FastAPI" not in source
 
 
 def test_entry_docs_describe_fakegov_as_provider_facade_with_canonical_public_names() -> (
@@ -268,16 +312,16 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "urlpatterns = auth.urlpatterns" in source
     assert "auth.register(app)" in source
     assert "python -m django runserver" in source
-    assert "flask --app examples.example_flask:create_app run" in source
+    assert "flask --app flask_app:app run" in source
+    assert "examples.django_settings" not in source
+    assert "examples.example_flask" not in source
     assert "[demo]" not in source
     assert "govbr_auth.demo" not in source
     assert ".install(" not in source
     assert "from govbr_auth import AuthContext, GovBrAuth" not in source
 
 
-def test_entry_docs_use_explicit_local_credentials_not_built_in_defaults() -> (
-    None
-):
+def test_entry_docs_use_explicit_local_credentials_not_built_in_defaults() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
@@ -307,6 +351,15 @@ def test_entry_docs_use_explicit_local_credentials_not_built_in_defaults() -> (
         False,
         False,
     )
+
+
+def test_readme_hero_image_uses_a_pypi_resolvable_url() -> None:
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert (
+        "https://raw.githubusercontent.com/cereja-project/govbr_auth/"
+        "main/docs/media/fakegov-flow.svg"
+    ) in source
 
 
 def test_advanced_fakegov_docs_match_application_argument_contract() -> None:

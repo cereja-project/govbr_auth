@@ -127,6 +127,24 @@ def test_json_repository_loads_and_authenticates(tmp_path: Path) -> None:
     ) == FakeUser(sub="12345678901", name="Ana Demo", email="ana@example.test")
 
 
+def test_json_repository_accepts_utf8_bom_written_by_windows_powershell(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "fake-users.json"
+    source.write_text(
+        '{"users":[{"cpf":"12345678901","password":"ana-demo",'
+        '"name":"Ana Demo","email":"ana@example.test"}]}',
+        encoding="utf-8-sig",
+    )
+
+    repository = JsonFakeUserRepository.from_file(source)
+
+    assert (
+        repository.authenticate(cpf="12345678901", password=SecretStr("ana-demo"))
+        is not None
+    )
+
+
 @pytest.mark.parametrize(
     "payload,error",
     (

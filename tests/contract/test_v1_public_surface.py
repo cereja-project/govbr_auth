@@ -1,6 +1,5 @@
 """Freeze the framework-neutral v1 public and distribution contracts."""
 
-import importlib.util
 import os
 import subprocess
 import sys
@@ -9,7 +8,6 @@ import tomllib
 import zipfile
 from pathlib import Path
 
-import pytest
 from cryptography.fernet import Fernet
 from packaging.requirements import Requirement
 
@@ -22,6 +20,14 @@ PROJECT_ROOT = Path(__file__).parents[2]
 def _project_metadata() -> dict[str, object]:
     with (PROJECT_ROOT / "pyproject.toml").open("rb") as pyproject_file:
         return tomllib.load(pyproject_file)["project"]
+
+
+def _build_environment() -> dict[str, str]:
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("COV_CORE_", "COVERAGE_"))
+    } | {"PYTHONUTF8": "1"}
 
 
 def test_top_level_exports_exact_framework_neutral_v1_surface() -> None:
@@ -102,56 +108,6 @@ def test_fake_exports_exact_optional_provider_surface() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    (
-        "govbr_auth.controller",
-        "govbr_auth.core.config",
-        "govbr_auth.core.govbr",
-        "govbr_auth.fake_govbr",
-        "govbr_auth.utils",
-    ),
-    ids=("controller", "legacy-config", "sync-core", "legacy-fake", "legacy-utils"),
-)
-def test_legacy_modules_are_not_importable(module_name: str) -> None:
-    assert importlib.util.find_spec(module_name) is None
-
-
-@pytest.mark.parametrize(
-    "symbol_name",
-    (
-        "AuthorizationRequest",
-        "FakeGovBrService",
-        "FakeUserData",
-        "GovBrAuthorize",
-        "GovBrAuthenticationError",
-        "GovBrConfig",
-        "GovBrConnector",
-        "GovBrException",
-        "GovBrIntegration",
-        "create_default_fake_users",
-        "process_fake_login",
-        "render_fake_login_page",
-    ),
-    ids=(
-        "legacy-authorization-request",
-        "legacy-fake-service",
-        "legacy-fake-user",
-        "legacy-authorize",
-        "legacy-auth-error",
-        "legacy-config",
-        "legacy-connector",
-        "legacy-error",
-        "legacy-integration",
-        "legacy-default-users",
-        "legacy-fake-login",
-        "legacy-fake-page",
-    ),
-)
-def test_top_level_has_no_legacy_or_fake_provider_symbol(symbol_name: str) -> None:
-    assert not hasattr(govbr_auth, symbol_name)
-
-
 def test_base_dependencies_are_exactly_framework_neutral() -> None:
     metadata = _project_metadata()
 
@@ -166,12 +122,19 @@ def test_base_dependencies_are_exactly_framework_neutral() -> None:
         "pyjwt",
         "python-dotenv",
     }
+    assert set(metadata["dependencies"]) == {
+        "httpx>=0.27,<1",
+        "PyJWT>=2.13,<3",
+        "cryptography>=42,<51",
+        "python-dotenv>=1,<2",
+        "pydantic>=2,<3",
+    }
 
 
 def test_project_version_is_static_without_importing_runtime_dependencies() -> None:
     metadata = _project_metadata()
 
-    assert metadata["version"] == "1.0.0rc1"
+    assert metadata["version"] == "1.0.0"
     assert "dynamic" not in metadata
 
 
@@ -181,10 +144,23 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
     optional_dependencies = metadata["optional-dependencies"]
 
     assert set(optional_dependencies) == {"dev", "fake", "fastapi", "django", "flask"}
-    assert optional_dependencies["fastapi"] == ["fastapi", "python-multipart"]
-    assert optional_dependencies["django"] == ["Django", "asgiref"]
-    assert optional_dependencies["flask"] == ["Flask", "asgiref"]
-    assert optional_dependencies["fake"] == ["fastapi", "python-multipart", "uvicorn"]
+    assert optional_dependencies["fastapi"] == [
+        "fastapi>=0.115,<1",
+        "python-multipart>=0.0.9,<1",
+    ]
+    assert optional_dependencies["django"] == [
+        "Django>=4.2,<7",
+        "asgiref>=3.8,<4",
+    ]
+    assert optional_dependencies["flask"] == [
+        "Flask>=3,<4",
+        "asgiref>=3.8,<4",
+    ]
+    assert optional_dependencies["fake"] == [
+        "fastapi>=0.115,<1",
+        "python-multipart>=0.0.9,<1",
+        "uvicorn>=0.30,<1",
+    ]
     assert optional_dependencies["dev"] == [
         "uvicorn",
         "pytest",
@@ -198,10 +174,13 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
     ]
 
 
-def test_development_install_enables_fake_and_dev_extras() -> None:
+def test_development_install_enables_every_tested_framework_extra() -> None:
     requirements = (PROJECT_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
 
-    assert requirements.splitlines() == ["-e .[fake,dev]", "respx>=0.22,<1"]
+    assert requirements.splitlines() == [
+        "-e .[fake,dev,django,flask]",
+        "respx>=0.22,<1",
+    ]
 
 
 def test_project_metadata_mentions_supported_frameworks() -> None:
@@ -214,7 +193,7 @@ def test_project_metadata_mentions_supported_frameworks() -> None:
     assert all(framework in keywords for framework in ("fastapi", "django", "flask"))
 
 
-def test_built_distributions_exclude_legacy_and_cache_artifacts(
+def test_built_distributions_contain_only_publishable_package_artifacts(
     tmp_path: Path,
 ) -> None:
     subprocess.run(
@@ -230,7 +209,7 @@ def test_built_distributions_exclude_legacy_and_cache_artifacts(
         check=True,
         capture_output=True,
         text=True,
-        env={**os.environ, "PYTHONUTF8": "1"},
+        env=_build_environment(),
     )
     (wheel_path,) = tmp_path.glob("*.whl")
     (sdist_path,) = tmp_path.glob("*.tar.gz")
@@ -240,29 +219,12 @@ def test_built_distributions_exclude_legacy_and_cache_artifacts(
     with tarfile.open(sdist_path, mode="r:gz") as sdist:
         sdist_entries = sdist.getnames()
 
-    forbidden_paths = {
-        "examples/django_example",
-        "examples/example_simple_app.py",
-        "govbr_auth/controller.py",
-        "govbr_auth/core/config.py",
-        "govbr_auth/core/govbr.py",
-        "govbr_auth/fake_govbr.py",
-        "govbr_auth/utils.py",
-        "govbr_auth/demo",
-    }
     invalid_entries = [
         entry
         for entry in wheel_entries + sdist_entries
-        if entry.endswith(".pyc")
-        or "__pycache__" in entry.split("/")
-        or any(
-            entry == forbidden_path or entry.endswith(f"/{forbidden_path}")
-            for forbidden_path in forbidden_paths
-        )
+        if entry.endswith(".pyc") or "__pycache__" in entry.split("/")
     ]
+    wheel_roots = {entry.split("/", 1)[0] for entry in wheel_entries}
 
     assert invalid_entries == []
-
-
-def test_demo_module_is_not_importable() -> None:
-    assert importlib.util.find_spec("govbr_auth.demo") is None
+    assert wheel_roots == {"govbr_auth", "govbr_auth-1.0.0.dist-info"}

@@ -37,8 +37,17 @@ python -m pip install flake8
 
 Use o simulador local durante o desenvolvimento. Nunca use credenciais, tokens, chaves ou dados reais de usuários em testes, exemplos, issues ou pull requests.
 
+No POSIX:
+
 ```bash
-USE_FAKE_GOVBR=true uvicorn examples.example_simple_app:app --reload
+GOVBR_PROVIDER=fake uvicorn examples.example_fastapi:create_app --factory --reload
+```
+
+No PowerShell:
+
+```powershell
+$env:GOVBR_PROVIDER = "fake"
+uvicorn examples.example_fastapi:create_app --factory --reload
 ```
 
 Execute a suíte de testes:
@@ -50,13 +59,13 @@ python -m pytest --tb=short --disable-warnings -q
 Formate os arquivos Python antes de enviar a contribuição:
 
 ```bash
-black govbr_auth tests examples
+black govbr_auth tests examples scripts
 ```
 
 Execute a verificação bloqueante usada pela CI:
 
 ```bash
-flake8 govbr_auth tests examples --count --select=E9,F63,F7,F82 --show-source --statistics
+flake8 govbr_auth tests examples scripts --count --select=E9,F63,F7,F82 --show-source --statistics
 ```
 
 ## Branches e commits
@@ -98,6 +107,8 @@ Uma contribuição está pronta para revisão quando:
 - a suíte de testes passa;
 - os arquivos Python alterados foram formatados com Black;
 - a verificação bloqueante do Flake8 passa;
+- o pacote é construído e validado com `python -m build` e `python -m twine check dist/*`;
+- a documentação passa com warnings tratados como erro;
 - testes cobrem mudanças de comportamento, quando aplicável;
 - documentação e changelog foram atualizados, quando aplicável;
 - não há credenciais, tokens, chaves ou dados reais de usuários;

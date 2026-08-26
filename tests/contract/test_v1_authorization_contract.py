@@ -1,4 +1,4 @@
-"""Characterize the v1 authorization URL contract against version 0.2.2."""
+"""Freeze the Gov.br v1 authorization URL contract."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -12,7 +12,7 @@ from govbr_auth.core.models import AuthTransaction
 from govbr_auth.core.settings import GovBrSettings
 
 FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
-V022_AUTHORIZATION_PARAMETERS = {
+AUTHORIZATION_PARAMETERS = {
     "response_type",
     "client_id",
     "scope",
@@ -58,7 +58,7 @@ def settings() -> GovBrSettings:
     )
 
 
-def test_build_preserves_the_v022_authorization_parameter_contract(
+def test_build_emits_the_required_authorization_parameters(
     settings: GovBrSettings,
 ) -> None:
     authorization = import_module("govbr_auth.core.authorization")
@@ -72,7 +72,7 @@ def test_build_preserves_the_v022_authorization_parameter_contract(
     assert parsed_url.scheme == "https"
     assert parsed_url.netloc == "sso.example.test"
     assert parsed_url.path == "/authorize"
-    assert set(query) == V022_AUTHORIZATION_PARAMETERS
+    assert set(query) == AUTHORIZATION_PARAMETERS
     assert query["response_type"] == ["code"]
     assert query["client_id"] == ["contract-client"]
     assert query["scope"] == ["openid profile email"]

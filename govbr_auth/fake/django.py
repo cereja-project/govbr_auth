@@ -59,7 +59,8 @@ def create_fake_govbr_urlpatterns(
                 status=401,
                 headers={"Cache-Control": "no-store"},
             )
-        assert result.redirect is not None
+        if result.redirect is None:
+            raise RuntimeError("successful fake login must include a redirect")
         return HttpResponseRedirect(result.redirect.redirect_uri)
 
     @csrf_exempt

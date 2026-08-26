@@ -9,17 +9,11 @@ Visão geral
 -----------
 
 O mesmo backend pode usar o Gov.br oficial ou o FakeGov. A troca de provedor
-ocorre na composição do runtime, sem alterar o código do frontend ou da API::
+ocorre na composição do runtime, sem alterar o código do frontend ou da API.
 
-    Frontend da aplicação
-             |
-             | chamadas HTTP da aplicação
-             v
-    API FastAPI + govbr-auth
-             |
-             | OAuth/OIDC: authorize, token, jwk, userinfo
-             v
-    Provedor: Gov.br oficial OU FakeGov
+.. image:: ../media/provider-switch.svg
+   :alt: Frontend e API permanecem iguais enquanto GOVBR_PROVIDER seleciona o Gov.br oficial ou o FakeGov.
+   :align: center
 
 O FakeGov é um simulador do provedor. Ele não é o frontend da aplicação. A
 interface HTML de login que ele oferece existe somente para representar a tela
@@ -34,37 +28,11 @@ O ``GOVBR_REDIRECT_URI`` deve apontar para a API, por exemplo::
 
 O frontend inicia o login pela API. Depois que o provedor conclui a
 autorização, o navegador volta para o callback da API. Assim, o backend pode
-manter o ``state``, o nonce, o PKCE e a troca de tokens sob seu controle::
+manter o ``state``, o nonce, o PKCE e a troca de tokens sob seu controle.
 
-    Frontend       API + govbr-auth       Gov.br ou FakeGov
-        |                  |                       |
-        | GET /auth/govbr/login                      |
-        |----------------->|                       |
-        |                  | gera state, nonce, PKCE
-        |                  |                       |
-        |<-- redirect para /authorize --------------|
-        |----------------------------------------->|
-        |                  |                       |
-        |<-- tela de login/consentimento ---------|
-        |----------------------------------------->|
-        |                  |                       |
-        |<-- redirect para API /callback?code&state|
-        |----------------->|                       |
-        |                  |                       |
-        |                  | POST /token ---------->
-        |                  |<-- access/id token ---|
-        |                  |                       |
-        |                  | GET /jwk ------------>
-        |                  |<-- chaves públicas ---|
-        |                  |                       |
-        |                  | valida assinatura,     |
-        |                  | issuer, audience,      |
-        |                  | nonce e subject       |
-        |                  |                       |
-        |                  | GET /userinfo ------->|
-        |                  |<-- identidade --------|
-        |                  |                       |
-        |<-- sessão/resultado autenticado ---------|
+.. image:: ../media/authentication-sequence.svg
+   :alt: Sequência entre navegador, API com govbr-auth e provedor OAuth OIDC.
+   :align: center
 
 O navegador nunca precisa receber o client secret, o access token ou o ID
 Token para que a API conclua a autenticação.
@@ -86,24 +54,9 @@ Com ``GOVBR_PROVIDER=fake``, as rotas do FakeGov são montadas na mesma API
 FastAPI. Não é necessário iniciar outro processo. O frontend continua chamando
 a API, e o navegador acessa as rotas FakeGov durante o redirect. As chamadas
 internas da API para ``token``, ``jwk`` e ``userinfo`` usam
-``FakeGovHttpTransport``::
-
-    Frontend       API FastAPI             FakeGov montado       Core
-        |                |                       |                 |
-        |-- /login ----->|                       |                 |
-        |<-- redirect ---|                       |                 |
-        |---------------- /fake-govbr/authorize ----------------->|
-        |<-- tela de login FakeGov --------------|                 |
-        |---------------- /callback?code&state -->|                 |
-        |                |                       |                 |
-        |                |-- HTTP POST /token --->|                 |
-        |                |<-- tokens -------------|                 |
-        |                |-- HTTP GET /jwk ------>|                 |
-        |                |<-- chaves -------------|                 |
-        |                |-- HTTP GET /userinfo ->|                 |
-        |                |<-- usuário ------------|                 |
-        |                |------------------------------------------>| valida
-        |<-- resultado --|                       |                 |
+``FakeGovHttpTransport``. A sequência é a mesma do diagrama acima; apenas o
+destino das chamadas do provedor muda para a aplicação HTTP neutra montada
+localmente.
 
 O FakeGov simula as respostas do provedor; as regras de segurança continuam
 sendo responsabilidade do core e do fluxo da API.
