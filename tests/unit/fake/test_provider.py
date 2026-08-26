@@ -15,7 +15,6 @@ from govbr_auth.fake import (
     AuthorizationCodeArtifact,
     FakeArtifactCodec,
     FakeAuthorizationRequest,
-    FakeAuthorizationSession,
     FakeClient,
     FakeClientCredentials,
     FakeGovBrProvider,

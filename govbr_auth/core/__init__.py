@@ -9,7 +9,10 @@ from govbr_auth.core.errors import (
     InvalidStateError,
 )
 from govbr_auth.core.models import AuthTransaction, GovBrAddress, GovBrUser, TokenSet
-from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+from govbr_auth.runtime import (  # noqa: F401  # compatibility re-exports
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
 from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import InMemoryTransactionStore, TransactionStore

@@ -13,8 +13,6 @@ from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
 from govbr_auth.runtime_settings import (
     GovBrProvider,
     GovBrRuntimeSettings,
-    _fake_callback_url,
-    _is_canonical_path_prefix,
 )
 from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import (

@@ -22,7 +22,6 @@ from starlette.requests import Request
 from starlette.types import Receive, Scope, Send
 
 import govbr_auth
-from govbr_auth import core
 from govbr_auth.core import (
     GovBrClient,
     GovBrSettings,
@@ -43,7 +42,6 @@ from govbr_auth.fake import (
 )
 from govbr_auth.fastapi import (
     AuthContext,
-    AuthSuccessHandler,
     GovBrAuth,
     create_govbr_router,
 )

@@ -11,10 +11,12 @@ from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
-    _fake_callback_url,
     create_govbr_runtime,
 )
-from govbr_auth.runtime_settings import _is_canonical_path_prefix
+from govbr_auth.runtime_settings import (
+    _fake_callback_url,
+    _is_canonical_path_prefix,
+)
 
 if TYPE_CHECKING:
     from govbr_auth.fake.runtime import FakeGovSimulator, FakeUserRepository

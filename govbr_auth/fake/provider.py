@@ -15,7 +15,7 @@ from govbr_auth.fake.artifacts import (
     AuthorizationRequestArtifact,
     FakeArtifactCodec,
 )
-from govbr_auth.fake.models import FakeClient, FakeUser
+from govbr_auth.fake.models import FakeUser
 from govbr_auth.fake.protocol import (
     FakeOAuthError,
     FakeOAuthProtocolRules,

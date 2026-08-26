@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import httpx
 import pytest
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import Response
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 

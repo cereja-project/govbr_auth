@@ -12,10 +12,7 @@ from govbr_auth.adapters._errors import describe_auth_error
 from govbr_auth.adapters._runtime import create_adapter_runtime
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
-from govbr_auth.core.errors import (
-    ExpiredTransactionError,
-    GovBrAuthError,
-)
+from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
