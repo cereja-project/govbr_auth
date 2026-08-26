@@ -3,8 +3,6 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from govbr_auth.adapters._sync import run_sync
-
 
 class _ClosableRuntime(Protocol):
     async def aclose(self) -> None: ...
@@ -20,6 +18,8 @@ class RuntimeOwner:
 
     def close(self) -> None:
         """Close an owned runtime exactly once."""
+        from govbr_auth.adapters._sync import run_sync
+
         if self._closed:
             return
         run_sync(self.aclose)

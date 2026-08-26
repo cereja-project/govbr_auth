@@ -8,6 +8,33 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parents[2]
 
 
+def test_fastapi_adapter_import_does_not_require_asgiref() -> None:
+    code = dedent("""
+        import builtins
+
+        real_import = builtins.__import__
+
+
+        def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name.split(".", 1)[0] == "asgiref":
+                raise AssertionError("FastAPI adapter imported asgiref")
+            return real_import(name, globals, locals, fromlist, level)
+
+
+        builtins.__import__ = guarded_import
+        import govbr_auth.fastapi
+        """)
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
 def test_neutral_modules_import_with_frameworks_blocked() -> None:
     code = dedent("""
         import builtins
