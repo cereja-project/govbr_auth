@@ -1,6 +1,8 @@
 ---
 name: code-review
-description: Use when GitHub Copilot reviews a pull request or changed code in the govbr_auth repository.
+description: >-
+  Use esta skill quando o GitHub Copilot revisar um pull request ou código
+  alterado no repositório govbr_auth.
 license: MIT
 ---
 
@@ -36,7 +38,7 @@ idioma original.
 7. Confirme no resumo se todos os arquivos alterados foram examinados. Liste
    cada exclusão e seu motivo quando a cobertura for parcial.
 
-Não use recursos pessoais ou locais à máquina, arquivos externos ao checkout,
+Não use recursos pessoais ou locais à máquina, arquivos externos à cópia de trabalho,
 prompts privados ou informações que não estejam disponíveis ao Copilot na
 branch do PR.
 
@@ -76,7 +78,7 @@ Analise nesta ordem:
 - Confirme que exceções internas não atravessam o limite HTTP nem mudam o
   contrato público acidentalmente.
 
-### Criptografia, secrets e FakeGov
+### Criptografia, segredos e FakeGov
 
 - Exija falha fechada para chave errada, adulteração, versão desconhecida,
   esquema inválido e tempo inválido.
@@ -91,7 +93,7 @@ Analise nesta ordem:
 
 - `govbr_auth/core/` e `govbr_auth/runtime.py` devem permanecer neutros de
   framework: não podem importar FastAPI, Starlette, Django, Flask ou Werkzeug.
-- Adapters devem preservar os artefatos e ciclos de vida idiomáticos de cada
+- Adaptadores devem preservar os artefatos e ciclos de vida idiomáticos de cada
   framework sem duplicar composição, armazenamento ou regras de domínio.
 - Examine mudanças na superfície pública, extras, limites de dependências e
   comportamento nas versões Python 3.11 a 3.14.
@@ -134,7 +136,7 @@ Cada apontamento deve conter:
 **Correção:** menor correção ou verificação capaz de resolver a causa.
 ```
 
-Ancore comentários inline na menor linha alterada que demonstre o problema.
+Ancore comentários em linha na menor linha alterada que demonstre o problema.
 Use o resumo para problemas entre arquivos, evidência ausente e documentação
 faltante. Não use uma linha alterada como pretexto para comentar código não
 relacionado.

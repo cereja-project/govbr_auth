@@ -1,30 +1,30 @@
-# GitHub Copilot instructions
+# Instruções do GitHub Copilot
 
-Read and follow the repository-level [`AGENTS.md`](../AGENTS.md) before
-analyzing or changing this project. Treat it as the canonical source for the
-package structure, supported tooling, architectural boundaries, tests, and
-pull request conventions.
+Leia e siga o [`AGENTS.md`](../AGENTS.md) do repositório antes de analisar ou
+alterar este projeto. Ele é a fonte canônica para estrutura do pacote, versões
+suportadas, comandos, limites arquiteturais, segurança, testes e convenções de
+pull requests.
 
-When reviewing a pull request, load and follow the
-[`code-review` skill](skills/code-review/SKILL.md). Apply it to every changed
-file and use the pull request's head branch as the source of repository
-instructions.
+Ao revisar um pull request, carregue e siga a
+[skill `code-review`](skills/code-review/SKILL.md). Aplique-a a todos os
+arquivos alterados e use a branch de origem do pull request como fonte das
+instruções versionadas.
 
-Use Brazilian Portuguese for review summaries, findings, and explanations.
-Keep code identifiers, paths, commands, protocol terms, and quoted text in
-their original form.
+Escreva resumos, apontamentos e explicações em português do Brasil. Preserve
+identificadores, caminhos, comandos, nomes de protocolos e texto citado no
+idioma original.
 
-Prioritize concrete defects in correctness, security, public compatibility,
-and tests. In particular, scrutinize OAuth 2.0 and OpenID Connect validation,
-JWT and JWKS handling, redirects, cookies, secrets, PKCE, nonce, state,
-authorization codes, framework boundaries, and FakeGov isolation.
+Priorize defeitos concretos de correção, segurança, compatibilidade pública e
+testes. Examine com atenção OAuth 2.0 e OpenID Connect, JWT e JWKS,
+redirecionamentos, cookies, segredos, PKCE, nonce, state, códigos de autorização,
+limites de framework e isolamento do FakeGov.
 
-Report only issues introduced by the pull request or made materially worse by
-it. Tie every finding to evidence and a credible execution path. Do not turn
-style preferences, speculative risks, generic praise, or unrelated existing
-debt into review findings.
+Reporte somente problemas introduzidos pelo pull request ou materialmente
+agravados por ele. Vincule cada apontamento a evidência e a um caminho de
+execução plausível. Não transforme preferência de estilo, risco especulativo,
+elogio genérico ou dívida preexistente alheia ao PR em apontamento.
 
-Never claim that a command, test, check, or file review succeeded unless it was
-actually performed and its result was observed. Do not expose credentials,
-tokens, keys, decrypted state, personal data, or other sensitive values in
-review output.
+Nunca afirme que um comando, teste, verificação ou arquivo foi validado sem
+executar a verificação e observar o resultado. Não exponha credenciais, tokens,
+chaves, state descriptografado, dados pessoais ou outros valores sensíveis na
+revisão.
