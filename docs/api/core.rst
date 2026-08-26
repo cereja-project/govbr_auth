@@ -20,7 +20,9 @@ Cliente e autorização
 Transações e validação
 ----------------------
 
-.. autoclass:: govbr_auth.core.InMemoryTransactionStore
+.. autoclass:: govbr_auth.core.EncryptedTransactionCodec
+
+.. autoclass:: govbr_auth.core.TransactionCodec
 
 .. autoclass:: govbr_auth.core.IdTokenValidator
 

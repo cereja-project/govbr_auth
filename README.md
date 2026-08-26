@@ -3,6 +3,10 @@
 Autenticação Gov.br para Python com um core OAuth 2.0/OpenID Connect independente
 de framework e adapters opcionais para FastAPI, Django e Flask.
 
+O fluxo OAuth é stateless no backend: funciona com múltiplos workers, sem
+armazenamento compartilhado, desde que todos usem a mesma secret
+`GOVBR_TRANSACTION_SECRET`.
+
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)](LICENSE)
 [![FakeGov](https://img.shields.io/badge/FakeGov-local-0f766e.svg)](#teste-a-integração-sem-depender-do-govbr)
@@ -200,10 +204,17 @@ print(generate_transaction_secret())
 ```
 
 Mantenha o valor secreto e use o mesmo valor em todas as instâncias. Não gere
-uma chave nova a cada inicialização. Execute o exemplo com:
+uma chave nova a cada inicialização. O backend cifra e autentica com Fernet um
+envelope de `state` com TTL, PKCE e nonce. O state não é um registro de uso
+único: a prevenção de replay depende do authorization code de uso único
+validado pelo provedor.
+
+Esse desenho permite múltiplos workers sem armazenamento compartilhado; todos
+precisam receber a mesma secret `GOVBR_TRANSACTION_SECRET`. Em produção, por
+exemplo:
 
 ```bash
-uvicorn myapp:app --reload
+uvicorn myapp:app --workers 4
 ```
 
 Consulte a [documentação](docs/index.rst) para configuração completa, solução

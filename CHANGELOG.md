@@ -11,6 +11,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Core OAuth 2.0/OpenID Connect assíncrono e independente de framework.
 - Adapters públicos para FastAPI, Django e Flask, instaláveis por extras.
 - FakeGov local opt-in com login por credenciais fictícias, launcher end-to-end e carregamento opcional de usuários via `GOVBR_FAKE_USERS_FILE`.
+- Transações OAuth stateless protegidas por Fernet, compatíveis com múltiplos workers sem armazenamento compartilhado.
 - Contratos públicos `FakeCredentialAuthenticator`, `InMemoryFakeUserRepository` e `JsonFakeUserRepository`.
 - Documentação Sphinx, diagramas vetoriais e exemplos executáveis para os três frameworks.
 
@@ -25,6 +26,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Security
 - Validação de `state`, PKCE, nonce, assinatura RS256/JWKS, issuer, audience e subject.
+- TTL autenticado para a transação; replay é rejeitado pelo authorization code de uso único do provedor, não por consumo local do `state`.
 - Tokens e segredos permanecem fora das respostas e páginas demonstrativas.
 - O launcher local aceita somente hosts de loopback e o provedor oficial é o padrão fail-closed.
 

@@ -35,6 +35,16 @@ Provedor oficial
 Mantenha o valor secreto e use o mesmo valor em todas as instâncias. Não gere
 uma chave nova a cada inicialização.
 
+O backend suporta múltiplos workers sem armazenamento compartilhado porque o
+``state`` contém um envelope de transação cifrado e autenticado por Fernet.
+Todos os workers precisam da mesma secret ``GOVBR_TRANSACTION_SECRET``. O
+envelope tem TTL e preserva os vínculos de PKCE e nonce até o callback.
+
+O ``state`` não é um registro de uso único e pode ser decodificado novamente
+durante o TTL. A prevenção de replay é responsabilidade do authorization code
+de uso único: o provedor deve invalidá-lo de forma atômica após a primeira
+troca. Rotacionar a secret invalida os fluxos que ainda estiverem em andamento.
+
 FakeGov
 -------
 

@@ -186,6 +186,16 @@ redirect URI, endpoints OAuth/OIDC e ``GOVBR_TRANSACTION_SECRET`` conforme
 login permanece igual; somente o runtime passa a conversar com o Gov.br
 oficial. O FakeGov não é fallback automático.
 
+O backend pode ser executado com múltiplos workers sem armazenamento
+compartilhado. Configure a mesma secret ``GOVBR_TRANSACTION_SECRET`` em todos
+eles e, em produção, execute por exemplo::
+
+    uvicorn myapp:app --workers 4
+
+O ``state`` é um envelope Fernet com TTL, PKCE e nonce, e não é um registro de
+uso único. A proteção contra replay depende do authorization code de uso único
+rejeitado pelo provedor após a primeira troca.
+
 Customizar usuários do FakeGov
 ------------------------------
 

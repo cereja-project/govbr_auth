@@ -39,8 +39,17 @@ falha. O JSON deve conter ``{"users": [...]}``; cada item exige ``"cpf"``,
 Transação expirada ou estado inválido
 -------------------------------------
 
-Volte ao início e crie um novo fluxo. Reiniciar o processo remove transações
-mantidas em memória. Não desative validação de ``state``, nonce ou PKCE.
+Volte ao início e crie um novo fluxo. Não desative validação de ``state``,
+nonce ou PKCE.
+
+O ``state`` é um envelope Fernet com TTL, PKCE e nonce; ele não depende do
+processo que iniciou o login. Em múltiplos workers sem armazenamento
+compartilhado, confirme que todos receberam a mesma secret
+``GOVBR_TRANSACTION_SECRET`` e que ela não foi rotacionada durante o fluxo.
+
+O ``state`` não é um registro de uso único. Se o mesmo callback for repetido
+dentro do TTL, a rejeição segura deve vir do authorization code de uso único
+que o provedor invalida na primeira troca.
 
 Configuração oficial conflitante com FakeGov
 ---------------------------------------------

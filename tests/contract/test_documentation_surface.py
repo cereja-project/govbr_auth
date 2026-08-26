@@ -15,6 +15,10 @@ AUTODOC_DIRECTIVE = re.compile(
 )
 
 
+def _normalized_prose(source: str) -> str:
+    return re.sub(r"\s+", " ", source.replace("`", "")).lower()
+
+
 def _toctree_entries(source: str) -> tuple[str, ...]:
     entries: list[str] = []
     lines = source.splitlines()
@@ -109,6 +113,66 @@ def test_transaction_secret_documentation_explains_generation_and_storage() -> N
         (True, True, True, True),
         (True, True, True, True),
     )
+
+
+def test_entry_docs_highlight_stateless_multi_worker_deployments() -> None:
+    sources = (
+        _normalized_prose((PROJECT_ROOT / "README.md").read_text(encoding="utf-8")),
+        _normalized_prose((DOCS_ROOT / "index.rst").read_text(encoding="utf-8")),
+        _normalized_prose(
+            (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8")
+        ),
+    )
+    required_guidance = (
+        "múltiplos workers",
+        "sem armazenamento compartilhado",
+        "mesma secret",
+    )
+
+    assert all(
+        all(guidance in source for guidance in required_guidance) for source in sources
+    )
+    assert "uvicorn myapp:app --workers 4" in sources[0]
+    assert "uvicorn myapp:app --workers 4" in sources[2]
+
+
+def test_security_docs_describe_the_stateless_replay_boundary_exactly() -> None:
+    sources = (
+        _normalized_prose((PROJECT_ROOT / "README.md").read_text(encoding="utf-8")),
+        _normalized_prose(
+            (DOCS_ROOT / "guide" / "configuration.rst").read_text(encoding="utf-8")
+        ),
+        _normalized_prose(
+            (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8")
+        ),
+    )
+    required_guidance = (
+        "fernet",
+        "ttl",
+        "pkce",
+        "nonce",
+        "authorization code de uso único",
+        "state não é um registro de uso único",
+    )
+
+    assert all(
+        all(guidance in source for guidance in required_guidance) for source in sources
+    )
+
+
+def test_user_docs_do_not_reference_the_removed_transaction_store() -> None:
+    sources = "\n".join(
+        document.read_text(encoding="utf-8") for document in _published_documents()
+    )
+    diagram = (DOCS_ROOT / "media" / "authentication-sequence.svg").read_text(
+        encoding="utf-8"
+    )
+
+    assert "InMemoryTransactionStore" not in sources
+    assert "TransactionStore" not in sources
+    assert "transações mantidas em memória" not in sources
+    assert "armazenados no backend" not in diagram
+    assert "cifrados no state" in diagram
 
 
 def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
