@@ -17,8 +17,8 @@ Uso no ``urls.py`` do projeto:
 O adapter é síncrono e entrega ``(context, request)`` ao callback. ``settings``
 e ``runtime`` são mutuamente exclusivos. Em modo fake, o consumidor continua no
 mesmo runtime consumidor; a configuração troca apenas os endpoints do provedor
-e o transporte HTTP interno. Para composição avançada, o simulador canônico é
-``govbr_auth.fake.FakeGovSimulator``, criado por
+e o transporte HTTP interno (``FakeGovHttpTransport``). Para composição
+avançada, o simulador canônico é ``govbr_auth.fake.FakeGovSimulator``, criado por
 ``govbr_auth.fake.create_fake_gov_simulator``. As URLs do FakeGov são
 adicionadas à lista no prefixo próprio do runtime.
 

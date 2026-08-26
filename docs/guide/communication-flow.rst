@@ -85,8 +85,8 @@ FakeGov embutido na API
 Com ``GOVBR_PROVIDER=fake``, as rotas do FakeGov são montadas na mesma API
 FastAPI. Não é necessário iniciar outro processo. O frontend continua chamando
 a API, e o navegador acessa as rotas FakeGov durante o redirect. As chamadas
-internas da API para ``token``, ``jwk`` e ``userinfo`` usam transporte ASGI em
-memória::
+internas da API para ``token``, ``jwk`` e ``userinfo`` usam
+``FakeGovHttpTransport``::
 
     Frontend       API FastAPI             FakeGov montado       Core
         |                |                       |                 |
@@ -96,11 +96,11 @@ memória::
         |<-- tela de login FakeGov --------------|                 |
         |---------------- /callback?code&state -->|                 |
         |                |                       |                 |
-        |                |-- ASGI POST /token --->|                 |
+        |                |-- HTTP POST /token --->|                 |
         |                |<-- tokens -------------|                 |
-        |                |-- ASGI GET /jwk ------>|                 |
+        |                |-- HTTP GET /jwk ------>|                 |
         |                |<-- chaves -------------|                 |
-        |                |-- ASGI GET /userinfo ->|                 |
+        |                |-- HTTP GET /userinfo ->|                 |
         |                |<-- usuário ------------|                 |
         |                |------------------------------------------>| valida
         |<-- resultado --|                       |                 |
@@ -140,8 +140,8 @@ Escolha do modo
     Usa os endpoints oficiais configurados.
 
 ``GOVBR_PROVIDER=fake``
-    Monta o FakeGov na mesma API e usa transporte ASGI interno para as chamadas
-    do backend.
+    Monta o FakeGov na mesma API e usa ``FakeGovHttpTransport`` para as
+    chamadas do backend.
 
 ``GOVBR_FAKE_END_TO_END=true``
     Ativa a página inicial de demonstração do launcher. Não é necessário em

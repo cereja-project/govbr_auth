@@ -184,13 +184,7 @@ def _as_http_runtime(
         if prefix is not None and prefix != runtime.prefix:
             raise ValueError("prefix does not match runtime prefix")
 
-        if credential_authenticator is None:
-            return runtime
-        return _ProviderRuntimeAdapter(
-            provider=runtime.provider,
-            credential_authenticator=credential_authenticator,
-            prefix=runtime.prefix,
-        )
+        return runtime
     return _ProviderRuntimeAdapter(
         provider=runtime,
         credential_authenticator=credential_authenticator,
@@ -205,5 +199,8 @@ def _resolve_http_application(
     clock: Callable[[], datetime],
 ) -> FakeGovHttpApplication:
     if application is not None:
+        runtime_application = getattr(runtime, "http_application", None)
+        if runtime_application is not None and application is not runtime_application:
+            raise ValueError("application does not match runtime HTTP application")
         return application
     return resolve_fake_http_application(runtime, clock=clock)

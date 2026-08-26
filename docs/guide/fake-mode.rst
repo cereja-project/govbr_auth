@@ -40,10 +40,10 @@ Monte a fachada do adaptador na API:
 
 Inicie a API com ``GOVBR_PROVIDER=fake``. O frontend da aplicação continua
 chamando a API normalmente. A biblioteca monta as rotas do FakeGov junto ao
-adaptador e usa transporte ASGI em memória para as chamadas de backend; o
-código da aplicação não precisa criar factories do provedor. O app continua no
-mesmo runtime consumidor; a configuração fake troca apenas os endpoints do
-provedor e o transporte HTTP interno.
+adaptador e usa ``FakeGovHttpTransport`` para as chamadas de backend; o código
+da aplicação não precisa criar factories do provedor. O app continua no mesmo
+runtime consumidor; a configuração fake troca apenas os endpoints do provedor e
+o transporte HTTP interno.
 
 Para os adapters síncronos suportados, mantenha a mesma lógica de consumo e
 troque apenas o extra de instalação e a montagem do adapter:
@@ -99,18 +99,19 @@ Customizar usuários
 Os usuários fictícios default tornam o primeiro fluxo executável. Para
 substituí-los, defina ``GOVBR_FAKE_USERS_FILE``:
 
-.. code-block:: json
+No POSIX::
 
-   {
-     "users": [
-       {
-         "cpf": "12345678901",
-         "password": "senha-ficticia",
-         "name": "Usuário Fake",
-         "email": "fake@example.test"
-       }
-     ]
-   }
+    cat > fake-users.local.json <<'JSON'
+    {"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
+    JSON
+    export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"
+
+No PowerShell::
+
+    @'
+    {"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
+    '@ | Set-Content -Encoding UTF8 .\fake-users.local.json
+    $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
 
 O arquivo é carregado na inicialização, exige ao menos um usuário, CPF com 11
 dígitos e CPFs únicos. JSON inválido, campos extras e campos ausentes são
@@ -144,7 +145,19 @@ Uso avançado
 ``GovBrRuntimeSettings`` e ``create_govbr_runtime`` formam o núcleo neutro de
 framework. ``create_fake_gov_simulator`` cria o grafo canônico do simulador.
 As factories ``create_fake_govbr_router`` e ``create_fake_govbr_app`` atendem
-topologias ASGI avançadas.
+topologias ASGI avançadas:
+
+``create_fake_govbr_router(runtime, *, prefix=None, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)``
+    Cria rotas ASGI para um ``FakeGovSimulator`` ou ``FakeGovBrProvider``.
+
+``create_fake_govbr_app(runtime, *, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)``
+    Cria uma aplicação ASGI de provedor separado para uso avançado.
+
+O argumento ``application`` aceita uma ``FakeGovHttpApplication`` já composta.
+Com ``FakeGovSimulator``, omita esse argumento ou passe
+``runtime.http_application`` para preservar a fachada canônica do simulador.
+Com ``FakeGovBrProvider`` cru, use ``credential_authenticator`` e
+``application`` para composições manuais.
 
 Os adapters públicos desta versão são FastAPI, Django e Flask. O store em memória rejeita replay
 de authorization code apenas na mesma instância; distribuição entre
