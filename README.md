@@ -210,8 +210,8 @@ Com `GOVBR_PROVIDER=official`, essas chamadas vão para o gov.br. Com
 backend usa `FakeGovHttpTransport`. Em outras palavras: é o mesmo runtime
 consumidor, e a configuração fake troca apenas os endpoints do provedor e o
 transporte HTTP interno. O fluxo end-to-end do launcher também inclui a página
-inicial. O diagrama completo está em
-[`docs/guide/communication-flow.rst`](docs/guide/communication-flow.rst).
+inicial. O diagrama completo está no
+[`guia de fluxo de comunicação`](https://govbr-auth.readthedocs.io/en/latest/guide/communication-flow.html).
 
 Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
 fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente
