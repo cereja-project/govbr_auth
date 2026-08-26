@@ -168,7 +168,7 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
         "pytest-mock",
         "black",
         "build",
-        "setuptools",
+        "setuptools>=77",
         "wheel",
         "flake8",
         "pytest-cov",
@@ -198,7 +198,7 @@ def test_project_metadata_mentions_supported_frameworks() -> None:
 def test_built_distributions_contain_only_publishable_package_artifacts(
     tmp_path: Path,
 ) -> None:
-    subprocess.run(
+    result = subprocess.run(
         [
             sys.executable,
             "-m",
@@ -208,11 +208,12 @@ def test_built_distributions_contain_only_publishable_package_artifacts(
             str(tmp_path),
         ],
         cwd=PROJECT_ROOT,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         env=_build_environment(),
     )
+    assert result.returncode == 0, result.stdout + result.stderr
     (wheel_path,) = tmp_path.glob("*.whl")
     (sdist_path,) = tmp_path.glob("*.tar.gz")
 

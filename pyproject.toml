@@ -38,7 +38,7 @@ fastapi = ["fastapi>=0.115,<1", "python-multipart>=0.0.9,<1"]
 django = ["Django>=4.2,<7", "asgiref>=3.8,<4"]
 flask = ["Flask>=3,<4", "asgiref>=3.8,<4"]
 fake = ["fastapi>=0.115,<1", "python-multipart>=0.0.9,<1", "uvicorn>=0.30,<1"]
-dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "setuptools", "wheel", "flake8", "pytest-cov", "PyYAML"]
+dev = ["uvicorn", "pytest", "pytest-asyncio", "pytest-mock", "black", "build", "setuptools>=77", "wheel", "flake8", "pytest-cov", "PyYAML"]
 
 [tool.setuptools]
 include-package-data = false
@@ -54,7 +54,7 @@ Documentation = "https://govbr-auth.readthedocs.io/"
 Issues = "https://github.com/cereja-project/govbr_auth/issues"
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
