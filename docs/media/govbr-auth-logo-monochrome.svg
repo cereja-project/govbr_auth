@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 88" role="img" aria-labelledby="title desc">
+  <title id="title">govbr-auth monocromático</title>
+  <desc id="desc">Versão monocromática do nome govbr-auth com duas cerejas formando o conector.</desc>
+  <text x="8" y="61" fill="#071d41" font-family="Rawline, Raleway, Arial, sans-serif" font-size="46" font-weight="600" textLength="126" lengthAdjust="spacingAndGlyphs">govbr</text>
+  <g fill="none" stroke="#071d41" stroke-width="3" stroke-linecap="round">
+    <path d="M145 52C147 42 152 34 160 32"/>
+    <path d="M175 52C173 42 168 34 160 32"/>
+  </g>
+  <g fill="#071d41">
+    <circle cx="144" cy="57" r="7"/>
+    <circle cx="176" cy="57" r="7"/>
+  </g>
+  <text x="186" y="61" fill="#071d41" font-family="Rawline, Raleway, Arial, sans-serif" font-size="46" font-weight="600" textLength="86" lengthAdjust="spacingAndGlyphs">auth</text>
+</svg>

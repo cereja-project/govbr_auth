@@ -1,5 +1,9 @@
 # govbr-auth
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg" alt="govbr-auth" width="320">
+</p>
+
 Autenticação gov.br para Python com um core OAuth 2.0/OpenID Connect independente
 de framework e adapters opcionais para FastAPI, Django e Flask.
 

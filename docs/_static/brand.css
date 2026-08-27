@@ -1,0 +1,8 @@
+.wy-side-nav-search > a {
+  display: block;
+}
+
+.wy-side-nav-search > a img.logo {
+  height: auto;
+  width: 240px;
+}

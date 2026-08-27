@@ -2,6 +2,7 @@
 
 import importlib
 import re
+import runpy
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -370,6 +371,48 @@ def test_versioned_diagrams_use_the_application_color_palette(filename: str) -> 
     )
     assert colors <= GOVBR_DIAGRAM_COLORS
     assert "#1351b4" in colors
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-logo.svg",
+        "govbr-auth-logo-light.svg",
+        "govbr-auth-logo-monochrome.svg",
+        "govbr-auth-mark.svg",
+    ),
+)
+def test_brand_assets_are_accessible_self_contained_svgs(filename: str) -> None:
+    source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
+    root = ET.fromstring(source)
+    namespace = "{http://www.w3.org/2000/svg}"
+
+    assert root.tag == f"{namespace}svg"
+    assert root.attrib["role"] == "img"
+    assert root.attrib["viewBox"]
+    assert root.find(f"{namespace}title") is not None
+    assert root.find(f"{namespace}desc") is not None
+    assert root.find(f".//{namespace}script") is None
+    assert not any(
+        attribute.rsplit("}", maxsplit=1)[-1] == "href"
+        for element in root.iter()
+        for attribute in element.attrib
+    )
+
+
+def test_documentation_entrypoints_publish_the_brand_assets() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    sphinx_config = runpy.run_path(str(DOCS_ROOT / "conf.py"))
+
+    assert (
+        "https://raw.githubusercontent.com/cereja-project/govbr_auth/"
+        "main/docs/media/govbr-auth-logo.svg"
+    ) in readme
+    assert sphinx_config["html_theme_options"]["logo_only"] is True
+    assert sphinx_config["html_logo"] == "media/govbr-auth-logo-light.svg"
+    assert sphinx_config["html_favicon"] == "media/govbr-auth-mark.svg"
+    assert "_static" in sphinx_config["html_static_path"]
+    assert "brand.css" in sphinx_config["html_css_files"]
 
 
 def test_authentication_sequence_lifelines_have_graphical_contrast() -> None:
