@@ -132,7 +132,7 @@ No PowerShell::
     $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     uvicorn myapp:app --reload
 
-Abra ``http://127.0.0.1:8000/auth/govbr/login``, use CPF ``11122233344`` e
+Abra ``http://localhost:8000/auth/govbr/login``, use CPF ``11122233344`` e
 senha ``senha-ficticia``. O navegador será redirecionado para as rotas FakeGov
 montadas na própria aplicação. O backend troca o código, busca JWKS e consulta
 ``userinfo`` usando ``FakeGovHttpTransport``. O callback retorna somente

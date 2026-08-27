@@ -148,7 +148,7 @@ uvicorn myapp:app --reload
 
 ### 3. Conclua o callback
 
-Abra `http://127.0.0.1:8000/auth/govbr/login`, entre com as
+Abra `http://localhost:8000/auth/govbr/login`, entre com as
 [credenciais de teste](#credenciais-de-teste) e conclua o callback. A resposta
 de exemplo renderiza somente `{"authenticated": true}`; CPF, senha, tokens e
 segredos não são exibidos em respostas HTTP.
@@ -196,7 +196,7 @@ avançadas, o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado 
 | Modo | URL de entrada | O que é servido |
 | --- | --- | --- |
 | Launcher end-to-end (`GOVBR_FAKE_END_TO_END=true`) | `http://localhost:8000` | Página inicial demonstrativa mais provedor/login |
-| Aplicação com `GOVBR_PROVIDER=fake` | `http://127.0.0.1:8000/auth/govbr/login` | Rotas do adapter: `/auth/govbr/login` e `/auth/govbr/callback` |
+| Aplicação com `GOVBR_PROVIDER=fake` | `http://localhost:8000/auth/govbr/login` | Rotas do adapter: `/auth/govbr/login` e `/auth/govbr/callback` |
 | Somente provedor FakeGov | Sem entrada direta | Endpoints do provedor: `/authorize`, `/login`, `/token`, `/userinfo` e `/jwk` |
 
 > [!NOTE]
