@@ -44,7 +44,7 @@ html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'analytics_id': '',
     'canonical_url': 'https://govbr-auth.readthedocs.io/',
-    'logo_only': False,
+    'logo_only': True,
     'prev_next_buttons_location': 'bottom',
     'style_external_links': False,
     'vcs_pageview_mode': '',
@@ -56,14 +56,15 @@ html_theme_options = {
     'titles_only': False
 }
 
-html_logo = None
-html_favicon = None
+html_logo = 'media/govbr-auth-logo-light.svg'
+html_favicon = 'media/govbr-auth-mark.svg'
 
 # Highlighting options
 pygments_style = 'sphinx'
 
 # HTML output directory
-html_static_path = []
+html_static_path = ['_static']
+html_css_files = ['brand.css']
 
 # Napoleon extension settings (for Google style docstrings)
 napoleon_google_docstring = True

@@ -2,6 +2,7 @@
 
 import importlib
 import re
+import runpy
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -67,6 +68,49 @@ def _svg_paint_values(source: str) -> set[str]:
             if property_name in SVG_PAINT_PROPERTIES:
                 values.add(value.strip().lower())
     return values
+
+
+def _assert_brand_svg_contract(source: str) -> None:
+    assert "<?" not in source
+    assert "<!doctype" not in source.lower()
+    root = ET.fromstring(source)
+    namespace = "{http://www.w3.org/2000/svg}"
+    allowed_elements = {"svg", "title", "desc", "g", "path", "circle"}
+
+    assert root.tag == f"{namespace}svg"
+    assert root.attrib["role"] == "img"
+    assert root.attrib["viewBox"]
+    title = root.find(f"{namespace}title")
+    description = root.find(f"{namespace}desc")
+    assert title is not None
+    assert description is not None
+    labelled_ids = root.attrib["aria-labelledby"].split()
+    identified_elements = {
+        element.attrib["id"]: element
+        for element in root.iter()
+        if "id" in element.attrib
+    }
+
+    assert labelled_ids
+    assert labelled_ids == [title.attrib["id"], description.attrib["id"]]
+    assert all(
+        identifier in identified_elements
+        and (identified_elements[identifier].text or "").strip()
+        for identifier in labelled_ids
+    )
+    assert all(
+        element.tag.rsplit("}", maxsplit=1)[-1] in allowed_elements
+        for element in root.iter()
+    )
+    assert root.find(f".//{namespace}text") is None
+    assert not any(
+        attribute.rsplit("}", maxsplit=1)[-1].lower().startswith("on")
+        or attribute.rsplit("}", maxsplit=1)[-1].lower() in {"href", "style"}
+        or "://" in value
+        or value.strip().lower().startswith("url(")
+        for element in root.iter()
+        for attribute, value in element.attrib.items()
+    )
 
 
 def _toctree_entries(source: str) -> tuple[str, ...]:
@@ -370,6 +414,97 @@ def test_versioned_diagrams_use_the_application_color_palette(filename: str) -> 
     )
     assert colors <= GOVBR_DIAGRAM_COLORS
     assert "#1351b4" in colors
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-logo.svg",
+        "govbr-auth-logo-light.svg",
+        "govbr-auth-logo-monochrome.svg",
+        "govbr-auth-mark.svg",
+    ),
+)
+def test_brand_assets_are_accessible_self_contained_svgs(filename: str) -> None:
+    source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
+    _assert_brand_svg_contract(source)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-logo.svg",
+        "govbr-auth-logo-light.svg",
+        "govbr-auth-logo-monochrome.svg",
+    ),
+)
+def test_wordmark_cherries_align_with_the_letter_baseline(filename: str) -> None:
+    source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
+    root = ET.fromstring(source)
+    namespace = "{http://www.w3.org/2000/svg}"
+    cherries = root.findall(f".//{namespace}circle")
+
+    assert len(cherries) == 2
+    assert all(
+        float(cherry.attrib["cy"]) + float(cherry.attrib["r"]) <= 50
+        for cherry in cherries
+    )
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    (
+        '<?xml-stylesheet type="text/css" href="https://evil.example/x.css"?>',
+        '<!DOCTYPE svg SYSTEM "https://evil.example/ext.dtd">',
+    ),
+)
+def test_brand_svg_contract_rejects_external_xml_prologs(prefix: str) -> None:
+    source = (
+        f"{prefix}"
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" '
+        'role="img" aria-labelledby="title desc">'
+        '<title id="title">Marca</title>'
+        '<desc id="desc">Descrição</desc>'
+        '<path d="M0 0"/>'
+        "</svg>"
+    )
+
+    with pytest.raises(AssertionError):
+        _assert_brand_svg_contract(source)
+
+
+def test_light_brand_colors_contrast_with_the_sphinx_header() -> None:
+    source = (DOCS_ROOT / "media" / "govbr-auth-logo-light.svg").read_text(
+        encoding="utf-8"
+    )
+    colors = {
+        value
+        for value in _svg_paint_values(source)
+        if SVG_HEX_COLOR.fullmatch(value) and value != "#ffffff"
+    }
+
+    sphinx_config = runpy.run_path(str(DOCS_ROOT / "conf.py"))
+    header_background = sphinx_config["html_theme_options"][
+        "style_nav_header_background"
+    ]
+
+    assert colors
+    assert all(_contrast_ratio(color, header_background) >= 3 for color in colors)
+
+
+def test_documentation_entrypoints_publish_the_brand_assets() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    sphinx_config = runpy.run_path(str(DOCS_ROOT / "conf.py"))
+
+    assert (
+        "https://raw.githubusercontent.com/cereja-project/govbr_auth/"
+        "main/docs/media/govbr-auth-logo.svg"
+    ) in readme
+    assert sphinx_config["html_theme_options"]["logo_only"] is True
+    assert sphinx_config["html_logo"] == "media/govbr-auth-logo-light.svg"
+    assert sphinx_config["html_favicon"] == "media/govbr-auth-mark.svg"
+    assert "_static" in sphinx_config["html_static_path"]
+    assert "brand.css" in sphinx_config["html_css_files"]
 
 
 def test_authentication_sequence_lifelines_have_graphical_contrast() -> None:
