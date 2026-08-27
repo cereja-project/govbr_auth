@@ -23,6 +23,15 @@ Provider ou booleano inválido
 ``GOVBR_FAKE_END_TO_END`` aceita exatamente ``true`` ou ``false`` em
 minúsculas. Corrija a variável e reinicie o processo.
 
+Variável desconhecida ou inativa
+--------------------------------
+
+Uma variável com prefixo ``GOVBR_`` que não pertence à versão instalada
+interrompe a inicialização e informa o nome desconhecido. Confira a grafia e a
+versão do pacote. Uma variável reconhecida, mas pertencente ao provider inativo,
+gera warning e é ignorada; remova-a ou selecione o provider correspondente.
+Mensagens de configuração nunca incluem o valor da variável.
+
 Host recusado
 -------------
 

@@ -7,6 +7,17 @@ Seleção do provedor
 ``GOVBR_PROVIDER`` aceita somente ``official`` ou ``fake``. O default é
 ``official``. Use ``GOVBR_PROVIDER=fake`` apenas em desenvolvimento.
 
+O launcher ``python -m govbr_auth.fake`` lê o arquivo ``.env`` apenas do
+diretório atual. A precedência é: configuração explícita passada pela aplicação,
+variável já exportada no ambiente do processo, valor do ``.env`` e, por fim,
+o padrão documentado. O ``.env`` nunca sobrescreve uma variável exportada.
+
+Nomes desconhecidos com o prefixo ``GOVBR_`` são rejeitados para que erros de
+digitação não ativem silenciosamente um valor padrão. Variáveis reconhecidas,
+mas inativas para o provider selecionado, emitem um warning contendo somente
+os nomes; valores e segredos não são incluídos. Endpoints oficiais combinados
+com ``GOVBR_PROVIDER=fake`` permanecem um erro de configuração.
+
 Provedor oficial
 ----------------
 

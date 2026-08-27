@@ -2,7 +2,8 @@
 
 import os
 import re
-from collections.abc import Mapping
+import warnings
+from collections.abc import Collection, Mapping
 from pathlib import Path
 from enum import StrEnum
 from urllib.parse import urlsplit
@@ -99,18 +100,35 @@ class GovBrRuntimeSettings(BaseModel):
 
 def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
     """Select only the environment inputs relevant to the chosen provider."""
+    _reject_unknown_govbr_variables(environ)
     provider = environ.get("GOVBR_PROVIDER", GovBrProvider.OFFICIAL.value)
     values: dict[str, object] = {"provider": provider}
 
     if provider == GovBrProvider.OFFICIAL.value:
+        _warn_about_inactive_variables(
+            environ,
+            provider=provider,
+            inactive_variables=_FAKE_FIELDS,
+        )
         oauth_values = _prefixed_values(environ, _OFFICIAL_OAUTH_FIELDS)
         if oauth_values:
             values["oauth"] = oauth_values
     elif provider == GovBrProvider.FAKE.value:
-        if any(name in environ for name in _OFFICIAL_ENDPOINT_FIELDS):
+        conflicting_endpoints = sorted(
+            set(environ).intersection(_OFFICIAL_ENDPOINT_FIELDS)
+        )
+        if conflicting_endpoints:
             raise ValueError(
-                "official endpoint variables conflict with fake provider selection"
+                "official endpoint variable(s) conflict with fake provider "
+                "selection: " + ", ".join(conflicting_endpoints)
             )
+        _warn_about_inactive_variables(
+            environ,
+            provider=provider,
+            inactive_variables=(
+                _OFFICIAL_OAUTH_FIELDS.keys() - _OFFICIAL_ENDPOINT_FIELDS
+            ),
+        )
         values.update(_prefixed_values(environ, _FAKE_FIELDS))
         if (
             values.get("fake_end_to_end") == "true"
@@ -119,6 +137,36 @@ def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
             values["fake_redirect_uri"] = _default_fake_redirect_uri(values)
 
     return values
+
+
+def _reject_unknown_govbr_variables(environ: Mapping[str, str]) -> None:
+    """Reject misspelled or unsupported configuration instead of defaulting."""
+    unknown = sorted(
+        name
+        for name in environ
+        if name.startswith("GOVBR_") and name not in _KNOWN_ENVIRONMENT_VARIABLES
+    )
+    if unknown:
+        raise ValueError(
+            "unknown GOVBR configuration variable(s): " + ", ".join(unknown)
+        )
+
+
+def _warn_about_inactive_variables(
+    environ: Mapping[str, str],
+    *,
+    provider: str,
+    inactive_variables: Collection[str],
+) -> None:
+    """Identify recognized settings ignored for the selected provider."""
+    inactive = sorted(set(environ).intersection(inactive_variables))
+    if inactive:
+        warnings.warn(
+            "ignoring provider-inactive GOVBR configuration variable(s) for "
+            f"provider '{provider}': {', '.join(inactive)}",
+            UserWarning,
+            stacklevel=4,
+        )
 
 
 def _prefixed_values(
@@ -186,6 +234,10 @@ _FAKE_FIELDS = {
     "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS": "fake_id_token_ttl_seconds",
     "GOVBR_FAKE_USERS_FILE": "fake_users_file",
 }
+
+_KNOWN_ENVIRONMENT_VARIABLES = frozenset(
+    {"GOVBR_PROVIDER", *_OFFICIAL_OAUTH_FIELDS, *_FAKE_FIELDS}
+)
 
 
 def _is_canonical_path_prefix(prefix: str, *, allow_empty: bool = False) -> bool:

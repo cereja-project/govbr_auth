@@ -1,6 +1,7 @@
 """Exercise the unified local Fake Gov.br launcher profiles."""
 
 import json
+from pathlib import Path
 from typing import get_type_hints
 import runpy
 from dataclasses import dataclass
@@ -19,8 +20,12 @@ FIXED_NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
-def isolate_fake_launcher_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def isolate_fake_launcher_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """Keep launcher profiles and user sources explicit in every test."""
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GOVBR_PROVIDER", "fake")
     monkeypatch.delenv("GOVBR_FAKE_END_TO_END", raising=False)
     monkeypatch.delenv("GOVBR_FAKE_USERS_FILE", raising=False)
@@ -143,6 +148,20 @@ def test_launcher_defaults_to_provider_only(monkeypatch) -> None:
     monkeypatch.delenv("GOVBR_FAKE_END_TO_END", raising=False)
 
     app = create_fake_app(clock=fixed_clock)
+
+    assert route_paths(app) == {"/authorize", "/login", "/token", "/userinfo", "/jwk"}
+    assert "/" not in route_paths(app)
+
+
+def test_explicit_settings_precede_process_environment(monkeypatch) -> None:
+    """Explicit settings must determine the graph before process configuration."""
+    monkeypatch.setenv("GOVBR_FAKE_END_TO_END", "true")
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_end_to_end=False,
+    )
+
+    app = create_fake_app(settings=settings, clock=fixed_clock)
 
     assert route_paths(app) == {"/authorize", "/login", "/token", "/userinfo", "/jwk"}
     assert "/" not in route_paths(app)
@@ -489,6 +508,119 @@ def test_run_uses_validated_loopback_settings(mocker) -> None:
         host="127.0.0.1",
         port=8000,
     )
+
+
+def test_launcher_reads_complete_fake_configuration_from_dotenv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mocker,
+) -> None:
+    """The launcher must preserve every supported FakeGov value from dotenv."""
+    users_file = tmp_path / "users.json"
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            (
+                "GOVBR_PROVIDER=fake",
+                "GOVBR_FAKE_END_TO_END=true",
+                "GOVBR_FAKE_HOST=localhost",
+                "GOVBR_FAKE_PORT=8123",
+                "GOVBR_FAKE_PROVIDER_PREFIX=/provider",
+                "GOVBR_FAKE_CLIENT_ID=dotenv-client",
+                "GOVBR_FAKE_CLIENT_SECRET=dotenv-secret",
+                "GOVBR_FAKE_REDIRECT_URI=http://localhost:8123/callback",
+                "GOVBR_FAKE_REQUEST_TTL_SECONDS=11",
+                "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS=12",
+                "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS=13",
+                "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS=14",
+                f"GOVBR_FAKE_USERS_FILE={users_file}",
+            )
+        ),
+        encoding="utf-8",
+    )
+    for variable in (
+        "GOVBR_FAKE_END_TO_END",
+        "GOVBR_FAKE_HOST",
+        "GOVBR_FAKE_PORT",
+        "GOVBR_FAKE_PROVIDER_PREFIX",
+        "GOVBR_FAKE_CLIENT_ID",
+        "GOVBR_FAKE_CLIENT_SECRET",
+        "GOVBR_FAKE_REDIRECT_URI",
+        "GOVBR_FAKE_REQUEST_TTL_SECONDS",
+        "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS",
+        "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS",
+        "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS",
+        "GOVBR_FAKE_USERS_FILE",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    uvicorn_run = mocker.patch("uvicorn.run")
+    from govbr_auth.fake.fastapi import _launcher_settings, run
+
+    run()
+    settings = _launcher_settings()
+
+    assert settings.provider is GovBrProvider.FAKE
+    assert settings.fake_end_to_end is True
+    assert settings.fake_host == "localhost"
+    assert settings.fake_port == 8123
+    assert settings.fake_provider_prefix == "/provider"
+    assert settings.fake_client_id == "dotenv-client"
+    assert settings.fake_client_secret.get_secret_value() == "dotenv-secret"
+    assert str(settings.fake_redirect_uri) == "http://localhost:8123/callback"
+    assert settings.fake_request_ttl_seconds == 11
+    assert settings.fake_authorization_code_ttl_seconds == 12
+    assert settings.fake_access_token_ttl_seconds == 13
+    assert settings.fake_id_token_ttl_seconds == 14
+    assert settings.fake_users_file == users_file
+    uvicorn_run.assert_called_once_with(
+        "govbr_auth.fake:create_fake_app",
+        factory=True,
+        host="localhost",
+        port=8123,
+    )
+
+
+def test_launcher_process_environment_precedes_dotenv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mocker,
+) -> None:
+    """Process variables must override values loaded from dotenv."""
+    (tmp_path / ".env").write_text(
+        "GOVBR_FAKE_HOST=localhost\nGOVBR_FAKE_PORT=8123\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GOVBR_FAKE_HOST", "127.0.0.1")
+    monkeypatch.setenv("GOVBR_FAKE_PORT", "9000")
+
+    mocker.patch("uvicorn.run")
+    from govbr_auth.fake.fastapi import _launcher_settings, run
+
+    run()
+    settings = _launcher_settings()
+
+    assert settings.fake_host == "127.0.0.1"
+    assert settings.fake_port == 9000
+
+
+def test_launcher_rejects_invalid_dotenv_value(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An invalid dotenv value must fail instead of activating a default."""
+    (tmp_path / ".env").write_text(
+        "GOVBR_FAKE_PORT=not-a-port\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GOVBR_FAKE_PORT", raising=False)
+
+    from govbr_auth.fake.fastapi import run
+
+    with pytest.raises(ValueError, match="GOVBR_FAKE_PORT|fake_port"):
+        run()
 
 
 def test_fake_module_executes_run(mocker) -> None:
