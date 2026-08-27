@@ -157,7 +157,7 @@ No PowerShell::
     $env:GOVBR_FAKE_END_TO_END = "true"
     python -m govbr_auth.fake
 
-Abra ``http://localhost:8000``, clique em **Entrar com Gov.br** e informe um
+Abra ``http://localhost:8000``, clique em **Entrar com gov.br** e informe um
 usuário fictício. O launcher é uma demonstração local; aplicações reais
 usam ``GovBrAuth`` diretamente e preservam o mesmo runtime consumidor.
 
