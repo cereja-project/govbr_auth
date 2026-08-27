@@ -36,11 +36,11 @@ def test_release_version_is_consistent_across_package_and_documentation() -> Non
     )
 
     assert versions == (
-        "1.0.0",
-        "1.0.0",
-        "1.0.0",
+        "1.0.0rc1",
+        "1.0.0rc1",
+        "1.0.0rc1",
         "1.0",
-        "1.0.0",
+        "1.0.0rc1",
     )
 
 

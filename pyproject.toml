@@ -1,6 +1,6 @@
 [project]
 name = "govbr-auth"
-version = "1.0.0"
+version = "1.0.0rc1"
 description = "Engine de autenticação Gov.br com adapters opcionais para FastAPI, Django e Flask."
 authors = [
     { name="Joab Leite", email="leitejoab@gmail.com" }
@@ -10,7 +10,7 @@ license = "MIT"
 keywords = ["gov.br", "autenticação", "fastapi", "django", "flask", "oauth2", "openid-connect"]
 requires-python = ">=3.11"
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Framework :: Django",
     "Framework :: FastAPI",
     "Framework :: Flask",

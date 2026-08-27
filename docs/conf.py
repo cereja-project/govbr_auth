@@ -5,7 +5,7 @@ project = 'GovBR Auth'
 author = 'Joab Leite'
 copyright = f'2026, {author}'
 version = '1.0'  # short version
-release = '1.0.0'  # full version
+release = '1.0.0rc1'  # full version
 
 # General configuration
 extensions = [
