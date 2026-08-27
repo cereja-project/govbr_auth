@@ -132,7 +132,7 @@ No PowerShell::
     $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     uvicorn myapp:app --reload
 
-Abra ``http://127.0.0.1:8000/auth/govbr/login``, use CPF ``11122233344`` e
+Abra ``http://localhost:8000/auth/govbr/login``, use CPF ``11122233344`` e
 senha ``senha-ficticia``. O navegador será redirecionado para as rotas FakeGov
 montadas na própria aplicação. O backend troca o código, busca JWKS e consulta
 ``userinfo`` usando ``FakeGovHttpTransport``. O callback retorna somente
@@ -157,7 +157,7 @@ No PowerShell::
     $env:GOVBR_FAKE_END_TO_END = "true"
     python -m govbr_auth.fake
 
-Abra ``http://localhost:8000``, clique em **Entrar com Gov.br** e informe um
+Abra ``http://localhost:8000``, clique em **Entrar com gov.br** e informe um
 usuário fictício. O launcher é uma demonstração local; aplicações reais
 usam ``GovBrAuth`` diretamente e preservam o mesmo runtime consumidor.
 
