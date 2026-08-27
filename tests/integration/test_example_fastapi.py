@@ -126,7 +126,9 @@ def test_example_uses_only_the_canonical_fastapi_facade() -> None:
 @pytest.mark.asyncio
 async def test_example_selects_complete_fake_graph_from_environment(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GOVBR_PROVIDER", "fake")
     for variable in (
         "GOVBR_AUTHORIZATION_URL",
