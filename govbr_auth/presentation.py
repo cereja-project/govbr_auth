@@ -28,35 +28,53 @@ class PresentedCredential(Protocol):
 
 _THEME_CSS = """
 :root {
-  --ink: #17213b;
-  --muted: #536078;
-  --surface: #ffffff;
-  --canvas: #eef3f8;
-  --primary: #1351b4;
-  --primary-dark: #0c3d8f;
-  --accent: #ffcd07;
-  --line: #d9e2ec;
-  --success: #168821;
-  --danger: #b3261e;
-  --radius: 1rem;
+  --pure-0: #ffffff;
+  --gray-2: #f8f8f8;
+  --gray-20: #cccccc;
+  --gray-40: #888888;
+  --gray-80: #333333;
+  --blue-warm-vivid-90: #071d41;
+  --blue-warm-vivid-80: #0c326f;
+  --blue-warm-vivid-70: #1351b4;
+  --blue-warm-vivid-10: #e8f1ff;
+  --green-cool-vivid-50: #168821;
+  --green-cool-vivid-5: #e3f5e1;
+  --yellow-vivid-20: #ffcd07;
+  --yellow-vivid-5: #fff5c2;
+  --red-vivid-50: #e52207;
+  --red-vivid-10: #f9dede;
+  --ink: var(--gray-80);
+  --muted: #555555;
+  --surface: var(--pure-0);
+  --canvas: var(--gray-2);
+  --primary: var(--blue-warm-vivid-70);
+  --primary-dark: var(--blue-warm-vivid-80);
+  --accent: var(--yellow-vivid-20);
+  --line: var(--gray-20);
+  --success: var(--green-cool-vivid-50);
+  --danger: var(--red-vivid-50);
+  --danger-text: #b3261e;
+  --input-focus: #1351b4;
+  --warning: #c58b00;
+  --radius: .5rem;
   color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+  font-family: Rawline, "Raleway", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   line-height: 1.5;
 }
 * { box-sizing: border-box; }
 body { background: var(--canvas); color: var(--ink); margin: 0; min-height: 100vh; }
 .container { margin-inline: auto; max-width: 70rem; padding-inline: 1.5rem; }
-.site-header { background: #071d41; color: #fff; }
+.site-header { background: var(--blue-warm-vivid-90); color: var(--pure-0); }
 .brand-row { align-items: center; display: flex; justify-content: space-between; min-height: 4.5rem; }
 .brand { font-size: 1.15rem; font-weight: 800; letter-spacing: -.02em; }
 .simulation-badge {
-  background: var(--accent); border-radius: 999px; color: #302800; font-size: .72rem;
+  background: var(--accent); border-radius: 100em; color: #302800; font-size: .72rem;
   font-weight: 800; letter-spacing: .08em; padding: .35rem .7rem;
 }
 main.container { display: grid; gap: 1.5rem; padding-block: 3rem; }
 section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2rem; }
-.hero { background: linear-gradient(135deg, #fff 55%, #e8f1ff); padding-block: 3rem; }
+.hero { background: linear-gradient(135deg, var(--pure-0) 55%, var(--blue-warm-vivid-10)); padding-block: 3rem; }
 .eyebrow, .section-kicker {
   color: var(--primary); font-size: .78rem; font-weight: 800; letter-spacing: .09em;
   margin: 0 0 .6rem; text-transform: uppercase;
@@ -65,14 +83,14 @@ h1 { font-size: clamp(2rem, 5vw, 3.6rem); letter-spacing: -.045em; line-height: 
 h2 { font-size: clamp(1.45rem, 3vw, 2rem); letter-spacing: -.025em; margin: 0 0 1rem; }
 .lead { color: var(--muted); font-size: 1.12rem; max-width: 58ch; }
 .primary, button {
-  background: var(--primary); border: 0; border-radius: .55rem; color: #fff; cursor: pointer;
+  background: var(--primary); border: 0; border-radius: 100em; color: var(--pure-0); cursor: pointer;
   display: inline-block; font: inherit; font-weight: 750; margin-top: .8rem; padding: .85rem 1.15rem;
   text-decoration: none; transition: background-color .18s ease, transform .18s ease;
 }
 .primary:hover, button:hover { background: var(--primary-dark); transform: translateY(-1px); }
 :focus-visible {
-  box-shadow: 0 0 0 .38rem #071d41;
-  outline: .16rem solid #fff;
+  box-shadow: 0 0 0 .38rem var(--blue-warm-vivid-90);
+  outline: .16rem solid var(--pure-0);
   outline-offset: .1rem;
 }
 .steps { display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); list-style: none; margin: 1.5rem 0 0; padding: 0; }
@@ -102,27 +120,38 @@ code { background: #edf2f7; border-radius: .3rem; color: var(--ink); padding: .1
 .error-code { color: var(--muted); }
 .site-footer { color: var(--muted); font-size: .88rem; padding-block: 0 2rem; text-align: center; }
 body.card-layout {
-  align-items: center; background: #f3f5f7; display: flex; justify-content: center;
+  align-items: center; background: var(--gray-2); display: flex; justify-content: center;
   margin: 0; min-height: 100vh; padding: 1.5rem;
 }
 main.card-layout-main {
-  background: #fff; border-radius: 0.75rem; box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 12%);
+  background: var(--pure-0); border-radius: 0.75rem; border-top: .25rem solid var(--warning);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 12%);
   max-width: 32rem; padding: 2rem; width: 100%;
 }
 .card-layout-main h1 { font-size: 1.5rem; max-width: none; }
-.warning { background: #fff4cc; border-left: .3rem solid #c58b00; padding: .75rem; }
-.error { color: var(--danger); font-weight: 700; }
+.message { border-left: .25rem solid; margin-block: 1rem; padding: 1rem; }
+.message strong { display: block; margin-bottom: .25rem; }
+.message.warning { background: var(--yellow-vivid-5); border-color: var(--warning); }
+.message.danger { background: var(--red-vivid-10); border-color: var(--danger); }
+.message.success { background: var(--green-cool-vivid-5); border-color: var(--success); }
+.error { color: var(--danger-text); font-weight: 700; }
 .card-layout-main form { display: grid; gap: .75rem; }
 .card-layout-main label { font-weight: 700; }
+.field-hint { color: var(--muted); font-size: .875rem; margin-top: -.5rem; }
 .card-layout-main input {
-  border: 1px solid #6c737f; border-radius: .35rem; font: inherit; padding: .75rem; width: 100%;
+  background: var(--pure-0); border: 1px solid var(--gray-40); border-radius: .25rem;
+  color: var(--gray-80); font: inherit; min-height: 3rem; padding: .75rem; width: 100%;
 }
+.card-layout-main input[aria-invalid="true"] { border-color: var(--danger); border-width: 2px; }
 .card-layout-main button {
   border-radius: .35rem; font-weight: 700; margin-top: 0; padding: .75rem 1rem;
 }
 .card-layout-main button + button { margin-top: .25rem; }
-.card-layout-main input:focus-visible, .card-layout-main button:focus-visible {
-  box-shadow: none; outline: .2rem solid #ffcd07; outline-offset: .15rem;
+.card-layout-main input:focus-visible {
+  box-shadow: none; outline: .2rem solid var(--input-focus); outline-offset: .15rem;
+}
+.card-layout-main button:focus-visible {
+  box-shadow: none; outline: .2rem solid var(--yellow-vivid-20); outline-offset: .15rem;
 }
 @media (max-width: 44rem) {
   .container { padding-inline: 1rem; }
@@ -188,7 +217,7 @@ def render_page(*, title: str, body: str, layout: Literal["wide", "card"]) -> st
     if layout == "wide":
         page_body = f"""<body>
 <header class="site-header"><div class="container brand-row">
-<span class="brand">gov.br auth</span>{render_simulation_badge()}
+<span class="brand">govbr-auth</span>{render_simulation_badge()}
 </div></header>
 <main class="container">{body}</main>
 <footer class="site-footer"><div class="container">
@@ -254,11 +283,11 @@ def render_success(user: GovBrUser) -> str:
         title="Autenticação concluída",
         layout="wide",
         body=(
-            '<section class="result" aria-live="polite" aria-labelledby="page-title">'
+            '<section class="result" aria-labelledby="page-title">'
             '<div class="success-mark" aria-hidden="true">✓</div>'
-            '<p class="eyebrow">Callback validado</p>'
             '<h1 id="page-title">Autenticação concluída</h1>'
-            '<p class="lead">A identidade fictícia foi recebida com sucesso.</p>'
+            '<div class="message success" role="status"><strong>Callback validado</strong>'
+            "A identidade fictícia foi recebida com sucesso.</div>"
             '<dl class="identity">'
             f"<div><dt>Nome</dt><dd>{name}</dd></div>"
             f"<div><dt>CPF</dt><dd>{masked_cpf}</dd></div>"
@@ -279,11 +308,11 @@ def render_error(*, code: str, status_code: int) -> str:
         title="Não foi possível autenticar",
         layout="wide",
         body=(
-            '<section class="result" role="alert" aria-labelledby="page-title">'
+            '<section class="result" aria-labelledby="page-title">'
             '<div class="error-mark" aria-hidden="true">!</div>'
-            '<p class="eyebrow">Fluxo interrompido</p>'
             '<h1 id="page-title">Não foi possível autenticar</h1>'
-            f"{render_safe_error_panel(message=_ERROR_GUIDANCE[public_code])}"
+            '<div class="message danger" role="alert"><strong>Fluxo interrompido</strong>'
+            f"{render_safe_error_panel(message=_ERROR_GUIDANCE[public_code])}</div>"
             f'<p class="error-code">Código: <code>{safe_code}</code> '
             f"(HTTP {safe_status})</p>"
             f'{render_primary_action(href="/auth/govbr/login", label="Tentar novamente")}'

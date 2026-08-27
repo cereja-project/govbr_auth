@@ -5,6 +5,13 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Changed
+- A interface local da demo e do FakeGov agora aplica fundamentos visuais e de
+  acessibilidade do GOVBR-DS sem dependências frontend ou recursos externos,
+  preservando a identificação explícita de simulação.
+
 ## [1.0.0rc1] - 2026-08-26
 
 ### Added

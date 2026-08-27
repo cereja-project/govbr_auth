@@ -15,23 +15,32 @@ def render_fake_login(
     request_value = html.escape(session.request.get_secret_value(), quote=True)
     action_value = html.escape(login_action, quote=True)
     credential_error = (
-        '<p class="error" role="alert">CPF ou senha inválidos.</p>'
+        '<div class="message danger"><strong>Não foi possível entrar</strong>'
+        '<p id="credential-error" class="error" role="alert">'
+        "CPF ou senha inválidos.</p></div>"
         if invalid_credentials
         else ""
     )
+    described_by = (
+        "fake-guidance credential-error" if invalid_credentials else "fake-guidance"
+    )
+    cpf_described_by = described_by.replace("fake-guidance", "fake-guidance cpf-hint")
+    invalid_state = ' aria-invalid="true"' if invalid_credentials else ""
     content = (
         "<h1>FAKE / SIMULAÇÃO</h1>"
-        '<p id="fake-guidance" class="warning"><strong>Atenção:</strong> '
-        "Não informe credenciais reais. Este provedor é somente para testes locais.</p>"
+        '<div id="fake-guidance" class="message warning" role="note">'
+        "<strong>Ambiente de simulação</strong>Não informe credenciais reais. "
+        "Este provedor é somente para testes locais.</div>"
         f"{credential_error}"
         f'<form method="post" action="{action_value}">'
         f'<input type="hidden" name="request" value="{request_value}">'
         '<label for="cpf">CPF</label>'
+        '<span id="cpf-hint" class="field-hint">Somente números.</span>'
         '<input id="cpf" name="cpf" type="text" inputmode="numeric" '
-        'autocomplete="username" aria-describedby="fake-guidance" required>'
+        f'autocomplete="username" aria-describedby="{cpf_described_by}"{invalid_state} required>'
         '<label for="password">Senha</label>'
         '<input id="password" name="password" type="password" '
-        'autocomplete="current-password" aria-describedby="fake-guidance" required>'
+        f'autocomplete="current-password" aria-describedby="{described_by}"{invalid_state} required>'
         '<button type="submit">Entrar</button>'
         "</form>"
     )
