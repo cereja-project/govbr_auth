@@ -386,18 +386,56 @@ def test_brand_assets_are_accessible_self_contained_svgs(filename: str) -> None:
     source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
     root = ET.fromstring(source)
     namespace = "{http://www.w3.org/2000/svg}"
+    allowed_elements = {"svg", "title", "desc", "g", "path", "circle"}
 
     assert root.tag == f"{namespace}svg"
     assert root.attrib["role"] == "img"
     assert root.attrib["viewBox"]
-    assert root.find(f"{namespace}title") is not None
-    assert root.find(f"{namespace}desc") is not None
-    assert root.find(f".//{namespace}script") is None
-    assert not any(
-        attribute.rsplit("}", maxsplit=1)[-1] == "href"
+    title = root.find(f"{namespace}title")
+    description = root.find(f"{namespace}desc")
+    assert title is not None
+    assert description is not None
+    labelled_ids = root.attrib["aria-labelledby"].split()
+    identified_elements = {
+        element.attrib["id"]: element
         for element in root.iter()
-        for attribute in element.attrib
+        if "id" in element.attrib
+    }
+
+    assert labelled_ids
+    assert labelled_ids == [title.attrib["id"], description.attrib["id"]]
+    assert all(
+        identifier in identified_elements
+        and (identified_elements[identifier].text or "").strip()
+        for identifier in labelled_ids
     )
+    assert all(
+        element.tag.rsplit("}", maxsplit=1)[-1] in allowed_elements
+        for element in root.iter()
+    )
+    assert root.find(f".//{namespace}text") is None
+    assert not any(
+        attribute.rsplit("}", maxsplit=1)[-1].lower().startswith("on")
+        or attribute.rsplit("}", maxsplit=1)[-1].lower() in {"href", "style"}
+        or "://" in value
+        or value.strip().lower().startswith("url(")
+        for element in root.iter()
+        for attribute, value in element.attrib.items()
+    )
+
+
+def test_light_brand_colors_contrast_with_the_sphinx_header() -> None:
+    source = (DOCS_ROOT / "media" / "govbr-auth-logo-light.svg").read_text(
+        encoding="utf-8"
+    )
+    colors = {
+        value
+        for value in _svg_paint_values(source)
+        if SVG_HEX_COLOR.fullmatch(value) and value != "#ffffff"
+    }
+
+    assert colors
+    assert all(_contrast_ratio(color, "#2c3e50") >= 3 for color in colors)
 
 
 def test_documentation_entrypoints_publish_the_brand_assets() -> None:
