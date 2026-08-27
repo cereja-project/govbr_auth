@@ -155,7 +155,7 @@ def test_home_does_not_render_credentials_in_the_launcher_response() -> None:
     assert "bruno-demo" not in page
     assert "nunca são exibidos" in page
     assert 'href="/auth/govbr/login"' in page
-    assert ">Entrar com Gov.br</a>" in page
+    assert ">Entrar com gov.br</a>" in page
     assert ":focus-visible" in page
     assert "@media" in page
 

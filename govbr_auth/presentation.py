@@ -256,7 +256,7 @@ def render_home(credentials: tuple[PresentedCredential, ...] = ()) -> str:
             '<h1 id="page-title">Teste a autenticação completa em ambiente local</h1>'
             '<p class="lead">Percorra uma simulação segura, isolada e sem acesso '
             "a serviços externos.</p>"
-            f'{render_primary_action(href="/auth/govbr/login", label="Entrar com Gov.br")}'
+            f'{render_primary_action(href="/auth/govbr/login", label="Entrar com gov.br")}'
             "</section>"
             '<section class="workflow" aria-labelledby="workflow-title">'
             '<p class="section-kicker">Como funciona</p>'

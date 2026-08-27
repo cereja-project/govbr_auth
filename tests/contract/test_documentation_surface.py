@@ -246,7 +246,7 @@ def test_fastapi_fake_quickstart_install_is_complete_for_uvicorn() -> None:
     required_guidance = (
         'pip install "govbr-auth[fastapi,fake]"',
         "uvicorn myapp:app --reload",
-        "http://127.0.0.1:8000/auth/govbr/login",
+        "http://localhost:8000/auth/govbr/login",
     )
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
@@ -264,15 +264,31 @@ def test_fastapi_fake_quickstart_install_is_complete_for_uvicorn() -> None:
 
 def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
     source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    first_section = next(line for line in source.splitlines() if line.startswith("## "))
-
-    assert first_section == "## Teste a integração sem depender do Gov.br"
+    sections = [line for line in source.splitlines() if line.startswith("## ")]
+    assert sections[0] == "## Índice"
+    assert sections[1] == "## Instalação"
+    assert sections[2] == "## Teste a integração sem depender do gov.br"
     assert "docs/media/fakegov-flow.svg" in source
     assert "**FakeGov**" in source
     assert "Instalar" in source
     assert "Iniciar" in source
     assert "Entrar" in source
     assert "Concluir" in source
+
+
+def test_entry_docs_quote_the_launcher_button_label_verbatim() -> None:
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+    )
+    assert tuple("**Entrar com gov.br**" in source for source in sources) == (
+        True,
+        True,
+    )
+    assert tuple("Entrar com Gov.br" in source for source in sources) == (
+        False,
+        False,
+    )
 
 
 def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
