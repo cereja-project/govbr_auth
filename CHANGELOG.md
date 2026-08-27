@@ -15,6 +15,14 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   os exemplos executáveis delegam a leitura completa ao carregador validado em
   vez de reconstruir apenas provider, host e porta.
 
+### Fixed
+- O launcher `python -m govbr_auth.fake` agora carrega o `.env` do
+  diretório atual sem sobrescrever variáveis exportadas pelo terminal e valida
+  todas as configurações FakeGov antes de iniciar o servidor.
+- Variáveis `GOVBR_*` desconhecidas agora falham explicitamente; variáveis
+  reconhecidas mas inativas para o provider selecionado emitem warning sem
+  revelar seus valores.
+
 ## [1.0.0rc1] - 2026-08-26
 
 ### Added
