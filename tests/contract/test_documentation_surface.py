@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from govbr_auth.runtime_settings import _FAKE_FIELDS, _OFFICIAL_OAUTH_FIELDS
+
 DOCS_ROOT = Path(__file__).parents[2] / "docs"
 PROJECT_ROOT = DOCS_ROOT.parent
 INCLUDE_DIRECTIVE = re.compile(r"^\.\. include::\s+(.+?)\s*$", re.MULTILINE)
@@ -88,6 +90,50 @@ def test_environment_example_documents_the_canonical_provider_switch() -> None:
     assert "GOVBR_PROVIDER=fake" in source
     assert "create_development_app" not in source
     assert "There is no fake-mode flag" not in source
+
+
+def test_environment_example_documents_every_supported_variable() -> None:
+    source = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+    documented_variables = set(
+        re.findall(r"^#?\s*(GOVBR_[A-Z0-9_]+)=", source, re.MULTILINE)
+    )
+    supported_variables = {
+        "GOVBR_PROVIDER",
+        *_OFFICIAL_OAUTH_FIELDS,
+        *_FAKE_FIELDS,
+    }
+    expected_variables = {
+        "GOVBR_PROVIDER",
+        "GOVBR_ENVIRONMENT",
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_USERINFO_URL",
+        "GOVBR_CLIENT_ID",
+        "GOVBR_CLIENT_SECRET",
+        "GOVBR_REDIRECT_URI",
+        "GOVBR_SCOPE",
+        "GOVBR_TRANSACTION_SECRET",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+        "GOVBR_CONNECT_TIMEOUT_SECONDS",
+        "GOVBR_READ_TIMEOUT_SECONDS",
+        "GOVBR_CLOCK_SKEW_SECONDS",
+        "GOVBR_FAKE_END_TO_END",
+        "GOVBR_FAKE_HOST",
+        "GOVBR_FAKE_PORT",
+        "GOVBR_FAKE_PROVIDER_PREFIX",
+        "GOVBR_FAKE_CLIENT_ID",
+        "GOVBR_FAKE_CLIENT_SECRET",
+        "GOVBR_FAKE_REDIRECT_URI",
+        "GOVBR_FAKE_REQUEST_TTL_SECONDS",
+        "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS",
+        "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS",
+        "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS",
+        "GOVBR_FAKE_USERS_FILE",
+    }
+
+    assert supported_variables == expected_variables
+    assert documented_variables == expected_variables
 
 
 def test_transaction_secret_documentation_explains_generation_and_storage() -> None:

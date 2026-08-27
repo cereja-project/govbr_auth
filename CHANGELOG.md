@@ -11,6 +11,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - A interface local da demo e do FakeGov agora aplica fundamentos visuais e de
   acessibilidade do GOVBR-DS sem dependências frontend ou recursos externos,
   preservando a identificação explícita de simulação.
+- O `.env.example` agora documenta todas as configurações oficiais e FakeGov;
+  os exemplos executáveis delegam a leitura completa ao carregador validado em
+  vez de reconstruir apenas provider, host e porta.
 
 ## [1.0.0rc1] - 2026-08-26
 
