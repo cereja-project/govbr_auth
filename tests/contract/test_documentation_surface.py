@@ -229,6 +229,7 @@ def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
     assert "Entrar" in source
     assert "Concluir" in source
 
+
 def test_entry_docs_quote_the_launcher_button_label_verbatim() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
@@ -242,6 +243,7 @@ def test_entry_docs_quote_the_launcher_button_label_verbatim() -> None:
         False,
         False,
     )
+
 
 def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
     source = (DOCS_ROOT / "guide" / "communication-flow.rst").read_text(
