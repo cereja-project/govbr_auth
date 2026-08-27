@@ -431,6 +431,27 @@ def test_brand_assets_are_accessible_self_contained_svgs(filename: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-logo.svg",
+        "govbr-auth-logo-light.svg",
+        "govbr-auth-logo-monochrome.svg",
+    ),
+)
+def test_wordmark_cherries_align_with_the_letter_baseline(filename: str) -> None:
+    source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
+    root = ET.fromstring(source)
+    namespace = "{http://www.w3.org/2000/svg}"
+    cherries = root.findall(f".//{namespace}circle")
+
+    assert len(cherries) == 2
+    assert all(
+        float(cherry.attrib["cy"]) + float(cherry.attrib["r"]) <= 50
+        for cherry in cherries
+    )
+
+
+@pytest.mark.parametrize(
     "prefix",
     (
         '<?xml-stylesheet type="text/css" href="https://evil.example/x.css"?>',
