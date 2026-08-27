@@ -44,7 +44,11 @@ asyncio.run(verify())
         [sys.executable, "-c", probe],
         cwd=tmp_path,
         env={
-            **os.environ,
+            **{
+                name: value
+                for name, value in os.environ.items()
+                if not name.startswith("GOVBR_")
+            },
             "GOVBR_PROVIDER": "fake",
             "PYTHONUTF8": "1",
             "PYTHONPATH": str(PROJECT_ROOT),

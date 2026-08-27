@@ -4,9 +4,11 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Protocol
 
 import httpx
+from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
 
 from govbr_auth.fake.http.routes import build_fake_govbr_routes
@@ -151,6 +153,7 @@ def run() -> None:
     """Run the selected fake profile on its validated loopback endpoint."""
     import uvicorn
 
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     settings = _launcher_settings()
     uvicorn.run(
         "govbr_auth.fake:create_fake_app",

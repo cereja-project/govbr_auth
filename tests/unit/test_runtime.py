@@ -120,22 +120,47 @@ def test_runtime_settings_parse_explicit_false_end_to_end() -> None:
 
 def test_runtime_settings_build_official_oauth_from_environment() -> None:
     """Official environment fields must populate the nested OAuth settings."""
+    transaction_secret = Fernet.generate_key().decode("ascii")
     settings = GovBrRuntimeSettings.from_environment(
         {
+            "GOVBR_PROVIDER": "official",
+            "GOVBR_ENVIRONMENT": "staging",
             "GOVBR_AUTHORIZATION_URL": "https://sso.example.test/authorize",
             "GOVBR_TOKEN_URL": "https://sso.example.test/token",
             "GOVBR_USERINFO_URL": "https://sso.example.test/userinfo",
             "GOVBR_CLIENT_ID": "test-client",
             "GOVBR_CLIENT_SECRET": "test-client-secret",
             "GOVBR_REDIRECT_URI": "https://consumer.example.test/oauth/callback",
-            "GOVBR_TRANSACTION_SECRET": Fernet.generate_key().decode("ascii"),
+            "GOVBR_SCOPE": "openid profile custom",
+            "GOVBR_TRANSACTION_SECRET": transaction_secret,
             "GOVBR_ISSUER": "https://sso.example.test",
             "GOVBR_JWKS_URL": "https://sso.example.test/jwks",
+            "GOVBR_CONNECT_TIMEOUT_SECONDS": "7.5",
+            "GOVBR_READ_TIMEOUT_SECONDS": "12.5",
+            "GOVBR_CLOCK_SKEW_SECONDS": "45",
         }
     )
 
     assert settings.oauth is not None
+    assert settings.provider is GovBrProvider.OFFICIAL
+    assert settings.oauth.environment.value == "staging"
+    assert str(settings.oauth.authorization_url) == (
+        "https://sso.example.test/authorize"
+    )
+    assert str(settings.oauth.token_url) == "https://sso.example.test/token"
+    assert str(settings.oauth.userinfo_url) == "https://sso.example.test/userinfo"
     assert settings.oauth.client_id == "test-client"
+    assert settings.oauth.client_secret.get_secret_value() == "test-client-secret"
+    assert str(settings.oauth.redirect_uri) == (
+        "https://consumer.example.test/oauth/callback"
+    )
+    assert settings.oauth.scope == "openid profile custom"
+    assert settings.oauth.transaction_secret.get_secret_value() == transaction_secret
+    assert str(settings.oauth.issuer) == "https://sso.example.test/"
+    assert str(settings.oauth.jwks_url) == "https://sso.example.test/jwks"
+    assert settings.oauth.connect_timeout_seconds == 7.5
+    assert settings.oauth.read_timeout_seconds == 12.5
+    assert settings.oauth.clock_skew_seconds == 45
 
 
 def test_runtime_settings_reject_unknown_provider(
@@ -146,6 +171,51 @@ def test_runtime_settings_reject_unknown_provider(
 
     with pytest.raises(ValidationError):
         GovBrRuntimeSettings.from_environment()
+
+
+def test_runtime_settings_reject_unknown_govbr_variable() -> None:
+    """A misspelled GOVBR variable must not disappear behind a default."""
+    with pytest.raises(
+        ValueError, match="unknown GOVBR configuration.*GOVBR_FAKE_PORRT"
+    ) as captured:
+        GovBrRuntimeSettings.from_environment(
+            {
+                "GOVBR_PROVIDER": "fake",
+                "GOVBR_FAKE_PORRT": "sensitive-unknown-value",
+            }
+        )
+    assert "sensitive-unknown-value" not in str(captured.value)
+
+
+@pytest.mark.parametrize(
+    ("environment", "inactive_variable"),
+    (
+        (
+            {"GOVBR_PROVIDER": "official", "GOVBR_FAKE_PORT": "8123"},
+            "GOVBR_FAKE_PORT",
+        ),
+        (
+            {
+                "GOVBR_PROVIDER": "fake",
+                "GOVBR_CONNECT_TIMEOUT_SECONDS": "7",
+            },
+            "GOVBR_CONNECT_TIMEOUT_SECONDS",
+        ),
+    ),
+    ids=(
+        "fake-variable-with-official-provider",
+        "official-variable-with-fake-provider",
+    ),
+)
+def test_runtime_settings_warn_about_provider_inactive_variables(
+    environment: dict[str, str],
+    inactive_variable: str,
+) -> None:
+    """Removing the warning must make a recognized inactive input silent."""
+    with pytest.warns(UserWarning, match=inactive_variable) as captured:
+        GovBrRuntimeSettings.from_environment(environment)
+    assert environment[inactive_variable] not in str(captured[0].message)
+    assert Path(captured[0].filename).name == "test_runtime.py"
 
 
 @pytest.mark.parametrize(
