@@ -2,6 +2,7 @@
 
 import importlib
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -15,10 +16,57 @@ AUTODOC_DIRECTIVE = re.compile(
     r"^\.\. auto(?:class|function|method|module)::\s+([\w.]+)\s*$",
     re.MULTILINE,
 )
+SVG_HEX_COLOR = re.compile(r"#[0-9a-f]{6}")
+SVG_PAINT_REFERENCE = re.compile(r"url\(#[A-Za-z_][\w.-]*\)")
+SVG_PAINT_PROPERTIES = {"fill", "stroke", "stop-color"}
+GOVBR_DIAGRAM_COLORS = {
+    "#071d41",
+    "#0c326f",
+    "#1351b4",
+    "#333333",
+    "#555555",
+    "#888888",
+    "#cccccc",
+    "#e8f1ff",
+    "#f8f8f8",
+    "#fb923c",
+    "#fff7ed",
+    "#ffffff",
+}
 
 
 def _normalized_prose(source: str) -> str:
     return re.sub(r"\s+", " ", source.replace("`", "")).lower()
+
+
+def _relative_luminance(color: str) -> float:
+    channels = tuple(int(color[index : index + 2], 16) / 255 for index in (1, 3, 5))
+    linear = tuple(
+        channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    )
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast_ratio(first: str, second: str) -> float:
+    lighter, darker = sorted(
+        (_relative_luminance(first), _relative_luminance(second)), reverse=True
+    )
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _svg_paint_values(source: str) -> set[str]:
+    root = ET.fromstring(source)
+    values: set[str] = set()
+    for element in root.iter():
+        element_name = element.tag.rsplit("}", maxsplit=1)[-1].lower()
+        assert element_name != "style", "SVG <style> elements are not supported"
+        assert "style" not in element.attrib, "SVG style attributes are not supported"
+        for name, value in element.attrib.items():
+            property_name = name.rsplit("}", maxsplit=1)[-1]
+            if property_name in SVG_PAINT_PROPERTIES:
+                values.add(value.strip().lower())
+    return values
 
 
 def _toctree_entries(source: str) -> tuple[str, ...]:
@@ -300,6 +348,44 @@ def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> N
     assert "../media/authentication-sequence.svg" in source
     assert "Frontend       API + govbr-auth" not in source
     assert "Frontend       API FastAPI" not in source
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "authentication-sequence.svg",
+        "fakegov-flow.svg",
+        "provider-switch.svg",
+    ),
+)
+def test_versioned_diagrams_use_the_application_color_palette(filename: str) -> None:
+    source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
+    paint_values = _svg_paint_values(source)
+    colors = {value for value in paint_values if SVG_HEX_COLOR.fullmatch(value)}
+    structural_values = paint_values - colors
+
+    assert all(
+        value == "none" or SVG_PAINT_REFERENCE.fullmatch(value)
+        for value in structural_values
+    )
+    assert colors <= GOVBR_DIAGRAM_COLORS
+    assert "#1351b4" in colors
+
+
+def test_authentication_sequence_lifelines_have_graphical_contrast() -> None:
+    source = (DOCS_ROOT / "media" / "authentication-sequence.svg").read_text(
+        encoding="utf-8"
+    )
+    root = ET.fromstring(source)
+    background = root.find("{http://www.w3.org/2000/svg}rect")
+    lifelines = next(
+        element
+        for element in root.iter("{http://www.w3.org/2000/svg}g")
+        if "stroke-dasharray" in element.attrib
+    )
+
+    assert background is not None
+    assert _contrast_ratio(lifelines.attrib["stroke"], background.attrib["fill"]) >= 3
 
 
 def test_entry_docs_describe_fakegov_as_provider_facade_with_canonical_public_names() -> (

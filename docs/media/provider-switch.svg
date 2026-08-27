@@ -2,26 +2,26 @@
   <title id="title">Seleção de provedor no mesmo runtime consumidor</title>
   <desc id="desc">Frontend e API permanecem iguais; a configuração seleciona Gov.br oficial ou FakeGov.</desc>
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#167a72"/></marker>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#1351b4"/></marker>
   </defs>
-  <rect width="1200" height="360" rx="24" fill="#f7fafc"/>
+  <rect width="1200" height="360" rx="24" fill="#f8f8f8"/>
   <g font-family="system-ui, sans-serif">
-    <rect x="48" y="114" width="230" height="128" rx="16" fill="#ffffff" stroke="#334155" stroke-width="2"/>
-    <text x="163" y="168" text-anchor="middle" fill="#0f172a" font-size="22" font-weight="700">Frontend</text>
-    <text x="163" y="202" text-anchor="middle" fill="#475569" font-size="16">inicia o login</text>
-    <path d="M290 178H382" stroke="#167a72" stroke-width="3" marker-end="url(#arrow)"/>
-    <rect x="396" y="84" width="326" height="188" rx="18" fill="#0f2f3a" stroke="#2dd4bf" stroke-width="2"/>
-    <text x="559" y="142" text-anchor="middle" fill="#f8fafc" font-size="24" font-weight="700">API + govbr-auth</text>
-    <text x="559" y="180" text-anchor="middle" fill="#b6cbd3" font-size="16">mesmas rotas e mesmo core</text>
-    <rect x="456" y="208" width="206" height="38" rx="19" fill="#164e63"/>
-    <text x="559" y="233" text-anchor="middle" fill="#cffafe" font-size="15">GOVBR_PROVIDER</text>
-    <path d="M734 154H826" stroke="#167a72" stroke-width="3" marker-end="url(#arrow)"/>
-    <path d="M734 202H826" stroke="#167a72" stroke-width="3" marker-end="url(#arrow)"/>
-    <rect x="840" y="64" width="310" height="112" rx="16" fill="#ffffff" stroke="#1d4ed8" stroke-width="2"/>
-    <text x="995" y="110" text-anchor="middle" fill="#1e3a8a" font-size="21" font-weight="700">Gov.br oficial</text>
-    <text x="995" y="142" text-anchor="middle" fill="#475569" font-size="15">produção e homologação</text>
-    <rect x="840" y="194" width="310" height="112" rx="16" fill="#ecfeff" stroke="#0f766e" stroke-width="2"/>
-    <text x="995" y="240" text-anchor="middle" fill="#115e59" font-size="21" font-weight="700">FakeGov local</text>
-    <text x="995" y="272" text-anchor="middle" fill="#475569" font-size="15">desenvolvimento e testes</text>
+    <rect x="48" y="114" width="230" height="128" rx="16" fill="#ffffff" stroke="#333333" stroke-width="2"/>
+    <text x="163" y="168" text-anchor="middle" fill="#333333" font-size="22" font-weight="700">Frontend</text>
+    <text x="163" y="202" text-anchor="middle" fill="#555555" font-size="16">inicia o login</text>
+    <path d="M290 178H382" stroke="#1351b4" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="396" y="84" width="326" height="188" rx="18" fill="#071d41" stroke="#e8f1ff" stroke-width="2"/>
+    <text x="559" y="142" text-anchor="middle" fill="#f8f8f8" font-size="24" font-weight="700">API + govbr-auth</text>
+    <text x="559" y="180" text-anchor="middle" fill="#cccccc" font-size="16">mesmas rotas e mesmo core</text>
+    <rect x="456" y="208" width="206" height="38" rx="19" fill="#0c326f"/>
+    <text x="559" y="233" text-anchor="middle" fill="#e8f1ff" font-size="15">GOVBR_PROVIDER</text>
+    <path d="M734 154H826" stroke="#1351b4" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M734 202H826" stroke="#1351b4" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="840" y="64" width="310" height="112" rx="16" fill="#ffffff" stroke="#1351b4" stroke-width="2"/>
+    <text x="995" y="110" text-anchor="middle" fill="#0c326f" font-size="21" font-weight="700">Gov.br oficial</text>
+    <text x="995" y="142" text-anchor="middle" fill="#555555" font-size="15">produção e homologação</text>
+    <rect x="840" y="194" width="310" height="112" rx="16" fill="#e8f1ff" stroke="#1351b4" stroke-width="2"/>
+    <text x="995" y="240" text-anchor="middle" fill="#0c326f" font-size="21" font-weight="700">FakeGov local</text>
+    <text x="995" y="272" text-anchor="middle" fill="#555555" font-size="15">desenvolvimento e testes</text>
   </g>
 </svg>
