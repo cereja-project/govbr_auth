@@ -70,6 +70,49 @@ def _svg_paint_values(source: str) -> set[str]:
     return values
 
 
+def _assert_brand_svg_contract(source: str) -> None:
+    assert "<?" not in source
+    assert "<!doctype" not in source.lower()
+    root = ET.fromstring(source)
+    namespace = "{http://www.w3.org/2000/svg}"
+    allowed_elements = {"svg", "title", "desc", "g", "path", "circle"}
+
+    assert root.tag == f"{namespace}svg"
+    assert root.attrib["role"] == "img"
+    assert root.attrib["viewBox"]
+    title = root.find(f"{namespace}title")
+    description = root.find(f"{namespace}desc")
+    assert title is not None
+    assert description is not None
+    labelled_ids = root.attrib["aria-labelledby"].split()
+    identified_elements = {
+        element.attrib["id"]: element
+        for element in root.iter()
+        if "id" in element.attrib
+    }
+
+    assert labelled_ids
+    assert labelled_ids == [title.attrib["id"], description.attrib["id"]]
+    assert all(
+        identifier in identified_elements
+        and (identified_elements[identifier].text or "").strip()
+        for identifier in labelled_ids
+    )
+    assert all(
+        element.tag.rsplit("}", maxsplit=1)[-1] in allowed_elements
+        for element in root.iter()
+    )
+    assert root.find(f".//{namespace}text") is None
+    assert not any(
+        attribute.rsplit("}", maxsplit=1)[-1].lower().startswith("on")
+        or attribute.rsplit("}", maxsplit=1)[-1].lower() in {"href", "style"}
+        or "://" in value
+        or value.strip().lower().startswith("url(")
+        for element in root.iter()
+        for attribute, value in element.attrib.items()
+    )
+
+
 def _toctree_entries(source: str) -> tuple[str, ...]:
     entries: list[str] = []
     lines = source.splitlines()
@@ -384,44 +427,29 @@ def test_versioned_diagrams_use_the_application_color_palette(filename: str) -> 
 )
 def test_brand_assets_are_accessible_self_contained_svgs(filename: str) -> None:
     source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
-    root = ET.fromstring(source)
-    namespace = "{http://www.w3.org/2000/svg}"
-    allowed_elements = {"svg", "title", "desc", "g", "path", "circle"}
+    _assert_brand_svg_contract(source)
 
-    assert root.tag == f"{namespace}svg"
-    assert root.attrib["role"] == "img"
-    assert root.attrib["viewBox"]
-    title = root.find(f"{namespace}title")
-    description = root.find(f"{namespace}desc")
-    assert title is not None
-    assert description is not None
-    labelled_ids = root.attrib["aria-labelledby"].split()
-    identified_elements = {
-        element.attrib["id"]: element
-        for element in root.iter()
-        if "id" in element.attrib
-    }
 
-    assert labelled_ids
-    assert labelled_ids == [title.attrib["id"], description.attrib["id"]]
-    assert all(
-        identifier in identified_elements
-        and (identified_elements[identifier].text or "").strip()
-        for identifier in labelled_ids
+@pytest.mark.parametrize(
+    "prefix",
+    (
+        '<?xml-stylesheet type="text/css" href="https://evil.example/x.css"?>',
+        '<!DOCTYPE svg SYSTEM "https://evil.example/ext.dtd">',
+    ),
+)
+def test_brand_svg_contract_rejects_external_xml_prologs(prefix: str) -> None:
+    source = (
+        f"{prefix}"
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" '
+        'role="img" aria-labelledby="title desc">'
+        '<title id="title">Marca</title>'
+        '<desc id="desc">Descrição</desc>'
+        '<path d="M0 0"/>'
+        "</svg>"
     )
-    assert all(
-        element.tag.rsplit("}", maxsplit=1)[-1] in allowed_elements
-        for element in root.iter()
-    )
-    assert root.find(f".//{namespace}text") is None
-    assert not any(
-        attribute.rsplit("}", maxsplit=1)[-1].lower().startswith("on")
-        or attribute.rsplit("}", maxsplit=1)[-1].lower() in {"href", "style"}
-        or "://" in value
-        or value.strip().lower().startswith("url(")
-        for element in root.iter()
-        for attribute, value in element.attrib.items()
-    )
+
+    with pytest.raises(AssertionError):
+        _assert_brand_svg_contract(source)
 
 
 def test_light_brand_colors_contrast_with_the_sphinx_header() -> None:
@@ -434,8 +462,13 @@ def test_light_brand_colors_contrast_with_the_sphinx_header() -> None:
         if SVG_HEX_COLOR.fullmatch(value) and value != "#ffffff"
     }
 
+    sphinx_config = runpy.run_path(str(DOCS_ROOT / "conf.py"))
+    header_background = sphinx_config["html_theme_options"][
+        "style_nav_header_background"
+    ]
+
     assert colors
-    assert all(_contrast_ratio(color, "#2c3e50") >= 3 for color in colors)
+    assert all(_contrast_ratio(color, header_background) >= 3 for color in colors)
 
 
 def test_documentation_entrypoints_publish_the_brand_assets() -> None:
