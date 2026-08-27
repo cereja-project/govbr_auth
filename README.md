@@ -295,7 +295,7 @@ exemplo:
 uvicorn myapp:app --workers 4
 ```
 
-Consulte a [documentação](docs/index.rst) para configuração completa, solução
+Consulte a [documentação](https://govbr-auth.readthedocs.io/en/latest/index.html) para configuração completa, solução
 de problemas e uso avançado.
 
 ## Desenvolvimento
