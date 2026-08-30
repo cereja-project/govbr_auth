@@ -188,7 +188,7 @@ def test_development_install_enables_every_tested_framework_extra() -> None:
 
     assert requirements.splitlines() == [
         "-e .[fake,dev,django,flask]",
-        "respx>=0.22,<1",
+        "respx>=0.23.1,<1",
     ]
 
 

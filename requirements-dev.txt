@@ -1,2 +1,2 @@
 -e .[fake,dev,django,flask]
-respx>=0.22,<1
+respx>=0.23.1,<1
