@@ -175,7 +175,7 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
         "pytest-mock",
         "black",
         "build",
-        "setuptools>=77",
+        "setuptools>=84.0.0",
         "wheel",
         "flake8",
         "pytest-cov",
