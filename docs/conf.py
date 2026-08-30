@@ -57,7 +57,7 @@ html_theme_options = {
 }
 
 html_logo = 'media/govbr-auth-logo-light.svg'
-html_favicon = 'media/govbr-auth-mark.svg'
+html_favicon = 'media/govbr-auth-mark-small.svg'
 
 # Highlighting options
 pygments_style = 'sphinx'

@@ -4,8 +4,9 @@
   <img src="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg" alt="govbr-auth" width="320">
 </p>
 
-Autenticação gov.br para Python com um core OAuth 2.0/OpenID Connect independente
-de framework e adapters opcionais para FastAPI, Django e Flask.
+Biblioteca Python comunitária para integração com gov.br, com um core OAuth
+2.0/OpenID Connect independente de framework e adapters opcionais para FastAPI,
+Django e Flask.
 
 O fluxo OAuth é stateless no backend: funciona com múltiplos workers, sem
 armazenamento compartilhado, desde que todos usem a mesma secret

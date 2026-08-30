@@ -29,6 +29,7 @@ usuários fictícios, sem alterar a fachada usada com o provedor oficial.
    guide/fake-mode
    guide/communication-flow
    guide/configuration
+   guide/brand
    guide/troubleshooting
 
 .. toctree::

@@ -423,11 +423,74 @@ def test_versioned_diagrams_use_the_application_color_palette(filename: str) -> 
         "govbr-auth-logo-light.svg",
         "govbr-auth-logo-monochrome.svg",
         "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+        "govbr-auth-mark-small.svg",
     ),
 )
 def test_brand_assets_are_accessible_self_contained_svgs(filename: str) -> None:
     source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
     _assert_brand_svg_contract(source)
+
+
+def test_brand_mark_family_is_complete() -> None:
+    expected = {
+        "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+        "govbr-auth-mark-small.svg",
+    }
+
+    assert expected <= {path.name for path in (DOCS_ROOT / "media").iterdir()}
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+        "govbr-auth-mark-small.svg",
+    ),
+)
+def test_brand_marks_use_one_continuous_connector(filename: str) -> None:
+    root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+
+    assert len(root.findall(f".//{namespace}path")) == 1
+
+
+def test_brand_mark_variants_share_the_same_connector_geometry() -> None:
+    namespace = "{http://www.w3.org/2000/svg}"
+    filenames = (
+        "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+    )
+    connectors = {
+        ET.parse(DOCS_ROOT / "media" / filename)
+        .getroot()
+        .find(f".//{namespace}path")
+        .attrib["d"]
+        for filename in filenames
+    }
+
+    assert connectors == {"M16 38C18 28 24 21 32 20C40 21 46 28 48 38"}
+
+
+def test_small_brand_mark_compensates_for_sixteen_pixels() -> None:
+    root = ET.parse(DOCS_ROOT / "media" / "govbr-auth-mark-small.svg").getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+    connector = root.find(f".//{namespace}path")
+    cherries = root.findall(f".//{namespace}circle")
+
+    assert connector is not None
+    assert connector.attrib["d"] == "M16 38C18 28 24 21 32 20C40 21 46 28 48 38"
+    assert {circle.attrib["r"] for circle in cherries} == {"10"}
+    assert any(
+        group.attrib.get("stroke-width") == "6"
+        for group in root.findall(f".//{namespace}g")
+    )
 
 
 @pytest.mark.parametrize(
@@ -449,6 +512,20 @@ def test_wordmark_cherries_align_with_the_letter_baseline(filename: str) -> None
         float(cherry.attrib["cy"]) + float(cherry.attrib["r"]) <= 50
         for cherry in cherries
     )
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-logo.svg",
+        "govbr-auth-logo-light.svg",
+        "govbr-auth-logo-monochrome.svg",
+    ),
+)
+def test_wordmark_viewbox_is_optically_centered(filename: str) -> None:
+    root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
+
+    assert root.attrib["viewBox"] == "0 6 280 60"
 
 
 @pytest.mark.parametrize(
@@ -502,9 +579,28 @@ def test_documentation_entrypoints_publish_the_brand_assets() -> None:
     ) in readme
     assert sphinx_config["html_theme_options"]["logo_only"] is True
     assert sphinx_config["html_logo"] == "media/govbr-auth-logo-light.svg"
-    assert sphinx_config["html_favicon"] == "media/govbr-auth-mark.svg"
+    assert sphinx_config["html_favicon"] == "media/govbr-auth-mark-small.svg"
     assert "_static" in sphinx_config["html_static_path"]
     assert "brand.css" in sphinx_config["html_css_files"]
+
+
+def test_brand_guide_publishes_the_approved_usage_contract() -> None:
+    index = (DOCS_ROOT / "index.rst").read_text(encoding="utf-8")
+    guide = (DOCS_ROOT / "guide" / "brand.rst").read_text(encoding="utf-8")
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    normalized_guide = _normalized_prose(guide)
+    descriptor = "biblioteca python comunitária para integração com gov.br"
+
+    assert "guide/brand" in _toctree_entries(index)
+    assert descriptor in _normalized_prose(readme)
+    assert descriptor in normalized_guide
+    assert "50% da altura visível" in normalized_guide
+    assert "mínimo de 24 px" in normalized_guide
+    assert "16 a 23 px" in normalized_guide
+    assert "#2c3e50" in normalized_guide
+    assert "contêiner uniforme #2c3e50" in normalized_guide
+    assert "variante monocromática branca" not in normalized_guide
+    assert "não use a marca para sugerir homologação ou endosso" in normalized_guide
 
 
 def test_authentication_sequence_lifelines_have_graphical_contrast() -> None:

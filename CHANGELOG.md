@@ -8,6 +8,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Changed
+- A identidade visual agora inclui símbolos responsivos para fundos claros,
+  escuros, reprodução monocromática e favicon, com regras documentadas de
+  redução, área de proteção e posicionamento comunitário.
 - A interface local da demo e do FakeGov agora aplica fundamentos visuais e de
   acessibilidade do GOVBR-DS sem dependências frontend ou recursos externos,
   preservando a identificação explícita de simulação.

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Símbolo reduzido govbr-auth</title>
+  <desc id="desc">Versão óptica reduzida das duas cerejas, para exibição entre 16 e 23 pixels.</desc>
+  <g fill="none" stroke="#168821" stroke-width="6" stroke-linecap="round">
+    <path d="M16 38C18 28 24 21 32 20C40 21 46 28 48 38"/>
+  </g>
+  <g fill="#e52207">
+    <circle cx="15" cy="44" r="10"/>
+    <circle cx="49" cy="44" r="10"/>
+  </g>
+</svg>
