@@ -64,7 +64,7 @@ jobs:
       - name: Install test tools
         run: >-
           python -m pip install pytest pytest-asyncio pytest-mock pytest-cov
-          PyYAML build "setuptools>=77" wheel
+          PyYAML build "setuptools>=84.0.0" wheel
       - run: python -m pip check
       - name: Test minimum supported dependencies
         run: >-

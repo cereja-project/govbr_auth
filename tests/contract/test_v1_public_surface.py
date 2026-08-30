@@ -157,11 +157,11 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
     ]
     assert optional_dependencies["django"] == [
         "Django>=5.2.17,<7",
-        "asgiref>=3.8.1,<4",
+        "asgiref>=3.12.1,<4",
     ]
     assert optional_dependencies["flask"] == [
         "Flask>=3.1.3,<4",
-        "asgiref>=3.8.1,<4",
+        "asgiref>=3.12.1,<4",
     ]
     assert optional_dependencies["fake"] == [
         "fastapi>=0.141.1,<1",
@@ -175,7 +175,7 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
         "pytest-mock",
         "black",
         "build",
-        "setuptools>=77",
+        "setuptools>=84.0.0",
         "wheel",
         "flake8",
         "pytest-cov",
@@ -188,7 +188,7 @@ def test_development_install_enables_every_tested_framework_extra() -> None:
 
     assert requirements.splitlines() == [
         "-e .[fake,dev,django,flask]",
-        "respx>=0.22,<1",
+        "respx>=0.23.1,<1",
     ]
 
 
