@@ -123,7 +123,7 @@ def test_base_dependencies_are_exactly_framework_neutral() -> None:
         "python-dotenv",
     }
     assert set(metadata["dependencies"]) == {
-        "httpx>=0.27,<1",
+        "httpx>=0.28.1,<1",
         "PyJWT>=2.13,<3",
         "cryptography>=50.0.0,<51",
         "python-dotenv>=1.2.3,<2",
