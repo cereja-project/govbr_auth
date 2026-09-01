@@ -27,13 +27,16 @@ Checklist da versão
    ``govbr_auth/__init__.py``, ``docs/conf.py`` e ``CHANGELOG.md``.
 #. Execute os gates locais::
 
+       # Substitua {TEMP} por um diretório temporário absoluto fora do checkout
+       # e aponte COVERAGE_FILE para {TEMP}/.coverage antes de executar o pytest.
+
        python -m black --check govbr_auth tests examples scripts
        python -m flake8 govbr_auth tests examples scripts --count --select=E9,F63,F7,F82 --show-source --statistics
-       python -m pytest --cov=govbr_auth --cov-branch --cov-fail-under=90
-       python -m build
-       python -m twine check dist/*
-       python -m sphinx -W -b html docs _build/html
-       python -m sphinx -W -b linkcheck docs _build/linkcheck
+       python -m pytest --cov=govbr_auth --cov-branch --cov-fail-under=90 --basetemp "{TEMP}/pytest" -o cache_dir="{TEMP}/pytest-cache"
+       python -m build --outdir "{TEMP}/dist"
+       python -m twine check "{TEMP}/dist/"*
+       python -m sphinx -W -b html docs "{TEMP}/docs-html"
+       python -m sphinx -W -b linkcheck docs "{TEMP}/docs-linkcheck"
 
 #. Faça merge da candidata em ``origin/main`` somente após a matriz da CI
    aprovar Linux, Windows e macOS em Python 3.11 a 3.14.

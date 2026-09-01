@@ -80,9 +80,9 @@ jobs:
         with:
           python-version: "3.14"
       - run: python -m pip install --upgrade build twine
-      - run: python -m build
-      - run: python -m twine check dist/*
-      - run: python scripts/verify_distribution.py dist/*.whl
+      - run: python -m build --outdir "${{ runner.temp }}/dist"
+      - run: python -m twine check "${{ runner.temp }}/dist"/*
+      - run: python scripts/verify_distribution.py "${{ runner.temp }}/dist"/*.whl
 
   required:
     if: ${{ always() }}
