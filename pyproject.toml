@@ -28,7 +28,7 @@ classifiers = [
 dependencies = [
     "httpx>=0.28.1,<1",
     "PyJWT>=2.13,<3",
-    "cryptography>=50.0.0,<51",
+    "cryptography>=50.0.1,<51",
     "python-dotenv>=1.2.3,<2",
     "pydantic>=2.13.4,<3"
 ]
