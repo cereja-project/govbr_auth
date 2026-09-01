@@ -1,5 +1,5 @@
 asgiref==3.12.1
-cryptography==50.0.0
+cryptography==50.0.1
 Django==5.2.17
 fastapi==0.141.1
 Flask==3.1.3
