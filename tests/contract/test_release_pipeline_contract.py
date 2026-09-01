@@ -265,10 +265,19 @@ def test_coverage_data_is_written_outside_the_checkout() -> None:
     release = _load_workflow("pythonpublish.yml")
 
     expected_coverage = "${{ runner.temp }}/govbr-auth.coverage"
-    assert ci["jobs"]["quality"]["env"]["COVERAGE_FILE"] == expected_coverage
-    assert (
-        release["jobs"]["verify-and-build"]["env"]["COVERAGE_FILE"] == expected_coverage
+    coverage_step = next(
+        step
+        for step in ci["jobs"]["quality"]["steps"]
+        if step.get("name") == "Coverage gate"
     )
+    release_verify_step = next(
+        step
+        for step in release["jobs"]["verify-and-build"]["steps"]
+        if step.get("name") == "Verify source at the released commit"
+    )
+
+    assert coverage_step["env"]["COVERAGE_FILE"] == expected_coverage
+    assert release_verify_step["env"]["COVERAGE_FILE"] == expected_coverage
 
 
 def test_workflows_pin_third_party_actions_to_commit_shas() -> None:
