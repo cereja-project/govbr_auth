@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg" alt="govbr-auth" width="320">
 </p>
 
-Biblioteca Python comunitária para integração com gov.br, com um core OAuth
+Biblioteca Python open source para integração com gov.br, com um core OAuth
 2.0/OpenID Connect independente de framework e adapters opcionais para FastAPI,
 Django e Flask.
 
@@ -18,10 +18,10 @@ armazenamento compartilhado, desde que todos usem a mesma secret
 [![FakeGov](https://img.shields.io/badge/FakeGov-local-0f766e.svg)](#teste-a-integração-sem-depender-do-govbr)
 
 > [!IMPORTANT]
-> Este é um projeto comunitário, sem manutenção, homologação ou endosso do
-> Governo Federal. O FakeGov é um simulador local: use nele somente credenciais
-> e dados pessoais fictícios. Essa restrição é exclusiva ao FakeGov; para uma
-> integração real, configure a biblioteca com o provedor oficial.
+> Este é um projeto open source independente, sem manutenção, homologação ou
+> endosso do Governo Federal. O FakeGov é um simulador local: use nele somente
+> credenciais e dados pessoais fictícios. Essa restrição é exclusiva ao FakeGov;
+> para uma integração real, configure a biblioteca com o provedor oficial.
 
 ## Índice
 

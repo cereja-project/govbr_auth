@@ -1,11 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
   <title id="title">Símbolo govbr-auth</title>
-  <desc id="desc">Duas cerejas vermelhas ligadas por talos verdes.</desc>
-  <g fill="none" stroke="#168821" stroke-width="4" stroke-linecap="round">
-    <path d="M16 38C18 28 24 21 32 20C40 21 46 28 48 38"/>
+  <desc id="desc">Rede verde sobre duas cerejas vermelha e vinho sobrepostas.</desc>
+  <g fill="none" stroke="#10b981" stroke-width="4" stroke-linejoin="round">
+    <path d="M 32 10 V 22 L 22 32 V 38"/>
+    <path d="M 32 22 L 42 32 V 38"/>
   </g>
-  <g fill="#e52207">
-    <circle cx="15" cy="44" r="9"/>
-    <circle cx="49" cy="44" r="9"/>
+  <g fill="#10b981">
+    <circle cx="32" cy="10" r="3.5"/><circle cx="32" cy="22" r="3.5"/>
+    <circle cx="22" cy="38" r="2.5"/><circle cx="42" cy="38" r="2.5"/>
   </g>
+  <circle cx="26" cy="46" r="11" fill="#ef4444"/>
+  <circle cx="38" cy="46" r="11" fill="#991b1b"/>
 </svg>

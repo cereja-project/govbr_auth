@@ -1,5 +1,5 @@
 import re
-from typing import cast
+from typing import Literal, cast
 
 import pytest
 
@@ -26,13 +26,17 @@ def test_shared_shell_preserves_accessibility_and_simulation_identity() -> None:
     assert "@media" in page
 
 
-def test_shared_shell_uses_local_govbr_ds_foundations_without_external_assets() -> None:
+def test_shared_shell_uses_the_approved_brand_without_external_assets() -> None:
     page = render_page(title="Teste", body="<p>conteúdo</p>", layout="wide")
 
-    assert "--blue-warm-vivid-90: #071d41;" in page
-    assert "--blue-warm-vivid-70: #1351b4;" in page
-    assert "--gray-80: #333333;" in page
-    assert 'font-family: Rawline, "Raleway",' in page
+    assert "--brand-graphite: #111827;" in page
+    assert "--brand-green: #10b981;" in page
+    assert "--brand-red: #ef4444;" in page
+    assert "--brand-wine: #991b1b;" in page
+    assert 'font-family: "Inter", ui-sans-serif' in page
+    assert 'font-family: "JetBrains Mono", ui-monospace' in page
+    assert "@font-face" in page
+    assert "url(data:font/woff2;base64," in page
     assert "<script" not in page
     assert "<link" not in page
     assert "url(http" not in page
@@ -42,19 +46,26 @@ def test_feedback_text_and_input_focus_meet_minimum_contrast() -> None:
     css = responsive_css()
 
     danger_text = _css_hex_token(css, "danger-text")
-    danger_surface = _css_hex_token(css, "red-vivid-10")
+    danger_surface = _css_hex_token(css, "danger-surface")
     input_focus = _css_hex_token(css, "input-focus")
-    input_surface = _css_hex_token(css, "pure-0")
+    input_surface = _css_hex_token(css, "surface")
+    simulation_text = _css_hex_token(css, "simulation-text")
+    simulation_surface = _css_hex_token(css, "simulation-surface")
 
     assert _contrast_ratio(danger_text, danger_surface) >= 4.5
     assert _contrast_ratio(input_focus, input_surface) >= 3
+    assert _contrast_ratio(simulation_text, simulation_surface) >= 4.5
     assert "outline: .2rem solid var(--input-focus);" in css
+    assert ".card-brand .simulation-badge {" in css
 
 
 def test_wide_shell_identifies_the_project_instead_of_imitating_the_portal() -> None:
     page = render_page(title="Teste", body="<p>conteúdo</p>", layout="wide")
 
-    assert '<span class="brand">govbr-auth</span>' in page
+    assert 'class="brand-signature"' in page
+    assert 'aria-label="govbr-auth"' in page
+    assert 'class="brand-mark"' in page
+    assert "<strong>Autenticamente</strong> pythônico." in page
     assert "SIMULAÇÃO LOCAL" in page
 
 
@@ -110,18 +121,94 @@ def test_primary_action_rejects_non_path_or_executable_destinations(href: str) -
 def test_card_layout_preserves_the_fake_provider_visual_contract() -> None:
     page = render_page(title="Teste", body="<p>conteúdo</p>", layout="card")
 
-    assert '<body class="card-layout">' in page
+    assert '<body class="fake-flow card-layout">' in page
     assert '<main class="card-layout-main">' in page
     assert "body.card-layout {" in page
     assert "align-items: center;" in page
-    assert "background: var(--gray-2);" in page
+    assert "background: var(--canvas);" in page
     assert "display: flex;" in page
     assert "justify-content: center;" in page
     assert "main.card-layout-main {" in page
-    assert "border-top: .25rem solid var(--warning);" in page
-    assert "box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 12%);" in page
+    assert "border-top: .25rem solid var(--brand-green);" in page
+    assert "box-shadow: var(--shadow-lg);" in page
     assert "max-width: 32rem;" in page
     assert "@media (max-width: 36rem)" in page
+
+
+@pytest.mark.parametrize(
+    ("layout", "expected_body"),
+    (
+        ("wide", '<body class="fake-flow wide-layout">'),
+        ("card", '<body class="fake-flow card-layout">'),
+    ),
+)
+def test_every_fakegov_layout_uses_an_accessible_dark_color_scheme(
+    layout: str, expected_body: str
+) -> None:
+    page = render_page(
+        title="Teste",
+        body="<p>conteúdo</p>",
+        layout=cast(Literal["wide", "card"], layout),
+    )
+    flow_theme = _css_rule(page, "body.fake-flow")
+
+    ink = _css_hex_token(flow_theme, "ink")
+    muted = _css_hex_token(flow_theme, "muted")
+    surface = _css_hex_token(flow_theme, "surface")
+    canvas = _css_hex_token(flow_theme, "canvas")
+    input_focus = _css_hex_token(flow_theme, "input-focus")
+    emphasis = _css_hex_token(flow_theme, "emphasis")
+    green_soft = _css_hex_token(flow_theme, "green-soft")
+    code_text = _css_hex_token(flow_theme, "code-text")
+    surface_soft = _css_hex_token(flow_theme, "surface-soft")
+    success = _css_hex_token(flow_theme, "success")
+    success_text = _css_hex_token(flow_theme, "success-text")
+
+    assert expected_body in page
+    assert '<meta name="color-scheme" content="dark">' in page
+    assert "color-scheme: dark;" in flow_theme
+    assert _contrast_ratio(ink, surface) >= 4.5
+    assert _contrast_ratio(muted, surface) >= 4.5
+    assert _contrast_ratio(input_focus, canvas) >= 3
+    assert _contrast_ratio(surface, canvas) >= 1.15
+    assert _contrast_ratio(emphasis, surface) >= 4.5
+    assert _contrast_ratio(emphasis, green_soft) >= 4.5
+    assert _contrast_ratio(code_text, surface_soft) >= 4.5
+    assert code_text == emphasis
+    assert _contrast_ratio(success_text, success) >= 3
+
+
+def test_fakegov_flow_uses_flat_surfaces_without_gradients() -> None:
+    page = render_page(title="Teste", body="<p>conteúdo</p>", layout="wide")
+
+    assert "gradient(" not in page
+
+
+def test_wide_layout_uses_only_the_header_dark_divider() -> None:
+    page = render_page(title="Teste", body="<p>conteúdo</p>", layout="wide")
+
+    header = _css_rule(page, ".site-header")
+    hero = _css_rule(page, ".hero")
+    login_card = _css_rule(page, "main.card-layout-main")
+
+    assert "border-bottom: .25rem solid var(--line);" in header
+    assert "border-top" not in hero
+    assert "border-top: .25rem solid var(--brand-green);" in login_card
+
+
+def test_fakegov_warning_uses_the_green_graphite_palette() -> None:
+    page = render_page(title="Teste", body="<p>conteúdo</p>", layout="card")
+    flow_theme = _css_rule(page, "body.fake-flow")
+
+    ink = _css_hex_token(flow_theme, "ink")
+    surface_soft = _css_hex_token(flow_theme, "surface-soft")
+    warning = _css_hex_token(flow_theme, "warning")
+    warning_surface = _css_hex_token(flow_theme, "warning-surface")
+
+    assert warning == "#10b981"
+    assert warning_surface == surface_soft
+    assert _contrast_ratio(ink, warning_surface) >= 4.5
+    assert _contrast_ratio(warning, warning_surface) >= 3
 
 
 def test_shared_presentation_components_expose_simulation_and_responsive_theme() -> (
@@ -238,6 +325,13 @@ def test_error_preserves_launcher_boundary_error_codes(
 
     assert code in page
     assert "govbr_auth_error" not in page
+
+
+def _css_rule(css: str, selector: str) -> str:
+    match = re.search(rf"{re.escape(selector)}\s*\{{(?P<body>[^}}]+)\}}", css)
+    if match is None:
+        raise AssertionError(f"CSS rule {selector} is missing")
+    return match.group("body")
 
 
 def _css_hex_token(css: str, name: str) -> str:
