@@ -1,6 +1,9 @@
 """Framework-neutral HTML presentation for local Gov.br simulations."""
 
+from base64 import b64encode
+from functools import lru_cache
 from html import escape
+from importlib.resources import files
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
 
@@ -28,75 +31,93 @@ class PresentedCredential(Protocol):
 
 _THEME_CSS = """
 :root {
-  --pure-0: #ffffff;
-  --gray-2: #f8f8f8;
-  --gray-20: #cccccc;
-  --gray-40: #888888;
-  --gray-80: #333333;
-  --blue-warm-vivid-90: #071d41;
-  --blue-warm-vivid-80: #0c326f;
-  --blue-warm-vivid-70: #1351b4;
-  --blue-warm-vivid-10: #e8f1ff;
-  --green-cool-vivid-50: #168821;
-  --green-cool-vivid-5: #e3f5e1;
-  --yellow-vivid-20: #ffcd07;
-  --yellow-vivid-5: #fff5c2;
-  --red-vivid-50: #e52207;
-  --red-vivid-10: #f9dede;
-  --ink: var(--gray-80);
-  --muted: #555555;
-  --surface: var(--pure-0);
-  --canvas: var(--gray-2);
-  --primary: var(--blue-warm-vivid-70);
-  --primary-dark: var(--blue-warm-vivid-80);
-  --accent: var(--yellow-vivid-20);
-  --line: var(--gray-20);
-  --success: var(--green-cool-vivid-50);
-  --danger: var(--red-vivid-50);
-  --danger-text: #b3261e;
-  --input-focus: #1351b4;
-  --warning: #c58b00;
-  --radius: .5rem;
+  --brand-graphite: #111827;
+  --brand-green: #10b981;
+  --brand-red: #ef4444;
+  --brand-wine: #991b1b;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --surface: #ffffff;
+  --canvas: #f8fafc;
+  --surface-soft: #f1f5f9;
+  --green-soft: #d1fae5;
+  --emphasis: #047857;
+  --code-text: #047857;
+  --line: #e2e8f0;
+  --primary: var(--brand-green);
+  --primary-dark: #059669;
+  --success: #047857;
+  --success-text: #ffffff;
+  --success-surface: #ecfdf5;
+  --simulation-text: #047857;
+  --simulation-surface: #ecfdf5;
+  --danger: var(--brand-wine);
+  --danger-text: #991b1b;
+  --danger-surface: #fef2f2;
+  --input-focus: #047857;
+  --warning: #b45309;
+  --warning-surface: #fffbeb;
+  --radius: 1rem;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
+  --shadow-lg: 0 1.25rem 3rem rgb(15 23 42 / 14%);
   color-scheme: light;
-  font-family: Rawline, "Raleway", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   line-height: 1.5;
 }
 * { box-sizing: border-box; }
-body { background: var(--canvas); color: var(--ink); margin: 0; min-height: 100vh; }
-.container { margin-inline: auto; max-width: 70rem; padding-inline: 1.5rem; }
-.site-header { background: var(--blue-warm-vivid-90); color: var(--pure-0); }
-.brand-row { align-items: center; display: flex; justify-content: space-between; min-height: 4.5rem; }
-.brand { font-size: 1.15rem; font-weight: 800; letter-spacing: -.02em; }
-.simulation-badge {
-  background: var(--accent); border-radius: 100em; color: #302800; font-size: .72rem;
-  font-weight: 800; letter-spacing: .08em; padding: .35rem .7rem;
+body {
+  background: var(--canvas);
+  color: var(--ink); margin: 0; min-height: 100vh;
 }
-main.container { display: grid; gap: 1.5rem; padding-block: 3rem; }
-section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2rem; }
-.hero { background: linear-gradient(135deg, var(--pure-0) 55%, var(--blue-warm-vivid-10)); padding-block: 3rem; }
+.container { margin-inline: auto; max-width: 70rem; padding-inline: 1.5rem; }
+.site-header {
+  background: var(--brand-graphite); border-bottom: .25rem solid var(--line);
+  color: #f8fafc;
+}
+.brand-row { align-items: center; display: flex; gap: 1.5rem; justify-content: space-between; min-height: 5.5rem; }
+.brand-signature { align-items: center; color: inherit; display: inline-flex; gap: .8rem; text-decoration: none; }
+.brand-mark { flex: 0 0 auto; height: 3rem; width: 3rem; }
+.brand-name { font-size: 1.25rem; font-weight: 800; letter-spacing: -.035em; }
+.brand-name span { color: #94a3b8; font-weight: 300; }
+.brand-tagline { color: #cbd5e1; font-size: .82rem; margin: .15rem 0 0; }
+.brand-tagline strong { color: #f8fafc; }
+.simulation-badge {
+  background: rgb(16 185 129 / 12%); border: 1px solid rgb(16 185 129 / 55%);
+  border-radius: 100em; color: #6ee7b7; font-size: .7rem; font-weight: 800;
+  letter-spacing: .12em; padding: .4rem .75rem;
+}
+main.container { display: grid; gap: 1.5rem; padding-block: 3.5rem; }
+section {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); padding: 2rem;
+}
+.hero {
+  background: var(--surface);
+  padding-block: 3.5rem;
+}
 .eyebrow, .section-kicker {
-  color: var(--primary); font-size: .78rem; font-weight: 800; letter-spacing: .09em;
+  color: var(--emphasis); font-size: .76rem; font-weight: 800; letter-spacing: .15em;
   margin: 0 0 .6rem; text-transform: uppercase;
 }
 h1 { font-size: clamp(2rem, 5vw, 3.6rem); letter-spacing: -.045em; line-height: 1.08; margin: 0; max-width: 15ch; }
 h2 { font-size: clamp(1.45rem, 3vw, 2rem); letter-spacing: -.025em; margin: 0 0 1rem; }
 .lead { color: var(--muted); font-size: 1.12rem; max-width: 58ch; }
 .primary, button {
-  background: var(--primary); border: 0; border-radius: 100em; color: var(--pure-0); cursor: pointer;
+  background: var(--primary); border: 0; border-radius: .65rem; color: var(--brand-graphite); cursor: pointer;
   display: inline-block; font: inherit; font-weight: 750; margin-top: .8rem; padding: .85rem 1.15rem;
-  text-decoration: none; transition: background-color .18s ease, transform .18s ease;
+  text-decoration: none; transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
-.primary:hover, button:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.primary:hover, button:hover { background: var(--primary-dark); box-shadow: 0 .5rem 1rem rgb(5 150 105 / 18%); transform: translateY(-1px); }
 :focus-visible {
-  box-shadow: 0 0 0 .38rem var(--blue-warm-vivid-90);
-  outline: .16rem solid var(--pure-0);
+  box-shadow: 0 0 0 .38rem rgb(16 185 129 / 28%);
+  outline: .16rem solid var(--input-focus);
   outline-offset: .1rem;
 }
 .steps { display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); list-style: none; margin: 1.5rem 0 0; padding: 0; }
 .steps li { border-top: .2rem solid var(--primary); display: flex; gap: .8rem; padding-top: 1rem; }
 .steps span {
-  align-items: center; background: #e8f1ff; border-radius: 50%; color: var(--primary);
+  align-items: center; background: var(--green-soft); border-radius: 50%; color: var(--emphasis);
   display: inline-flex; flex: 0 0 2rem; font-weight: 800; height: 2rem; justify-content: center;
 }
 .steps p { color: var(--muted); margin: .35rem 0 0; }
@@ -105,42 +126,73 @@ h2 { font-size: clamp(1.45rem, 3vw, 2rem); letter-spacing: -.025em; margin: 0 0 
 table { border-collapse: collapse; min-width: 34rem; width: 100%; }
 th, td { border-bottom: 1px solid var(--line); padding: .85rem; text-align: left; }
 thead th { color: var(--muted); font-size: .8rem; text-transform: uppercase; }
-code { background: #edf2f7; border-radius: .3rem; color: var(--ink); padding: .15rem .35rem; }
+code {
+  background: var(--surface-soft); border-radius: .35rem; color: var(--code-text);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: .88em; padding: .15rem .35rem;
+}
 .result { margin-inline: auto; max-width: 44rem; width: 100%; }
 .success-mark, .error-mark {
-  align-items: center; border-radius: 50%; color: #fff; display: flex; font-size: 1.5rem;
+  align-items: center; border-radius: 50%; display: flex; font-size: 1.5rem;
   font-weight: 900; height: 3rem; justify-content: center; margin-bottom: 1.25rem; width: 3rem;
 }
-.success-mark { background: var(--success); }
-.error-mark { background: var(--danger); }
+.success-mark { background: var(--success); color: var(--success-text); }
+.error-mark { background: var(--danger); color: #fff; }
 .identity { border-top: 1px solid var(--line); margin-block: 1.5rem; }
 .identity div { border-bottom: 1px solid var(--line); display: grid; gap: 1rem; grid-template-columns: 8rem 1fr; padding-block: .8rem; }
 .identity dt { color: var(--muted); font-weight: 700; }
 .identity dd { margin: 0; overflow-wrap: anywhere; }
 .error-code { color: var(--muted); }
 .site-footer { color: var(--muted); font-size: .88rem; padding-block: 0 2rem; text-align: center; }
+body.fake-flow {
+  --ink: #f8fafc;
+  --muted: #cbd5e1;
+  --surface: #1e293b;
+  --canvas: #111827;
+  --surface-soft: #0f172a;
+  --line: #475569;
+  --green-soft: #064e3b;
+  --emphasis: #a7f3d0;
+  --code-text: #a7f3d0;
+  --simulation-text: #a7f3d0;
+  --simulation-surface: #064e3b;
+  --danger-text: #fca5a5;
+  --danger-surface: #450a0a;
+  --warning: #10b981;
+  --warning-surface: #0f172a;
+  --success: #6ee7b7;
+  --success-text: #111827;
+  --success-surface: #022c22;
+  --input-focus: #10b981;
+  background: var(--canvas); color-scheme: dark;
+}
 body.card-layout {
-  align-items: center; background: var(--gray-2); display: flex; justify-content: center;
+  align-items: center; display: flex; justify-content: center;
   margin: 0; min-height: 100vh; padding: 1.5rem;
 }
 main.card-layout-main {
-  background: var(--pure-0); border-radius: 0.75rem; border-top: .25rem solid var(--warning);
-  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 12%);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  border-top: .25rem solid var(--brand-green); box-shadow: var(--shadow-lg);
   max-width: 32rem; padding: 2rem; width: 100%;
+}
+.card-brand { align-items: center; display: flex; justify-content: space-between; margin-bottom: 2rem; }
+.card-brand .brand-mark { height: 2.75rem; width: 2.75rem; }
+.card-brand .simulation-badge {
+  background: var(--simulation-surface); border-color: #10b981; color: var(--simulation-text);
 }
 .card-layout-main h1 { font-size: 1.5rem; max-width: none; }
 .message { border-left: .25rem solid; margin-block: 1rem; padding: 1rem; }
 .message strong { display: block; margin-bottom: .25rem; }
-.message.warning { background: var(--yellow-vivid-5); border-color: var(--warning); }
-.message.danger { background: var(--red-vivid-10); border-color: var(--danger); }
-.message.success { background: var(--green-cool-vivid-5); border-color: var(--success); }
+.message.warning { background: var(--warning-surface); border-color: var(--warning); }
+.message.danger { background: var(--danger-surface); border-color: var(--danger); }
+.message.success { background: var(--success-surface); border-color: var(--success); }
 .error { color: var(--danger-text); font-weight: 700; }
 .card-layout-main form { display: grid; gap: .75rem; }
 .card-layout-main label { font-weight: 700; }
 .field-hint { color: var(--muted); font-size: .875rem; margin-top: -.5rem; }
 .card-layout-main input {
-  background: var(--pure-0); border: 1px solid var(--gray-40); border-radius: .25rem;
-  color: var(--gray-80); font: inherit; min-height: 3rem; padding: .75rem; width: 100%;
+  background: var(--surface-soft); border: 1px solid #64748b; border-radius: .5rem;
+  color: var(--ink); font: inherit; min-height: 3rem; padding: .75rem; width: 100%;
 }
 .card-layout-main input[aria-invalid="true"] { border-color: var(--danger); border-width: 2px; }
 .card-layout-main button {
@@ -151,7 +203,7 @@ main.card-layout-main {
   box-shadow: none; outline: .2rem solid var(--input-focus); outline-offset: .15rem;
 }
 .card-layout-main button:focus-visible {
-  box-shadow: none; outline: .2rem solid var(--yellow-vivid-20); outline-offset: .15rem;
+  box-shadow: none; outline: .2rem solid var(--input-focus); outline-offset: .15rem;
 }
 @media (max-width: 44rem) {
   .container { padding-inline: 1rem; }
@@ -159,6 +211,7 @@ main.card-layout-main {
   section, .hero { padding: 1.35rem; }
   .steps { grid-template-columns: 1fr; }
   .identity div { gap: .25rem; grid-template-columns: 1fr; }
+  .brand-tagline { display: none; }
 }
 @media (max-width: 36rem) {
   body.card-layout { padding: 0; }
@@ -170,9 +223,50 @@ main.card-layout-main {
 """.strip()
 
 
+@lru_cache(maxsize=1)
+def _font_face_css() -> str:
+    font_root = files("govbr_auth").joinpath("_assets", "fonts")
+
+    def data_url(filename: str) -> str:
+        payload = b64encode(font_root.joinpath(filename).read_bytes()).decode("ascii")
+        return f"data:font/woff2;base64,{payload}"
+
+    return "\n".join(
+        (
+            '@font-face { font-family: "Inter"; font-style: normal; font-weight: 100 900; '
+            f'src: url({data_url("InterVariable.woff2")}) format("woff2"); font-display: swap; }}',
+            '@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; '
+            f'src: url({data_url("JetBrainsMono-Regular.woff2")}) format("woff2"); font-display: swap; }}',
+            '@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; '
+            f'src: url({data_url("JetBrainsMono-Bold.woff2")}) format("woff2"); font-display: swap; }}',
+        )
+    )
+
+
+@lru_cache(maxsize=1)
 def responsive_css() -> str:
     """Return the responsive rules used by every rendered local page."""
-    return _THEME_CSS
+    return f"{_font_face_css()}\n{_THEME_CSS}"
+
+
+def _render_brand_mark() -> str:
+    return """<svg class="brand-mark" viewBox="0 0 64 64" role="img" aria-label="govbr-auth">
+<g fill="none" stroke="#10b981" stroke-width="4" stroke-linejoin="round">
+<path d="M 32 10 V 22 L 22 32 V 38"/><path d="M 32 22 L 42 32 V 38"/>
+</g><g fill="#10b981"><circle cx="32" cy="10" r="3.5"/><circle cx="32" cy="22" r="3.5"/>
+<circle cx="22" cy="38" r="2.5"/><circle cx="42" cy="38" r="2.5"/></g>
+<circle cx="26" cy="46" r="11" fill="#ef4444"/><circle cx="38" cy="46" r="11" fill="#991b1b"/>
+</svg>"""
+
+
+def _render_brand_signature() -> str:
+    return (
+        '<div class="brand-signature">'
+        f"{_render_brand_mark()}"
+        '<div><div class="brand-name">govbr<span>-auth</span></div>'
+        '<p class="brand-tagline"><strong>Autenticamente</strong> pythônico.</p></div>'
+        "</div>"
+    )
 
 
 def render_simulation_badge() -> str:
@@ -215,9 +309,9 @@ def render_safe_error_panel(*, message: str) -> str:
 def render_page(*, title: str, body: str, layout: Literal["wide", "card"]) -> str:
     """Wrap owned HTML markup in the shared, accessible local shell."""
     if layout == "wide":
-        page_body = f"""<body>
+        page_body = f"""<body class="fake-flow wide-layout">
 <header class="site-header"><div class="container brand-row">
-<span class="brand">govbr-auth</span>{render_simulation_badge()}
+{_render_brand_signature()}{render_simulation_badge()}
 </div></header>
 <main class="container">{body}</main>
 <footer class="site-footer"><div class="container">
@@ -225,8 +319,8 @@ Ambiente local para desenvolvimento e testes. Não use credenciais reais.
 </div></footer>
 </body>"""
     elif layout == "card":
-        page_body = f"""<body class="card-layout">
-<main class="card-layout-main">{render_simulation_badge()}{body}</main>
+        page_body = f"""<body class="fake-flow card-layout">
+<main class="card-layout-main"><div class="card-brand">{_render_brand_mark()}{render_simulation_badge()}</div>{body}</main>
 </body>"""
     else:
         raise ValueError("layout must be 'wide' or 'card'")
@@ -236,7 +330,7 @@ Ambiente local para desenvolvimento e testes. Não use credenciais reais.
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="dark">
 <title>{escape(title)}</title>
 <style>{responsive_css()}</style>
 </head>

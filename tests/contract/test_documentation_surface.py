@@ -20,18 +20,17 @@ AUTODOC_DIRECTIVE = re.compile(
 SVG_HEX_COLOR = re.compile(r"#[0-9a-f]{6}")
 SVG_PAINT_REFERENCE = re.compile(r"url\(#[A-Za-z_][\w.-]*\)")
 SVG_PAINT_PROPERTIES = {"fill", "stroke", "stop-color"}
-GOVBR_DIAGRAM_COLORS = {
-    "#071d41",
-    "#0c326f",
-    "#1351b4",
-    "#333333",
-    "#555555",
-    "#888888",
-    "#cccccc",
-    "#e8f1ff",
-    "#f8f8f8",
-    "#fb923c",
-    "#fff7ed",
+BRAND_DIAGRAM_COLORS = {
+    "#0f172a",
+    "#111827",
+    "#10b981",
+    "#991b1b",
+    "#ef4444",
+    "#fef2f2",
+    "#64748b",
+    "#d1fae5",
+    "#e2e8f0",
+    "#f8fafc",
     "#ffffff",
 }
 
@@ -412,8 +411,74 @@ def test_versioned_diagrams_use_the_application_color_palette(filename: str) -> 
         value == "none" or SVG_PAINT_REFERENCE.fullmatch(value)
         for value in structural_values
     )
-    assert colors <= GOVBR_DIAGRAM_COLORS
-    assert "#1351b4" in colors
+    assert colors <= BRAND_DIAGRAM_COLORS
+    assert "#10b981" in colors
+    assert "#111827" in colors
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "authentication-sequence.svg",
+        "fakegov-flow.svg",
+        "provider-switch.svg",
+    ),
+)
+def test_versioned_diagrams_use_flat_surfaces(filename: str) -> None:
+    root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+
+    assert root.findall(f".//{namespace}linearGradient") == []
+    assert root.findall(f".//{namespace}radialGradient") == []
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "authentication-sequence.svg",
+        "fakegov-flow.svg",
+        "provider-switch.svg",
+    ),
+)
+def test_versioned_diagrams_use_the_brand_typeface(filename: str) -> None:
+    root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
+    families = {
+        element.attrib["font-family"]
+        for element in root.iter()
+        if "font-family" in element.attrib
+    }
+
+    assert families == {"Inter, Arial, sans-serif"}
+
+
+def test_fakegov_flow_step_numbers_have_readable_contrast() -> None:
+    root = ET.parse(DOCS_ROOT / "media" / "fakegov-flow.svg").getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+    step_numbers = {"1", "2", "3", "4"}
+    checked_steps = set()
+
+    for group in root.findall(f".//{namespace}g"):
+        circle = group.find(f"{namespace}circle")
+        text = group.find(f"{namespace}text")
+        if circle is None or text is None or text.text not in step_numbers:
+            continue
+        assert _contrast_ratio(text.attrib["fill"], circle.attrib["fill"]) >= 4.5
+        checked_steps.add(text.text)
+
+    assert checked_steps == step_numbers
+
+
+def test_authentication_sequence_validation_uses_the_success_palette() -> None:
+    root = ET.parse(DOCS_ROOT / "media" / "authentication-sequence.svg").getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+    validation = next(
+        rect
+        for rect in root.findall(f".//{namespace}rect")
+        if rect.attrib.get("y") == "538"
+    )
+
+    assert validation.attrib["fill"] == "#d1fae5"
+    assert validation.attrib["stroke"] == "#10b981"
 
 
 @pytest.mark.parametrize(
@@ -423,11 +488,82 @@ def test_versioned_diagrams_use_the_application_color_palette(filename: str) -> 
         "govbr-auth-logo-light.svg",
         "govbr-auth-logo-monochrome.svg",
         "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+        "govbr-auth-mark-small.svg",
     ),
 )
 def test_brand_assets_are_accessible_self_contained_svgs(filename: str) -> None:
     source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
     _assert_brand_svg_contract(source)
+
+
+def test_brand_mark_family_is_complete() -> None:
+    expected = {
+        "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+        "govbr-auth-mark-small.svg",
+    }
+
+    assert expected <= {path.name for path in (DOCS_ROOT / "media").iterdir()}
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+        "govbr-auth-mark-small.svg",
+    ),
+)
+def test_brand_marks_use_the_network_connector(filename: str) -> None:
+    root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+
+    assert len(root.findall(f".//{namespace}path")) == 2
+
+
+def test_brand_mark_variants_share_the_same_connector_geometry() -> None:
+    namespace = "{http://www.w3.org/2000/svg}"
+    filenames = (
+        "govbr-auth-mark.svg",
+        "govbr-auth-mark-light.svg",
+        "govbr-auth-mark-monochrome.svg",
+    )
+    connectors = {
+        tuple(
+            path.attrib["d"]
+            for path in ET.parse(DOCS_ROOT / "media" / filename)
+            .getroot()
+            .findall(f".//{namespace}path")
+        )
+        for filename in filenames
+    }
+
+    assert connectors == {
+        (
+            "M 32 10 V 22 L 22 32 V 38",
+            "M 32 22 L 42 32 V 38",
+        )
+    }
+
+
+def test_small_brand_mark_compensates_for_sixteen_pixels() -> None:
+    root = ET.parse(DOCS_ROOT / "media" / "govbr-auth-mark-small.svg").getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+    connector = root.find(f".//{namespace}path")
+    cherries = root.findall(f".//{namespace}circle")
+
+    assert connector is not None
+    assert connector.attrib["d"] == "M 32 10 V 22 L 22 32 V 38"
+    assert len(cherries) == 6
+    assert {circle.attrib["r"] for circle in cherries} == {"3", "4", "11"}
+    assert any(
+        group.attrib.get("stroke-width") == "5"
+        for group in root.findall(f".//{namespace}g")
+    )
 
 
 @pytest.mark.parametrize(
@@ -444,11 +580,54 @@ def test_wordmark_cherries_align_with_the_letter_baseline(filename: str) -> None
     namespace = "{http://www.w3.org/2000/svg}"
     cherries = root.findall(f".//{namespace}circle")
 
-    assert len(cherries) == 2
+    fruit = [cherry for cherry in cherries if cherry.attrib.get("r") == "11"]
+    assert len(fruit) == 2
     assert all(
-        float(cherry.attrib["cy"]) + float(cherry.attrib["r"]) <= 50
-        for cherry in cherries
+        float(cherry.attrib["cy"]) + float(cherry.attrib["r"]) <= 64 for cherry in fruit
     )
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-logo.svg",
+        "govbr-auth-logo-light.svg",
+        "govbr-auth-logo-monochrome.svg",
+    ),
+)
+def test_wordmark_viewbox_is_optically_centered(filename: str) -> None:
+    root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
+
+    assert root.attrib["viewBox"] == "0 0 360 96"
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "govbr-auth-logo.svg",
+        "govbr-auth-logo-light.svg",
+        "govbr-auth-logo-monochrome.svg",
+    ),
+)
+def test_wordmark_hyphen_does_not_overlap_the_r(filename: str) -> None:
+    root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+    wordmark = root.findall(f"{namespace}path")
+
+    assert len(wordmark) == 2
+
+    translations = []
+    for path in wordmark:
+        match = re.fullmatch(
+            r"translate\((-?\d+(?:\.\d+)?) 0\)", path.attrib.get("transform", "")
+        )
+        assert match is not None
+        translations.append(float(match.group(1)))
+
+    r_right_edge = 244.937 + translations[0]
+    hyphen_left_edge = 232.893 + translations[1]
+
+    assert hyphen_left_edge - r_right_edge >= 3
 
 
 @pytest.mark.parametrize(
@@ -473,23 +652,24 @@ def test_brand_svg_contract_rejects_external_xml_prologs(prefix: str) -> None:
         _assert_brand_svg_contract(source)
 
 
-def test_light_brand_colors_contrast_with_the_sphinx_header() -> None:
-    source = (DOCS_ROOT / "media" / "govbr-auth-logo-light.svg").read_text(
-        encoding="utf-8"
-    )
-    colors = {
-        value
-        for value in _svg_paint_values(source)
-        if SVG_HEX_COLOR.fullmatch(value) and value != "#ffffff"
+def test_light_wordmark_contrasts_with_the_sphinx_header() -> None:
+    root = ET.parse(DOCS_ROOT / "media" / "govbr-auth-logo-light.svg").getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+    wordmark_colors = {
+        path.attrib["fill"]
+        for path in root.findall(f"{namespace}path")
+        if "fill" in path.attrib
     }
-
     sphinx_config = runpy.run_path(str(DOCS_ROOT / "conf.py"))
     header_background = sphinx_config["html_theme_options"][
         "style_nav_header_background"
     ]
 
-    assert colors
-    assert all(_contrast_ratio(color, header_background) >= 3 for color in colors)
+    assert header_background == "#111827"
+    assert wordmark_colors == {"#ffffff", "#94a3b8"}
+    assert all(
+        _contrast_ratio(color, header_background) >= 3 for color in wordmark_colors
+    )
 
 
 def test_documentation_entrypoints_publish_the_brand_assets() -> None:
@@ -502,9 +682,50 @@ def test_documentation_entrypoints_publish_the_brand_assets() -> None:
     ) in readme
     assert sphinx_config["html_theme_options"]["logo_only"] is True
     assert sphinx_config["html_logo"] == "media/govbr-auth-logo-light.svg"
-    assert sphinx_config["html_favicon"] == "media/govbr-auth-mark.svg"
+    assert sphinx_config["html_favicon"] == "media/govbr-auth-mark-small.svg"
     assert "_static" in sphinx_config["html_static_path"]
     assert "brand.css" in sphinx_config["html_css_files"]
+
+
+def test_sphinx_theme_uses_the_approved_brand_and_local_fonts() -> None:
+    stylesheet = (DOCS_ROOT / "_static" / "brand.css").read_text(encoding="utf-8")
+
+    assert "--brand-graphite: #111827;" in stylesheet
+    assert "--brand-green: #10b981;" in stylesheet
+    assert "--brand-red: #ef4444;" in stylesheet
+    assert "--brand-wine: #991b1b;" in stylesheet
+    assert 'font-family: "Inter"' in stylesheet
+    assert 'font-family: "JetBrains Mono"' in stylesheet
+    assert 'url("fonts/InterVariable.woff2")' in stylesheet
+    assert "#1351b4" not in stylesheet
+    assert "gradient(" not in stylesheet
+    assert ".rst-content a:hover" in stylesheet
+    assert ".rst-content code" in stylesheet
+    assert stylesheet.count("color: var(--link);") >= 3
+
+
+def test_brand_guide_publishes_the_approved_usage_contract() -> None:
+    index = (DOCS_ROOT / "index.rst").read_text(encoding="utf-8")
+    guide = (DOCS_ROOT / "guide" / "brand.rst").read_text(encoding="utf-8")
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    normalized_guide = _normalized_prose(guide)
+    descriptor = "biblioteca python open source para integração com gov.br"
+
+    assert "guide/brand" in _toctree_entries(index)
+    assert descriptor in _normalized_prose(readme)
+    assert descriptor in normalized_guide
+    assert "50% da altura visível" in normalized_guide
+    assert "mínimo de 24 px" in normalized_guide
+    assert "16 a 23 px" in normalized_guide
+    assert "#111827" in normalized_guide
+    assert "#10b981" in normalized_guide
+    assert "#ef4444" in normalized_guide
+    assert "#991b1b" in normalized_guide
+    assert "inter" in normalized_guide
+    assert "jetbrains mono" in normalized_guide
+    assert "autenticamente pythônico" in normalized_guide
+    assert "variante monocromática branca" not in normalized_guide
+    assert "não use a marca para sugerir homologação ou endosso" in normalized_guide
 
 
 def test_authentication_sequence_lifelines_have_graphical_contrast() -> None:

@@ -48,7 +48,7 @@ html_theme_options = {
     'prev_next_buttons_location': 'bottom',
     'style_external_links': False,
     'vcs_pageview_mode': '',
-    'style_nav_header_background': '#2c3e50',
+    'style_nav_header_background': '#111827',
     'collapse_navigation': True,
     'sticky_navigation': True,
     'navigation_depth': 4,
@@ -57,13 +57,13 @@ html_theme_options = {
 }
 
 html_logo = 'media/govbr-auth-logo-light.svg'
-html_favicon = 'media/govbr-auth-mark.svg'
+html_favicon = 'media/govbr-auth-mark-small.svg'
 
 # Highlighting options
 pygments_style = 'sphinx'
 
 # HTML output directory
-html_static_path = ['_static']
+html_static_path = ['_static', '../govbr_auth/_assets']
 html_css_files = ['brand.css']
 
 # Napoleon extension settings (for Google style docstrings)

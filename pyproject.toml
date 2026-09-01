@@ -49,6 +49,9 @@ include-package-data = false
 include = ["govbr_auth*"]
 exclude = ["govbr_auth.__pycache__*", "govbr_auth.*.__pycache__*"]
 
+[tool.setuptools.package-data]
+govbr_auth = ["_assets/fonts/*.woff2", "_assets/fonts/*.txt"]
+
 [project.urls]
 Homepage = "https://github.com/cereja-project/govbr_auth"
 Repository = "https://github.com/cereja-project/govbr_auth"

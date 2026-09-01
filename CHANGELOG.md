@@ -8,9 +8,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Changed
-- A interface local da demo e do FakeGov agora aplica fundamentos visuais e de
-  acessibilidade do GOVBR-DS sem dependências frontend ou recursos externos,
-  preservando a identificação explícita de simulação.
+- A identidade visual agora inclui símbolos responsivos para fundos claros,
+  escuros, reprodução monocromática e favicon, com regras documentadas de
+  redução, área de proteção e posicionamento de projeto independente e open source.
+- A documentação, os diagramas e a interface local da demo e do FakeGov agora
+  usam a identidade govbr-auth em grafite, verde e vermelho, com Inter e
+  JetBrains Mono locais, sem CDN e preservando a identificação explícita de
+  simulação.
 - O `.env.example` agora documenta todas as configurações oficiais e FakeGov;
   os exemplos executáveis delegam a leitura completa ao carregador validado em
   vez de reconstruir apenas provider, host e porta.
