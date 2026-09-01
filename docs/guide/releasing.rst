@@ -25,15 +25,27 @@ Checklist da versão
 
 #. Confirme que a versão coincide em ``pyproject.toml``,
    ``govbr_auth/__init__.py``, ``docs/conf.py`` e ``CHANGELOG.md``.
+#. Substitua ``{TEMP}`` por um diretório temporário absoluto fora do checkout e
+   configure o arquivo de cobertura. No PowerShell::
+
+       $env:COVERAGE_FILE = "{TEMP}/.coverage"
+
+   Em shells POSIX::
+
+       export COVERAGE_FILE="{TEMP}/.coverage"
+
 #. Execute os gates locais::
 
        python -m black --check govbr_auth tests examples scripts
        python -m flake8 govbr_auth tests examples scripts --count --select=E9,F63,F7,F82 --show-source --statistics
-       python -m pytest --cov=govbr_auth --cov-branch --cov-fail-under=90
-       python -m build
-       python -m twine check dist/*
-       python -m sphinx -W -b html docs _build/html
-       python -m sphinx -W -b linkcheck docs _build/linkcheck
+       python -m pytest --cov=govbr_auth --cov-branch --cov-fail-under=90 --basetemp "{TEMP}/pytest" -o cache_dir="{TEMP}/pytest-cache"
+       python -c "from pathlib import Path; Path(r'{TEMP}/source').mkdir(parents=True, exist_ok=True)"
+       git archive --format=tar --output "{TEMP}/source.tar" HEAD
+       tar -xf "{TEMP}/source.tar" -C "{TEMP}/source"
+       python -m build --outdir "{TEMP}/dist" "{TEMP}/source"
+       python -m twine check "{TEMP}/dist/"*
+       python -m sphinx -W -b html docs "{TEMP}/docs-html"
+       python -m sphinx -W -b linkcheck docs "{TEMP}/docs-linkcheck"
 
 #. Faça merge da candidata em ``origin/main`` somente após a matriz da CI
    aprovar Linux, Windows e macOS em Python 3.11 a 3.14.

@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-01
+
 ### Changed
 - A identidade visual agora inclui símbolos responsivos para fundos claros,
   escuros, reprodução monocromática e favicon, com regras documentadas de

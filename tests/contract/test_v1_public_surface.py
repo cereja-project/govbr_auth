@@ -134,15 +134,15 @@ def test_base_dependencies_are_exactly_framework_neutral() -> None:
 def test_project_version_is_static_without_importing_runtime_dependencies() -> None:
     metadata = _project_metadata()
 
-    assert metadata["version"] == "1.0.0rc1"
+    assert metadata["version"] == "1.0.0"
     assert "dynamic" not in metadata
 
 
-def test_release_candidate_metadata_does_not_claim_stable_maturity() -> None:
+def test_stable_release_metadata_claims_production_maturity() -> None:
     classifiers = _project_metadata()["classifiers"]
 
-    assert "Development Status :: 4 - Beta" in classifiers
-    assert "Development Status :: 5 - Production/Stable" not in classifiers
+    assert "Development Status :: 5 - Production/Stable" in classifiers
+    assert "Development Status :: 4 - Beta" not in classifiers
 
 
 def test_optional_dependencies_expose_framework_and_development_tools() -> None:
@@ -237,4 +237,4 @@ def test_built_distributions_contain_only_publishable_package_artifacts(
     wheel_roots = {entry.split("/", 1)[0] for entry in wheel_entries}
 
     assert invalid_entries == []
-    assert wheel_roots == {"govbr_auth", "govbr_auth-1.0.0rc1.dist-info"}
+    assert wheel_roots == {"govbr_auth", "govbr_auth-1.0.0.dist-info"}

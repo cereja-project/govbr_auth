@@ -26,6 +26,7 @@ def test_release_version_is_consistent_across_package_and_documentation() -> Non
     with (PROJECT_ROOT / "pyproject.toml").open("rb") as pyproject_file:
         project_version = tomllib.load(pyproject_file)["project"]["version"]
     docs_config = runpy.run_path(str(PROJECT_ROOT / "docs" / "conf.py"))
+    changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
     versions = (
         project_version,
@@ -36,12 +37,13 @@ def test_release_version_is_consistent_across_package_and_documentation() -> Non
     )
 
     assert versions == (
-        "1.0.0rc1",
-        "1.0.0rc1",
-        "1.0.0rc1",
+        "1.0.0",
+        "1.0.0",
+        "1.0.0",
         "1.0",
-        "1.0.0rc1",
+        "1.0.0",
     )
+    assert "## [1.0.0] - 2026-09-01" in changelog
 
 
 def test_docs_configuration_does_not_prepend_the_source_checkout() -> None:
@@ -72,7 +74,10 @@ def test_docs_job_installs_every_documented_adapter_before_sphinx() -> None:
     build_index = next(
         index
         for index, step in enumerate(run_steps)
-        if "python -m build" in step["run"].splitlines()
+        if any(
+            line.strip().startswith("python -m build")
+            for line in step["run"].splitlines()
+        )
     )
     wheel_install_index = next(
         index
@@ -191,6 +196,88 @@ def test_release_verifies_tag_main_commit_tests_and_built_wheel() -> None:
     assert "--cov-fail-under=90" in commands
     assert "python scripts/verify_distribution.py" in commands
     assert "python -m twine check" in commands
+
+
+def test_distribution_builds_use_runner_temp_outside_the_checkout() -> None:
+    ci = _load_workflow("pythonpackage.yml")
+    docs = _load_docs_workflow()
+    release = _load_workflow("pythonpublish.yml")
+    ci_package = ci["jobs"]["package"]
+    release_verify = release["jobs"]["verify-and-build"]
+    release_publish = release["jobs"]["publish"]
+    docs_build = docs["jobs"]["build"]
+
+    ci_commands = "\n".join(
+        step.get("run", "") for step in ci_package["steps"] if "run" in step
+    )
+    release_commands = "\n".join(
+        step.get("run", "") for step in release_verify["steps"] if "run" in step
+    )
+    docs_commands = "\n".join(
+        step.get("run", "") for step in docs_build["steps"] if "run" in step
+    )
+
+    expected_dist = "${{ runner.temp }}/dist"
+    for commands in (ci_commands, release_commands, docs_commands):
+        assert 'source_dir="$RUNNER_TEMP/source"' in commands
+        assert 'git archive HEAD | tar -x -C "$source_dir"' in commands
+        assert 'python -m build --outdir "$RUNNER_TEMP/dist" "$source_dir"' in commands
+    assert 'python -m twine check "$RUNNER_TEMP/dist"/*' in ci_commands
+    assert 'find "$RUNNER_TEMP/dist"' in docs_commands
+
+    upload_step = next(
+        step
+        for step in release_verify["steps"]
+        if step.get("uses", "").startswith("actions/upload-artifact@")
+    )
+    download_step = next(
+        step
+        for step in release_publish["steps"]
+        if step.get("uses", "").startswith("actions/download-artifact@")
+    )
+    publish_step = next(
+        step
+        for step in release_publish["steps"]
+        if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
+    )
+
+    assert upload_step["with"]["path"] == f"{expected_dist}/"
+    assert download_step["with"]["path"] == f"{expected_dist}/"
+    assert publish_step["with"]["packages-dir"] == f"{expected_dist}/"
+
+    docs_sphinx_steps = [
+        step
+        for step in docs_build["steps"]
+        if "python -m sphinx" in step.get("run", "")
+    ]
+    assert "${{ runner.temp }}/docs-html" in docs_sphinx_steps[0]["run"]
+    assert "${{ runner.temp }}/docs-linkcheck" in docs_sphinx_steps[1]["run"]
+    pages_upload = next(
+        step
+        for step in docs_build["steps"]
+        if step.get("uses", "").startswith("actions/upload-pages-artifact@")
+    )
+    assert pages_upload["with"]["path"] == "${{ runner.temp }}/docs-html"
+
+
+def test_coverage_data_is_written_outside_the_checkout() -> None:
+    ci = _load_workflow("pythonpackage.yml")
+    release = _load_workflow("pythonpublish.yml")
+
+    expected_coverage = "${{ runner.temp }}/govbr-auth.coverage"
+    coverage_step = next(
+        step
+        for step in ci["jobs"]["quality"]["steps"]
+        if step.get("name") == "Coverage gate"
+    )
+    release_verify_step = next(
+        step
+        for step in release["jobs"]["verify-and-build"]["steps"]
+        if step.get("name") == "Verify source at the released commit"
+    )
+
+    assert coverage_step["env"]["COVERAGE_FILE"] == expected_coverage
+    assert release_verify_step["env"]["COVERAGE_FILE"] == expected_coverage
 
 
 def test_workflows_pin_third_party_actions_to_commit_shas() -> None:
