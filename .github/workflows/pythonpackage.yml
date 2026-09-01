@@ -11,6 +11,8 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      COVERAGE_FILE: ${{ runner.temp }}/govbr-auth.coverage
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -80,9 +82,15 @@ jobs:
         with:
           python-version: "3.14"
       - run: python -m pip install --upgrade build twine
-      - run: python -m build --outdir "${{ runner.temp }}/dist"
-      - run: python -m twine check "${{ runner.temp }}/dist"/*
-      - run: python scripts/verify_distribution.py "${{ runner.temp }}/dist"/*.whl
+      - name: Build distributions outside the checkout
+        shell: bash
+        run: |
+          source_dir="$RUNNER_TEMP/source"
+          mkdir -p "$source_dir"
+          git archive HEAD | tar -x -C "$source_dir"
+          python -m build --outdir "$RUNNER_TEMP/dist" "$source_dir"
+      - run: python -m twine check "$RUNNER_TEMP/dist"/*
+      - run: python scripts/verify_distribution.py "$RUNNER_TEMP/dist"/*.whl
 
   required:
     if: ${{ always() }}

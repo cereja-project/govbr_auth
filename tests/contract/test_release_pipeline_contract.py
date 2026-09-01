@@ -218,10 +218,11 @@ def test_distribution_builds_use_runner_temp_outside_the_checkout() -> None:
     )
 
     expected_dist = "${{ runner.temp }}/dist"
-    assert f'python -m build --outdir "{expected_dist}"' in ci_commands
-    assert f'python -m twine check "{expected_dist}"/*' in ci_commands
-    assert expected_dist in release_commands
-    assert f'python -m build --outdir "{expected_dist}"' in docs_commands
+    for commands in (ci_commands, release_commands, docs_commands):
+        assert 'source_dir="$RUNNER_TEMP/source"' in commands
+        assert 'git archive HEAD | tar -x -C "$source_dir"' in commands
+        assert 'python -m build --outdir "$RUNNER_TEMP/dist" "$source_dir"' in commands
+    assert 'python -m twine check "$RUNNER_TEMP/dist"/*' in ci_commands
     assert 'find "$RUNNER_TEMP/dist"' in docs_commands
 
     upload_step = next(
@@ -257,6 +258,17 @@ def test_distribution_builds_use_runner_temp_outside_the_checkout() -> None:
         if step.get("uses", "").startswith("actions/upload-pages-artifact@")
     )
     assert pages_upload["with"]["path"] == "${{ runner.temp }}/docs-html"
+
+
+def test_coverage_data_is_written_outside_the_checkout() -> None:
+    ci = _load_workflow("pythonpackage.yml")
+    release = _load_workflow("pythonpublish.yml")
+
+    expected_coverage = "${{ runner.temp }}/govbr-auth.coverage"
+    assert ci["jobs"]["quality"]["env"]["COVERAGE_FILE"] == expected_coverage
+    assert (
+        release["jobs"]["verify-and-build"]["env"]["COVERAGE_FILE"] == expected_coverage
+    )
 
 
 def test_workflows_pin_third_party_actions_to_commit_shas() -> None:

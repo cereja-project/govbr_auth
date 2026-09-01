@@ -10,6 +10,8 @@ permissions:
 jobs:
   verify-and-build:
     runs-on: ubuntu-latest
+    env:
+      COVERAGE_FILE: ${{ runner.temp }}/govbr-auth.coverage
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,11 +37,17 @@ jobs:
           -o cache_dir="${{ runner.temp }}/govbr-auth-cache"
       - run: python -m black --check govbr_auth tests examples scripts
       - run: python -m flake8 govbr_auth tests examples scripts --count --select=E9,F63,F7,F82 --show-source --statistics
-      - run: python -m build --outdir "${{ runner.temp }}/dist"
-      - run: python -m twine check "${{ runner.temp }}/dist"/*
+      - name: Build distributions outside the checkout
+        shell: bash
+        run: |
+          source_dir="$RUNNER_TEMP/source"
+          mkdir -p "$source_dir"
+          git archive HEAD | tar -x -C "$source_dir"
+          python -m build --outdir "$RUNNER_TEMP/dist" "$source_dir"
+      - run: python -m twine check "$RUNNER_TEMP/dist"/*
       - name: Verify the built wheel in an isolated environment
         shell: bash
-        run: python scripts/verify_distribution.py "${{ runner.temp }}/dist"/*.whl
+        run: python scripts/verify_distribution.py "$RUNNER_TEMP/dist"/*.whl
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: python-distributions
