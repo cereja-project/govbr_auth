@@ -677,6 +677,16 @@ def test_documentation_entrypoints_publish_the_brand_assets() -> None:
     sphinx_config = runpy.run_path(str(DOCS_ROOT / "conf.py"))
 
     assert (
+        '<source media="(prefers-color-scheme: dark)" '
+        'srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/'
+        'main/docs/media/govbr-auth-logo-light.svg">'
+    ) in readme
+    assert (
+        '<source media="(prefers-color-scheme: light)" '
+        'srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/'
+        'main/docs/media/govbr-auth-logo.svg">'
+    ) in readme
+    assert (
         "https://raw.githubusercontent.com/cereja-project/govbr_auth/"
         "main/docs/media/govbr-auth-logo.svg"
     ) in readme
