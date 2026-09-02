@@ -20,7 +20,10 @@ mesmo runtime consumidor; a configuração troca apenas os endpoints do provedor
 e o transporte HTTP interno (``FakeGovHttpTransport``). Para composição
 avançada, o simulador canônico é ``govbr_auth.fake.FakeGovSimulator``, criado por
 ``govbr_auth.fake.create_fake_gov_simulator``. As URLs do FakeGov são
-adicionadas à lista no prefixo próprio do runtime.
+adicionadas à lista no prefixo próprio do runtime. No provedor oficial, o
+callback é registrado no caminho de ``GOVBR_REDIRECT_URI``; ``prefix``
+continua definindo a rota de login. Inclua ``auth.urlpatterns`` na raiz do
+URLconf, pois um prefixo externo também alteraria o caminho do callback.
 
 .. py:class:: GovBrAuth(*, on_success, settings=None, runtime=None, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now, user_repository=None)
    :no-index:

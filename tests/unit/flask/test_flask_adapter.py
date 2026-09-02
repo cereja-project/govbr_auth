@@ -9,6 +9,7 @@ from pydantic import SecretStr
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
+from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
 
 FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
@@ -39,9 +40,26 @@ class ContractClient:
         return GovBrUser(sub=expected_subject, name="Flask user")
 
 
-def _runtime(client: ContractClient) -> GovBrRuntime:
+def _runtime(
+    client: ContractClient,
+    *,
+    redirect_uri: str | None = None,
+) -> GovBrRuntime:
+    oauth = None
+    if redirect_uri is not None:
+        oauth = GovBrSettings(
+            authorization_url="https://sso.example.test/authorize",
+            token_url="https://sso.example.test/token",
+            userinfo_url="https://sso.example.test/userinfo",
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+            redirect_uri=redirect_uri,
+            transaction_secret=SecretStr("transaction-secret"),
+            issuer="https://sso.example.test/",
+            jwks_url="https://sso.example.test/jwks",
+        )
     return GovBrRuntime(
-        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL, oauth=oauth),
         client=client,
         provider=GovBrProvider.OFFICIAL,
         fake=None,
@@ -63,6 +81,30 @@ def test_flask_facade_exposes_a_blueprint_with_consumer_routes() -> None:
     paths = {rule.rule for rule in application.url_map.iter_rules()}
 
     assert {"/auth/govbr/login", "/auth/govbr/callback"} <= paths
+
+
+def test_flask_facade_mounts_callback_at_configured_redirect_uri_path() -> None:
+    from govbr_auth.flask import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(
+            ContractClient({"sub": "subject"}),
+            redirect_uri=(
+                "https://staging.example.test/oauth/govbr/caf%C3%A9%20retorno"
+            ),
+        ),
+        on_success=lambda context, request: ("", 204),
+        clock=lambda: FIXED_NOW,
+    )
+    application = Flask(__name__)
+    application.register_blueprint(auth.blueprint)
+
+    paths = {rule.rule for rule in application.url_map.iter_rules()}
+    assert "/auth/govbr/login" in paths
+    assert "/oauth/govbr/café retorno" in paths
+    assert "/auth/govbr/callback" not in paths
+    callback = application.test_client().get("/oauth/govbr/caf%C3%A9%20retorno")
+    assert callback.status_code == 400
 
 
 def test_flask_login_redirects_using_the_core_authorization_url() -> None:

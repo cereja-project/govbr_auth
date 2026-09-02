@@ -169,8 +169,68 @@ def test_runtime_settings_reject_unknown_provider(
     """Unsupported providers must fail before runtime construction."""
     monkeypatch.setenv("GOVBR_PROVIDER", "fallback")
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError) as exc_info:
         GovBrRuntimeSettings.from_environment()
+
+    assert type(exc_info.value) is ValueError
+    assert str(exc_info.value) == (
+        "Configuração Gov.br inválida: valor inválido para GOVBR_PROVIDER."
+    )
+
+
+def test_runtime_settings_reports_environment_mismatch_in_portuguese() -> None:
+    """The startup boundary must not expose Pydantic or configured values."""
+    sensitive_secret = "sensitive-secret-marker"
+    environment = {
+        "GOVBR_PROVIDER": "official",
+        "GOVBR_ENVIRONMENT": "staging",
+        "GOVBR_AUTHORIZATION_URL": "https://sso.staging.acesso.gov.br/authorize",
+        "GOVBR_TOKEN_URL": "https://sso.staging.acesso.gov.br/token",
+        "GOVBR_USERINFO_URL": "https://sso.staging.acesso.gov.br/userinfo/",
+        "GOVBR_CLIENT_ID": "test-client",
+        "GOVBR_CLIENT_SECRET": sensitive_secret,
+        "GOVBR_REDIRECT_URI": "https://consumer.example.test/oauth/callback",
+        "GOVBR_TRANSACTION_SECRET": sensitive_secret,
+        "GOVBR_ISSUER": "https://sso.acesso.gov.br/",
+        "GOVBR_JWKS_URL": "https://sso.acesso.gov.br/jwk",
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        GovBrRuntimeSettings.from_environment(environment)
+
+    assert type(exc_info.value) is ValueError
+    assert str(exc_info.value) == (
+        "Configuração Gov.br inválida: Endpoints oficiais do Gov.br "
+        "incompatíveis com GOVBR_ENVIRONMENT='staging': "
+        "GOVBR_ISSUER, GOVBR_JWKS_URL."
+    )
+    assert sensitive_secret not in str(exc_info.value)
+    assert exc_info.value.__cause__ is None
+
+
+def test_runtime_settings_explains_http_dns_redirect_in_portuguese() -> None:
+    """A DNS callback without TLS must identify the variable and correction."""
+    environment = {
+        "GOVBR_PROVIDER": "official",
+        "GOVBR_ENVIRONMENT": "staging",
+        "GOVBR_AUTHORIZATION_URL": "https://sso.staging.acesso.gov.br/authorize",
+        "GOVBR_TOKEN_URL": "https://sso.staging.acesso.gov.br/token",
+        "GOVBR_USERINFO_URL": "https://sso.staging.acesso.gov.br/userinfo/",
+        "GOVBR_CLIENT_ID": "test-client",
+        "GOVBR_CLIENT_SECRET": "test-client-secret",
+        "GOVBR_REDIRECT_URI": "http://app.example.test/oauth/callback",
+        "GOVBR_TRANSACTION_SECRET": "test-transaction-secret",
+        "GOVBR_ISSUER": "https://sso.staging.acesso.gov.br/",
+        "GOVBR_JWKS_URL": "https://sso.staging.acesso.gov.br/jwk",
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        GovBrRuntimeSettings.from_environment(environment)
+
+    assert str(exc_info.value) == (
+        "Configuração Gov.br inválida: GOVBR_REDIRECT_URI usa HTTP em um host "
+        "não-loopback. Configure HTTPS para esse DNS ou use uma URI de loopback."
+    )
 
 
 def test_runtime_settings_reject_unknown_govbr_variable() -> None:
@@ -244,7 +304,7 @@ def test_fake_environment_rejects_official_endpoint_variables(variable: str) -> 
 @pytest.mark.parametrize("value", ["1", "yes", "enabled", ""])
 def test_runtime_settings_reject_noncanonical_end_to_end(value: str) -> None:
     """Truth-like strings must not accidentally activate the fake flow."""
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError, match="Configuração.*GOVBR_FAKE_END_TO_END"):
         GovBrRuntimeSettings.from_environment(
             {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_END_TO_END": value}
         )
@@ -253,7 +313,7 @@ def test_runtime_settings_reject_noncanonical_end_to_end(value: str) -> None:
 @pytest.mark.parametrize("host", ["0.0.0.0", "192.168.0.10", "example.test"])
 def test_runtime_settings_reject_non_loopback_fake_host(host: str) -> None:
     """The local fake provider must not bind a remotely reachable host."""
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError, match="Configuração.*GOVBR_FAKE_HOST"):
         GovBrRuntimeSettings.from_environment(
             {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_HOST": host}
         )
@@ -262,7 +322,7 @@ def test_runtime_settings_reject_non_loopback_fake_host(host: str) -> None:
 @pytest.mark.parametrize("port", ["0", "65536"])
 def test_runtime_settings_reject_invalid_fake_port(port: str) -> None:
     """The runtime must reject ports outside the TCP port range."""
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError, match="Configuração.*GOVBR_FAKE_PORT"):
         GovBrRuntimeSettings.from_environment(
             {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_PORT": port}
         )

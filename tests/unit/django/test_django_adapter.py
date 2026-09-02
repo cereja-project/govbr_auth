@@ -7,6 +7,7 @@ import pytest
 from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory
+from django.urls import Resolver404, resolve
 from pydantic import SecretStr
 
 if not settings.configured:
@@ -23,6 +24,7 @@ django.setup()
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
+from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
 
 FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
@@ -53,9 +55,26 @@ class ContractClient:
         return GovBrUser(sub=expected_subject, name="Django user")
 
 
-def _runtime(client: ContractClient) -> GovBrRuntime:
+def _runtime(
+    client: ContractClient,
+    *,
+    redirect_uri: str | None = None,
+) -> GovBrRuntime:
+    oauth = None
+    if redirect_uri is not None:
+        oauth = GovBrSettings(
+            authorization_url="https://sso.example.test/authorize",
+            token_url="https://sso.example.test/token",
+            userinfo_url="https://sso.example.test/userinfo",
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+            redirect_uri=redirect_uri,
+            transaction_secret=SecretStr("transaction-secret"),
+            issuer="https://sso.example.test/",
+            jwks_url="https://sso.example.test/jwks",
+        )
     return GovBrRuntime(
-        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL, oauth=oauth),
         client=client,
         provider=GovBrProvider.OFFICIAL,
         fake=None,
@@ -84,6 +103,31 @@ def test_django_facade_exposes_native_login_and_callback_patterns() -> None:
         "auth/govbr/login",
         "auth/govbr/callback",
     ]
+
+
+def test_django_facade_mounts_callback_at_configured_redirect_uri_path() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(
+            ContractClient({"sub": "subject"}),
+            redirect_uri=(
+                "https://staging.example.test/oauth/govbr/caf%C3%A9%20retorno"
+            ),
+        ),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    assert [str(pattern.pattern) for pattern in auth.urlpatterns] == [
+        "auth/govbr/login",
+        "oauth/govbr/café retorno",
+    ]
+    match = resolve("/oauth/govbr/café retorno", urlconf=tuple(auth.urlpatterns))
+    response = match.func(RequestFactory().get("/oauth/govbr/caf%C3%A9%20retorno"))
+    assert response.status_code == 400
+    with pytest.raises(Resolver404):
+        resolve("/auth/govbr/callback", urlconf=tuple(auth.urlpatterns))
 
 
 def test_django_login_redirects_using_the_core_authorization_url() -> None:

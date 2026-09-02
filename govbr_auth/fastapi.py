@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from govbr_auth.adapters._errors import describe_auth_error
-from govbr_auth.adapters._runtime import create_adapter_runtime
+from govbr_auth.adapters._runtime import adapter_callback_path, create_adapter_runtime
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import GovBrAuthError
@@ -50,15 +50,38 @@ def create_govbr_router(
 ) -> APIRouter:
     """Create consumer authentication routes backed by a strict core client."""
     prefix = _validate_router_prefix(prefix)
-    router = APIRouter(prefix=prefix)
+    return _create_govbr_router(
+        client=client,
+        on_success=on_success,
+        on_error=on_error,
+        expose_tokens=expose_tokens,
+        router_prefix=prefix,
+        login_path="/login",
+        callback_path="/callback",
+        clock=clock,
+    )
+
+
+def _create_govbr_router(
+    *,
+    client: GovBrClient,
+    on_success: AuthSuccessHandler,
+    on_error: AuthErrorHandler | None,
+    expose_tokens: bool,
+    router_prefix: str,
+    login_path: str,
+    callback_path: str,
+    clock: Callable[[], datetime],
+) -> APIRouter:
+    router = APIRouter(prefix=router_prefix)
     service = AuthenticationService(client, expose_tokens=expose_tokens)
 
-    @router.get("/login")
+    @router.get(login_path)
     async def login() -> RedirectResponse:
         authorization = service.authorization_url(now=clock())
         return RedirectResponse(authorization.url, status_code=302)
 
-    @router.get("/callback")
+    @router.get(callback_path)
     async def callback(code: str, state: str) -> Response:
         try:
             context = await service.authenticate(
@@ -116,12 +139,14 @@ class GovBrAuth:
 
         router = APIRouter(lifespan=lifespan)
         router.include_router(
-            create_govbr_router(
+            _create_govbr_router(
                 client=self._runtime.client,
                 on_success=on_success,
                 on_error=on_error,
                 expose_tokens=expose_tokens,
-                prefix=prefix,
+                router_prefix="",
+                login_path=f"{prefix}/login" if prefix else "/login",
+                callback_path=adapter_callback_path(self._runtime, prefix),
                 clock=clock,
             )
         )

@@ -12,6 +12,7 @@ from pydantic import SecretStr
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
+from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
 
 FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
@@ -68,10 +69,24 @@ def client_runtime(
     client: RecordingClient,
     *,
     owned_http: AsyncClient | None = None,
+    redirect_uri: str | None = None,
 ) -> GovBrRuntime:
     """Build a real runtime around the adapter-boundary client."""
+    oauth = None
+    if redirect_uri is not None:
+        oauth = GovBrSettings(
+            authorization_url="https://sso.example.test/authorize",
+            token_url="https://sso.example.test/token",
+            userinfo_url="https://sso.example.test/userinfo",
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+            redirect_uri=redirect_uri,
+            transaction_secret=SecretStr("transaction-secret"),
+            issuer="https://sso.example.test/",
+            jwks_url="https://sso.example.test/jwks",
+        )
     return GovBrRuntime(
-        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL, oauth=oauth),
         client=client,
         provider=GovBrProvider.OFFICIAL,
         fake=None,
@@ -100,6 +115,143 @@ def test_fastapi_facade_exposes_read_only_router_without_install() -> None:
     assert not hasattr(auth, "install")
     with pytest.raises(AttributeError):
         auth.router = APIRouter()
+
+
+@pytest.mark.asyncio
+async def test_fastapi_facade_mounts_callback_at_configured_redirect_uri_path() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    auth = GovBrAuth(
+        runtime=client_runtime(
+            RecordingClient(),
+            redirect_uri=(
+                "https://staging.example.test/oauth/govbr/caf%C3%A9%20retorno"
+            ),
+        ),
+        on_success=success_handler,
+    )
+    app = FastAPI()
+    app.include_router(auth.router)
+
+    login = await request(app, "/auth/govbr/login")
+    callback = await request(app, "/oauth/govbr/caf%C3%A9%20retorno")
+    obsolete_callback = await request(app, "/auth/govbr/callback")
+
+    assert login.status_code == 302
+    assert callback.status_code == 422
+    assert obsolete_callback.status_code == 404
+
+
+def test_create_govbr_router_preserves_the_public_router_prefix() -> None:
+    from govbr_auth.fastapi import create_govbr_router
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    router = create_govbr_router(
+        client=RecordingClient(),
+        on_success=success_handler,
+        prefix="/custom-auth",
+    )
+
+    assert router.prefix == "/custom-auth"
+
+
+@pytest.mark.asyncio
+async def test_official_callback_path_is_validated_before_runtime_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import govbr_auth.adapters._runtime as adapter_runtime
+    from govbr_auth.fastapi import GovBrAuth
+
+    oauth = GovBrSettings(
+        authorization_url="https://sso.example.test/authorize",
+        token_url="https://sso.example.test/token",
+        userinfo_url="https://sso.example.test/userinfo",
+        client_id="client-id",
+        client_secret=SecretStr("client-secret"),
+        redirect_uri="https://staging.example.test/oauth%2Fgovbr/callback",
+        transaction_secret=SecretStr("transaction-secret"),
+        issuer="https://sso.example.test/",
+        jwks_url="https://sso.example.test/jwks",
+    )
+    settings = GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL, oauth=oauth)
+    allocated_http: list[AsyncClient] = []
+
+    def allocate_runtime(*args, **kwargs) -> GovBrRuntime:
+        del args, kwargs
+        owned_http = AsyncClient()
+        allocated_http.append(owned_http)
+        return GovBrRuntime(
+            settings=settings,
+            client=RecordingClient(),
+            provider=GovBrProvider.OFFICIAL,
+            fake=None,
+            _owned_http=owned_http,
+        )
+
+    monkeypatch.setattr(adapter_runtime, "create_govbr_runtime", allocate_runtime)
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    try:
+        with pytest.raises(ValueError, match="redirect URI path is not route-safe"):
+            GovBrAuth(settings=settings, on_success=success_handler)
+        assert allocated_http == []
+    finally:
+        for http in allocated_http:
+            await http.aclose()
+
+
+@pytest.mark.parametrize(
+    "redirect_path",
+    (
+        "/oauth%2Fgovbr/callback",
+        "/oauth%5Cgovbr/callback",
+        "/oauth/{subject}/callback",
+        "/oauth/<path:subject>/callback",
+        "/oauth//callback",
+    ),
+)
+def test_fastapi_facade_rejects_ambiguous_redirect_uri_paths(
+    redirect_path: str,
+) -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    with pytest.raises(ValueError, match="redirect URI path is not route-safe"):
+        GovBrAuth(
+            runtime=client_runtime(
+                RecordingClient(),
+                redirect_uri=f"https://staging.example.test{redirect_path}",
+            ),
+            on_success=success_handler,
+        )
+
+
+def test_fastapi_facade_rejects_callback_route_colliding_with_login() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def success_handler(context) -> Response:
+        return Response(status_code=204)
+
+    with pytest.raises(
+        ValueError,
+        match="redirect URI callback path must differ from the login path",
+    ):
+        GovBrAuth(
+            runtime=client_runtime(
+                RecordingClient(),
+                redirect_uri="https://staging.example.test/auth/govbr/login",
+            ),
+            on_success=success_handler,
+        )
 
 
 def test_fastapi_facade_rejects_settings_and_runtime_together() -> None:

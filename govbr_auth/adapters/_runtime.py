@@ -2,7 +2,9 @@
 
 from collections.abc import Callable
 from datetime import datetime
+import re
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 import httpx
 
@@ -41,6 +43,8 @@ def create_adapter_runtime(
         resolved_settings = settings or GovBrRuntimeSettings.from_environment()
         if resolved_settings.provider is GovBrProvider.FAKE:
             resolved_settings = _settings_for_fake_callback(resolved_settings, prefix)
+        adapter_settings_callback_path(resolved_settings, prefix)
+        if resolved_settings.provider is GovBrProvider.FAKE:
             runtime = create_govbr_runtime(
                 resolved_settings,
                 fake_transport_factory=fake_transport_factory,
@@ -57,6 +61,51 @@ def create_adapter_runtime(
 
     _validate_runtime_callback(runtime, prefix)
     return RuntimeOwner(runtime=runtime, owns_runtime=False)
+
+
+def adapter_callback_path(runtime: GovBrRuntime, prefix: str) -> str:
+    """Resolve the consumer callback path from validated runtime settings."""
+    return adapter_settings_callback_path(runtime.settings, prefix)
+
+
+def adapter_settings_callback_path(
+    settings: GovBrRuntimeSettings,
+    prefix: str,
+) -> str:
+    """Resolve and validate the callback before allocating runtime resources."""
+    if settings.provider is GovBrProvider.OFFICIAL and settings.oauth is not None:
+        callback_path = _route_path(settings.oauth.redirect_uri.path or "/")
+    else:
+        callback_path = f"{prefix}/callback" if prefix else "/callback"
+
+    login_path = f"{prefix}/login" if prefix else "/login"
+    if callback_path == login_path:
+        raise ValueError("redirect URI callback path must differ from the login path")
+    return callback_path
+
+
+def _route_path(encoded_path: str) -> str:
+    """Decode one static URL path or reject ambiguous router syntax."""
+    if re.search(r"%(?:2f|5c)", encoded_path, flags=re.IGNORECASE) or re.search(
+        r"%(?![0-9a-f]{2})", encoded_path, flags=re.IGNORECASE
+    ):
+        raise ValueError("redirect URI path is not route-safe")
+    try:
+        path = unquote(encoded_path, errors="strict")
+    except UnicodeDecodeError as error:
+        raise ValueError("redirect URI path is not route-safe") from error
+
+    segments = path[1:].split("/") if path.startswith("/") else []
+    if (
+        not path.startswith("/")
+        or "//" in path
+        or "\\" in path
+        or any(character in path for character in "{}<>")
+        or any(ord(character) < 32 or ord(character) == 127 for character in path)
+        or any(segment in {".", ".."} for segment in segments)
+    ):
+        raise ValueError("redirect URI path is not route-safe")
+    return path
 
 
 def _settings_for_fake_callback(

@@ -194,6 +194,7 @@ avançadas, o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado 
 | Variável | Valores | Efeito |
 | --- | --- | --- |
 | `GOVBR_PROVIDER` | `official` (default), `fake` | Escolhe os endpoints do provedor e o transporte HTTP interno |
+| `GOVBR_ENVIRONMENT` | `production`, `staging`, `local` | Identifica o ambiente do provedor; endpoints oficiais incompatíveis impedem a inicialização |
 | `GOVBR_FAKE_USERS_FILE` | Caminho para um JSON fora do Git | Substitui os usuários defaults do FakeGov |
 | `GOVBR_FAKE_END_TO_END` | `true` | Inclui a página inicial demonstrativa no launcher |
 | `GOVBR_TRANSACTION_SECRET` | Segredo gerado uma única vez | Obrigatório no provedor oficial; o mesmo valor em todas as instâncias |
@@ -212,9 +213,13 @@ avançadas, o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado 
 
 ## Como a comunicação funciona
 
-A aplicação expõe `/auth/govbr/login` e `/auth/govbr/callback`. Depois do
-login, o backend troca o código no endpoint `token`, busca as chaves em `jwk`,
-valida o ID Token e consulta `userinfo` antes de chamar `on_success`.
+A aplicação expõe `/auth/govbr/login`. Com o provedor oficial, a rota de
+callback usa exatamente o caminho de `GOVBR_REDIRECT_URI`; por exemplo,
+`https://api.example.com/oauth/govbr/retorno` registra
+`/oauth/govbr/retorno`. No FakeGov, o callback permanece
+`/auth/govbr/callback` por padrão. Depois do login, o backend troca o código no
+endpoint `token`, busca as chaves em `jwk`, valida o ID Token e consulta
+`userinfo` antes de chamar `on_success`.
 
 Com `GOVBR_PROVIDER=official`, essas chamadas vão para o gov.br. Com
 `GOVBR_PROVIDER=fake`, as rotas FakeGov são montadas no mesmo router e o
@@ -223,6 +228,14 @@ consumidor, e a configuração fake troca apenas os endpoints do provedor e o
 transporte HTTP interno. O fluxo end-to-end do launcher também inclui a página
 inicial. O diagrama completo está no
 [`guia de fluxo de comunicação`](https://govbr-auth.readthedocs.io/en/latest/guide/communication-flow.html).
+
+`GOVBR_ENVIRONMENT` descreve o provedor acessado, não onde a aplicação roda.
+Ao usar os hosts oficiais, `authorize`, `token`, `userinfo`, `issuer` e `jwk`
+devem ser todos de produção ou todos de staging. O `GOVBR_REDIRECT_URI` é
+independente dessa comparação e pode apontar para a aplicação local, desde que
+use HTTPS quando não for loopback. Para usar um DNS de desenvolvimento,
+termine o TLS em um proxy reverso e encaminhe para a aplicação HTTP no
+loopback; a biblioteca não gerencia certificados nem inicia esse proxy.
 
 Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
 fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente

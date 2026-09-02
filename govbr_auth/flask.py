@@ -10,7 +10,7 @@ from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
     describe_auth_error,
 )
-from govbr_auth.adapters._runtime import create_adapter_runtime
+from govbr_auth.adapters._runtime import adapter_callback_path, create_adapter_runtime
 from govbr_auth.adapters._sync import run_sync
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.errors import GovBrAuthError
@@ -95,14 +95,16 @@ class GovBrAuth:
             application.register_blueprint(self._fake_blueprint)
 
     def _build_blueprint(self, prefix: str) -> Blueprint:
-        blueprint = Blueprint("govbr_auth", __name__, url_prefix=prefix or "")
+        blueprint = Blueprint("govbr_auth", __name__)
+        login_path = f"{prefix}/login" if prefix else "/login"
+        callback_path = adapter_callback_path(self._owner.runtime, prefix)
 
-        @blueprint.get("/login")
+        @blueprint.get(login_path)
         def login():
             authorization = self._service.authorization_url(now=self._clock())
             return redirect(authorization.url)
 
-        @blueprint.route("/callback", methods=["GET", "POST"])
+        @blueprint.route(callback_path, methods=["GET", "POST"])
         def callback():
             code = request.values.get("code")
             state = request.values.get("state")

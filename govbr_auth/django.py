@@ -12,7 +12,7 @@ from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
     describe_auth_error,
 )
-from govbr_auth.adapters._runtime import create_adapter_runtime
+from govbr_auth.adapters._runtime import adapter_callback_path, create_adapter_runtime
 from govbr_auth.adapters._sync import run_sync
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.errors import GovBrAuthError
@@ -83,10 +83,14 @@ class GovBrAuth:
 
     def _build_urlpatterns(self) -> list[URLPattern]:
         prefix = f"{self._prefix}/" if self._prefix else ""
+        callback_path = adapter_callback_path(
+            self._owner.runtime,
+            f"/{self._prefix}" if self._prefix else "",
+        ).lstrip("/")
         patterns = [
             path(f"{prefix}login", self._login, name="govbr-auth-login"),
             path(
-                f"{prefix}callback",
+                callback_path,
                 self._callback,
                 name="govbr-auth-callback",
             ),

@@ -30,12 +30,17 @@ Salve ``myapp.py`` com a fachada pública e inclua o router na aplicação:
 
 Essa aplicação não cria um cliente OAuth, uma rota de callback ou uma factory
 do FakeGov manualmente. ``GovBrAuth`` compõe o runtime selecionado e publica
-as rotas ``/auth/govbr/login`` e ``/auth/govbr/callback``. Com
-``GOVBR_PROVIDER=fake``, o app continua usando o mesmo runtime consumidor; a
-configuração fake troca apenas os endpoints do provedor e o transporte HTTP
-interno (``FakeGovHttpTransport``). Para composição avançada, o simulador canônico é
-``govbr_auth.fake.FakeGovSimulator``, criado por
+``/auth/govbr/login``. Com o provedor oficial, o callback é registrado no
+caminho de ``GOVBR_REDIRECT_URI``; com ``GOVBR_PROVIDER=fake``, permanece em
+``/auth/govbr/callback`` por padrão. O app continua usando o mesmo runtime
+consumidor; a configuração fake troca apenas os endpoints do provedor e o
+transporte HTTP interno (``FakeGovHttpTransport``). Para composição avançada,
+o simulador canônico é ``govbr_auth.fake.FakeGovSimulator``, criado por
 ``govbr_auth.fake.create_fake_gov_simulator``.
+
+Monte o router, os URL patterns ou o blueprint na raiz da aplicação. Um
+prefixo externo imposto pelo framework também alteraria o caminho público e
+deixaria de corresponder ao URI cadastrado no provedor.
 
 Aplicação Django
 ----------------

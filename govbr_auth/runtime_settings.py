@@ -14,6 +14,7 @@ from pydantic import (
     ConfigDict,
     PositiveInt,
     SecretStr,
+    ValidationError,
     field_validator,
     model_validator,
 )
@@ -31,7 +32,11 @@ class GovBrProvider(StrEnum):
 class GovBrRuntimeSettings(BaseModel):
     """Keep provider selection and runtime inputs independent of web frameworks."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        hide_input_in_errors=True,
+    )
 
     provider: GovBrProvider = GovBrProvider.OFFICIAL
     oauth: GovBrSettings | None = None
@@ -95,7 +100,10 @@ class GovBrRuntimeSettings(BaseModel):
     ) -> "GovBrRuntimeSettings":
         """Build validated settings from an explicit environment mapping."""
         values = os.environ if environ is None else environ
-        return cls.model_validate(_runtime_values(values))
+        try:
+            return cls.model_validate(_runtime_values(values))
+        except ValidationError as error:
+            raise ValueError(_configuration_error_message(error)) from None
 
 
 def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
@@ -137,6 +145,35 @@ def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
             values["fake_redirect_uri"] = _default_fake_redirect_uri(values)
 
     return values
+
+
+def _configuration_error_message(error: ValidationError) -> str:
+    """Translate validation failures without exposing configured values."""
+    details = [
+        _configuration_issue_message(issue)
+        for issue in error.errors(include_url=False, include_input=False)
+    ]
+    unique_details = list(dict.fromkeys(details))
+    return "Configuração Gov.br inválida: " + "; ".join(unique_details) + "."
+
+
+def _configuration_issue_message(issue: Mapping[str, object]) -> str:
+    """Describe one Pydantic issue in concise Brazilian Portuguese."""
+    context = issue.get("ctx")
+    if isinstance(context, Mapping):
+        custom_error = context.get("error")
+        detail = str(custom_error) if custom_error is not None else ""
+        if detail.startswith(("Endpoints oficiais do Gov.br", "GOVBR_")):
+            return detail
+
+    location = issue.get("loc")
+    field_name = location[-1] if isinstance(location, tuple) and location else None
+    environment_name = _ENVIRONMENT_NAMES_BY_FIELD.get(field_name)
+    if environment_name is None:
+        return "combinação de valores inválida"
+    if issue.get("type") == "missing":
+        return f"variável obrigatória ausente: {environment_name}"
+    return f"valor inválido para {environment_name}"
 
 
 def _reject_unknown_govbr_variables(environ: Mapping[str, str]) -> None:
@@ -238,6 +275,11 @@ _FAKE_FIELDS = {
 _KNOWN_ENVIRONMENT_VARIABLES = frozenset(
     {"GOVBR_PROVIDER", *_OFFICIAL_OAUTH_FIELDS, *_FAKE_FIELDS}
 )
+_ENVIRONMENT_NAMES_BY_FIELD = {
+    "provider": "GOVBR_PROVIDER",
+    **{field_name: name for name, field_name in _OFFICIAL_OAUTH_FIELDS.items()},
+    **{field_name: name for name, field_name in _FAKE_FIELDS.items()},
+}
 
 
 def _is_canonical_path_prefix(prefix: str, *, allow_empty: bool = False) -> bool:

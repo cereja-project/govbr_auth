@@ -21,7 +21,10 @@ consumidor continua no mesmo runtime consumidor; a configuração fake troca
 apenas os endpoints do provedor e o transporte HTTP interno
 (``FakeGovHttpTransport``). Para composição avançada, o simulador canônico é
 ``govbr_auth.fake.FakeGovSimulator``, criado por
-``govbr_auth.fake.create_fake_gov_simulator``.
+``govbr_auth.fake.create_fake_gov_simulator``. No provedor oficial, o callback
+é registrado no caminho de ``GOVBR_REDIRECT_URI``; ``prefix`` continua
+definindo a rota de login. Registre a fachada sem ``url_prefix`` externo, pois
+um prefixo adicional também alteraria o caminho do callback.
 
 .. py:class:: GovBrAuth(*, on_success, settings=None, runtime=None, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now, user_repository=None)
    :no-index:

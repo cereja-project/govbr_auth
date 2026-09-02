@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Fixed
+- Os adapters FastAPI, Django e Flask agora registram o callback oficial no
+  caminho configurado por `GOVBR_REDIRECT_URI`, mantendo o prefixo do adapter
+  para a rota de login e o comportamento existente do FakeGov.
+- A configuração agora rejeita, antes da inicialização do runtime, endpoints
+  oficiais de produção e staging misturados ou incompatíveis com
+  `GOVBR_ENVIRONMENT`.
+- Erros do Pydantic ao carregar variáveis de ambiente agora são convertidos em
+  mensagens diretas em português, sem incluir os valores configurados.
+- Erros de URL HTTP fora de loopback agora identificam a variável responsável
+  e orientam o uso de HTTPS por DNS ou de uma URI local de loopback.
+
+### Security
+- URLs HTTP no ambiente local voltam a ser aceitas somente para hosts de
+  loopback; DNS de desenvolvimento não pode desativar a exigência de HTTPS.
+
 ## [1.0.0] - 2026-09-01
 
 ### Changed

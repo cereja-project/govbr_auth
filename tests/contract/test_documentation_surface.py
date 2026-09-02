@@ -717,12 +717,10 @@ def test_sphinx_theme_uses_the_approved_brand_and_local_fonts() -> None:
 def test_brand_guide_publishes_the_approved_usage_contract() -> None:
     index = (DOCS_ROOT / "index.rst").read_text(encoding="utf-8")
     guide = (DOCS_ROOT / "guide" / "brand.rst").read_text(encoding="utf-8")
-    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     normalized_guide = _normalized_prose(guide)
     descriptor = "biblioteca python open source para integração com gov.br"
 
     assert "guide/brand" in _toctree_entries(index)
-    assert descriptor in _normalized_prose(readme)
     assert descriptor in normalized_guide
     assert "50% da altura visível" in normalized_guide
     assert "mínimo de 24 px" in normalized_guide

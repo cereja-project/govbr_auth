@@ -35,6 +35,62 @@ Provedor oficial
     GOVBR_ISSUER=https://sso.acesso.gov.br/
     GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
 
+``GOVBR_ENVIRONMENT`` identifica o ambiente do provedor Gov.br, não o ambiente
+em que a aplicação consumidora está sendo executada. Quando os hosts oficiais
+são usados, ``GOVBR_AUTHORIZATION_URL``, ``GOVBR_TOKEN_URL``,
+``GOVBR_USERINFO_URL``, ``GOVBR_ISSUER`` e ``GOVBR_JWKS_URL`` devem pertencer
+ao mesmo ambiente e corresponder a ``production`` ou ``staging``. Uma mistura
+é rejeitada durante a inicialização, antes da criação de clientes HTTP e rotas.
+Falhas ao carregar variáveis de ambiente são apresentadas em português, com os
+nomes das variáveis que precisam de correção e sem os valores configurados ou
+detalhes internos do Pydantic.
+
+``GOVBR_REDIRECT_URI`` não participa dessa comparação porque pertence à
+aplicação consumidora. Ela pode usar outro host, mas todas as URLs exigem HTTPS
+fora de ``localhost``, ``127.0.0.1`` e ``::1``. Portanto, um DNS de
+desenvolvimento acessível pelo Gov.br também precisa servir HTTPS.
+
+HTTPS local com DNS
+~~~~~~~~~~~~~~~~~~~
+
+A biblioteca não emite certificados nem inicia um proxy TLS. Mantenha a
+aplicação em HTTP no loopback e termine o HTTPS em um proxy reverso:
+
+.. code-block:: text
+
+    https://app.dev.example:443 -> http://127.0.0.1:8000
+
+Uma configuração mínima do Caddy para essa topologia é:
+
+.. code-block:: text
+
+    app.dev.example {
+        tls internal
+        reverse_proxy 127.0.0.1:8000
+    }
+
+Nesse exemplo local, a CA interna do Caddy precisa ser instalada como confiável
+no navegador ou dispositivo que receberá o redirecionamento. Para um DNS
+público, substitua o hostname reservado pelo domínio real e use um certificado
+público válido em vez de ``tls internal``.
+
+Como alternativa, servidores ASGI como o Uvicorn podem receber diretamente o
+certificado e a chave TLS. Em todos os casos, esquema, host, porta e caminho de
+``GOVBR_REDIRECT_URI`` devem corresponder exatamente à URI cadastrada no
+Gov.br. Certificados, chaves privadas e arquivos locais não devem ser
+versionados.
+
+Para o ambiente de staging oficial, use o conjunto coerente abaixo:
+
+.. code-block:: text
+
+    GOVBR_ENVIRONMENT=staging
+    GOVBR_AUTHORIZATION_URL=https://sso.staging.acesso.gov.br/authorize
+    GOVBR_TOKEN_URL=https://sso.staging.acesso.gov.br/token
+    GOVBR_USERINFO_URL=https://sso.staging.acesso.gov.br/userinfo/
+    GOVBR_ISSUER=https://sso.staging.acesso.gov.br/
+    GOVBR_JWKS_URL=https://sso.staging.acesso.gov.br/jwk
+
 ``GOVBR_TRANSACTION_SECRET`` protege ``state``, nonce e PKCE. Gere uma vez:
 
 .. code-block:: python
