@@ -1,4 +1,4 @@
-<p align="center">
+<p align="left">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo-light.svg">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg">
@@ -6,24 +6,26 @@
   </picture>
 </p>
 
-Biblioteca Python open source para integração com gov.br, com um core OAuth
-2.0/OpenID Connect independente de framework e adapters opcionais para FastAPI,
-Django e Flask.
-
-O fluxo OAuth é stateless no backend: funciona com múltiplos workers, sem
-armazenamento compartilhado, desde que todos usem a mesma secret
-`GOVBR_TRANSACTION_SECRET`.
-
+[![PyPI version](https://badge.fury.io/py/govbr-auth.svg)](https://badge.fury.io/py/govbr-auth)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)](LICENSE)
 [![Core](https://img.shields.io/badge/Core-async%20OAuth%2FOIDC-0f766e.svg)](#instalação)
 [![FakeGov](https://img.shields.io/badge/FakeGov-local-0f766e.svg)](#teste-a-integração-sem-depender-do-govbr)
 
+Uma biblioteca autenticamente pythônica para integração com o Login Único gov.br. Seu core assíncrono OAuth 2.0/OpenID Connect é independente de framework e cuida das partes sensíveis do fluxo - PKCE, nonce, state criptografado e stateless, troca de tokens, validação de assinatura e claims do ID Token e consulta ao userinfo - deixando para a aplicação uma API menor, segura e previsível. Adapters opcionais integram esse mesmo core ao FastAPI, Django e Flask.
+
+Inclui o FakeGov, um simulador local que permite desenvolver, testar e depurar o fluxo completo de autenticação antes da homologação oficial, reduzindo dependências externas, acelerando o setup do ambiente e encurtando o ciclo de desenvolvimento.
+
+O fluxo OAuth é stateless no backend: funciona com múltiplos workers, sem
+armazenamento compartilhado, desde que todos usem a mesma secret
+`GOVBR_TRANSACTION_SECRET`.
+
+
 > [!IMPORTANT]
-> Este é um projeto open source independente, sem manutenção, homologação ou
-> endosso do Governo Federal. O FakeGov é um simulador local: use nele somente
-> credenciais e dados pessoais fictícios. Essa restrição é exclusiva ao FakeGov;
-> para uma integração real, configure a biblioteca com o provedor oficial.
+> 1. Este é um projeto open source independente, sem manutenção, homologação ou
+> endosso do Governo Federal.
+> 
+> 2. O FakeGov é um simulador para testes end-to-end, não o utilize para além deste propósito.
 
 ## Índice
 
