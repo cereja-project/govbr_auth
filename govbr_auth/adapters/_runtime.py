@@ -41,25 +41,22 @@ def create_adapter_runtime(
         raise TypeError("settings and runtime are mutually exclusive")
     if settings is not None and demo_page:
         raise TypeError("demo_page must be configured in settings")
-    if not _is_canonical_path_prefix(prefix, allow_empty=True):
-        raise ValueError("prefix must be an empty string or a canonical path")
 
     if runtime is None:
         application_settings = settings or GovBrApplicationSettings.from_environment()
-        _validate_demo_page_callback(
-            application_settings.runtime,
-            prefix,
-            application_settings.demo_page,
+        resolved_settings = prepare_adapter_runtime_settings(
+            application_settings,
+            prefix=prefix,
         )
         owner = _create_owned_adapter_runtime(
-            application_settings.runtime,
-            prefix=prefix,
+            resolved_settings,
             clock=clock,
             user_repository=user_repository,
             fake_transport_factory=fake_transport_factory,
         )
         return owner, application_settings.demo_page
 
+    _validate_adapter_prefix(prefix)
     _validate_runtime_callback(runtime, prefix)
     _validate_demo_page_callback(runtime.settings, prefix, demo_page)
     return RuntimeOwner(runtime=runtime, owns_runtime=False), demo_page
@@ -68,29 +65,48 @@ def create_adapter_runtime(
 def _create_owned_adapter_runtime(
     settings: GovBrRuntimeSettings,
     *,
-    prefix: str,
     clock: Callable[[], datetime],
     user_repository: "FakeUserRepository | None",
     fake_transport_factory: Callable[["FakeGovSimulator"], httpx.AsyncBaseTransport],
 ) -> RuntimeOwner:
-    resolved_settings = settings
-    if resolved_settings.provider is GovBrProvider.FAKE:
-        resolved_settings = _settings_for_fake_callback(resolved_settings, prefix)
-    adapter_settings_callback_path(resolved_settings, prefix)
-    if resolved_settings.provider is GovBrProvider.FAKE:
+    if settings.provider is GovBrProvider.FAKE:
         runtime = create_govbr_runtime(
-            resolved_settings,
+            settings,
             fake_transport_factory=fake_transport_factory,
             clock=clock,
             user_repository=user_repository,
         )
     else:
         runtime = create_govbr_runtime(
-            resolved_settings,
+            settings,
             clock=clock,
             user_repository=user_repository,
         )
     return RuntimeOwner(runtime=runtime, owns_runtime=True)
+
+
+def prepare_adapter_runtime_settings(
+    application_settings: GovBrApplicationSettings,
+    *,
+    prefix: str,
+) -> GovBrRuntimeSettings:
+    """Validate callback topology before allocating adapter runtime resources."""
+    _validate_adapter_prefix(prefix)
+    settings = application_settings.runtime
+    _validate_demo_page_callback(
+        settings,
+        prefix,
+        application_settings.demo_page,
+    )
+    if settings.provider is GovBrProvider.FAKE:
+        settings = _settings_for_fake_callback(settings, prefix)
+    adapter_settings_callback_path(settings, prefix)
+    return settings
+
+
+def _validate_adapter_prefix(prefix: str) -> None:
+    if not _is_canonical_path_prefix(prefix, allow_empty=True):
+        raise ValueError("prefix must be an empty string or a canonical path")
 
 
 def adapter_callback_path(runtime: GovBrRuntime, prefix: str) -> str:
@@ -119,7 +135,13 @@ def _validate_demo_page_callback(
     prefix: str,
     demo_page: bool,
 ) -> None:
-    if demo_page and adapter_settings_callback_path(settings, prefix) == DEMO_PAGE_PATH:
+    callback_path = adapter_settings_callback_path(settings, prefix)
+    if (
+        settings.provider is GovBrProvider.FAKE
+        and settings.fake_redirect_uri is not None
+    ):
+        callback_path = _route_path(settings.fake_redirect_uri.path or "/")
+    if demo_page and callback_path == DEMO_PAGE_PATH:
         raise ValueError(
             "redirect URI callback path must differ from the demo page path"
         )

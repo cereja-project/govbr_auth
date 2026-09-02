@@ -221,6 +221,43 @@ def test_end_to_end_rejects_official_provider_before_runtime_allocation(
     assert runtime_calls == []
 
 
+@pytest.mark.parametrize(
+    ("callback_path", "message"),
+    (
+        ("/unexpected/callback", "fake redirect URI does not match"),
+        ("/govbr-auth-demo", "demo page path"),
+    ),
+    ids=("incompatible", "demo-collision"),
+)
+def test_demo_launcher_validates_callback_before_runtime_allocation(
+    callback_path: str,
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invalid callbacks must fail before the launcher owns an HTTP client."""
+    import govbr_auth.fake.fastapi as fake_fastapi
+
+    settings = GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_redirect_uri=f"http://127.0.0.1:8000{callback_path}",
+        ),
+        demo_page=True,
+    )
+    runtime_calls: list[object] = []
+
+    def record_runtime_allocation(*args, **kwargs):
+        runtime_calls.append((args, kwargs))
+        raise AssertionError("runtime allocation must not be reached")
+
+    monkeypatch.setattr(fake_fastapi, "create_govbr_runtime", record_runtime_allocation)
+
+    with pytest.raises(ValueError, match=message):
+        create_fake_app(settings=settings, clock=fixed_clock)
+
+    assert runtime_calls == []
+
+
 @pytest.mark.asyncio
 async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form() -> (
     None

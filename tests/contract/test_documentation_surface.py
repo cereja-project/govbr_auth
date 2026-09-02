@@ -235,9 +235,12 @@ def test_environment_example_documents_every_supported_variable() -> None:
         "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS",
         "GOVBR_FAKE_USERS_FILE",
     }
+    temporarily_documented_variables = {"GOVBR_FAKE_END_TO_END"}
 
     assert supported_variables == expected_variables
-    assert documented_variables & supported_variables == expected_variables
+    assert documented_variables == (
+        expected_variables | temporarily_documented_variables
+    )
 
 
 def test_transaction_secret_documentation_explains_generation_and_storage() -> None:

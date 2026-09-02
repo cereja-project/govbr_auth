@@ -44,7 +44,7 @@ async def verify_http_boundaries():
         transport=httpx.ASGITransport(app=fake_app),
         base_url="http://127.0.0.1:8000",
     ) as client:
-        response = await client.get("/fake-govbr/jwk")
+        response = await client.get("/jwk")
         assert response.status_code == 200
         assert response.json()["keys"]
 
@@ -148,13 +148,14 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
         )
         child_environment = {
             **os.environ,
-            "GOVBR_FAKE_END_TO_END": "true",
+            "GOVBR_DEMO_PAGE": "false",
             "GOVBR_FAKE_USERS_FILE": str(users_file),
             "GOVBR_PROVIDER": "fake",
             "PYTHONNOUSERSITE": "1",
             "PYTHONPATH": "",
             "PYTHONUTF8": "1",
         }
+        child_environment.pop("GOVBR_FAKE_END_TO_END", None)
         for profile in distribution_profiles():
             profile_root = root / profile.name
             profile_root.mkdir()

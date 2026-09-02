@@ -11,6 +11,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
 
+from govbr_auth.adapters._runtime import prepare_adapter_runtime_settings
 from govbr_auth.application_settings import GovBrApplicationSettings
 from govbr_auth.fake.http.routes import build_fake_govbr_routes
 from govbr_auth.fake.http.application import (
@@ -135,8 +136,12 @@ def create_fake_app(
             clock=clock,
         )
 
+    runtime_settings = prepare_adapter_runtime_settings(
+        resolved,
+        prefix="/auth/govbr",
+    )
     runtime = create_govbr_runtime(
-        resolved.runtime,
+        runtime_settings,
         fake_transport_factory=lambda fake: _fake_asgi_transport(fake, clock=clock),
         clock=clock,
         user_repository=user_repository,
