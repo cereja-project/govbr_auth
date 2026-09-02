@@ -33,8 +33,9 @@ página sem simulação.
 
 A rota é fixa. Se a aplicação já registrou esse caminho, remova a duplicidade
 antes de habilitar o opt-in; evitar a colisão é responsabilidade do integrador.
-O comando ``python -m govbr_auth.fake`` permanece ``provider-only`` e não cria
-essa página na aplicação consumidora.
+O comando ``python -m govbr_auth.fake`` é ``provider-only`` por padrão, sem
+``GOVBR_DEMO_PAGE=true``. ``GOVBR_DEMO_PAGE=true`` seleciona a composição
+completa e cria a página na aplicação consumidora.
 
 Variável desconhecida ou inativa
 --------------------------------

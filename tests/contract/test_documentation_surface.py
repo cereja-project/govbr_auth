@@ -3,7 +3,9 @@
 import importlib
 import re
 import runpy
+import subprocess
 import xml.etree.ElementTree as ET
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -501,14 +503,94 @@ def test_public_docs_publish_only_the_application_demo_page_contract() -> None:
         "Entrar com gov.br",
     ):
         assert required_symbol in combined
-    assert "GOVBR_FAKE_END_TO_END" not in combined
-    assert "fake_end_to_end" not in combined
     assert "abra http://localhost:8000 " not in normalized
     assert "demo_page=false" in normalized
     assert "provedor oficial usa a mesma página" in normalized
     assert "provider-only" in normalized
     assert "rota fixa" in normalized
     assert "responsabilidade do integrador" in normalized
+
+
+def test_removed_fake_switch_occurs_only_in_the_closed_tracked_file_allowlist() -> None:
+    legacy_environment_name = "GOVBR_FAKE_" + "END_TO_END"
+    legacy_field_name = "fake_" + "end_to_end"
+    tokens = {
+        "environment_variable": legacy_environment_name,
+        "field_name": legacy_field_name,
+    }
+    completed = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+    )
+    tracked_files = tuple(
+        path for path in completed.stdout.decode("utf-8").split("\0") if path
+    )
+    occurrences: Counter[tuple[str, str, str]] = Counter()
+    for relative_path in tracked_files:
+        content = (PROJECT_ROOT / relative_path).read_bytes()
+        for raw_line in content.splitlines():
+            line = raw_line.decode("utf-8", errors="replace").strip()
+            for token_kind, token in tokens.items():
+                if count := line.count(token):
+                    occurrences[(relative_path, token_kind, line)] += count
+
+    expected: Counter[tuple[str, str, str]] = Counter(
+        {
+            (
+                "CHANGELOG.md",
+                "environment_variable",
+                f"`{legacy_environment_name}`/`{legacy_field_name}` foi removida em favor do opt-in",
+            ): 1,
+            (
+                "CHANGELOG.md",
+                "field_name",
+                f"`{legacy_environment_name}`/`{legacy_field_name}` foi removida em favor do opt-in",
+            ): 1,
+            (
+                "scripts/verify_distribution.py",
+                "environment_variable",
+                f'child_environment.pop("{legacy_environment_name}", None)',
+            ): 1,
+            (
+                "tests/unit/test_verify_distribution.py",
+                "environment_variable",
+                f'monkeypatch.setenv("{legacy_environment_name}", "true")',
+            ): 1,
+            (
+                "tests/unit/test_verify_distribution.py",
+                "environment_variable",
+                f'assert "{legacy_environment_name}" not in environment',
+            ): 1,
+            (
+                "tests/unit/test_runtime.py",
+                "environment_variable",
+                f'"{legacy_environment_name}": "true",',
+            ): 1,
+            (
+                "tests/unit/test_runtime.py",
+                "environment_variable",
+                f'"{legacy_environment_name}."',
+            ): 1,
+        }
+    )
+
+    assert "AGENTS.md" in tracked_files
+    assert "scripts/verify_distribution.py" in tracked_files
+    assert occurrences == expected
+
+
+def test_launcher_docs_qualify_provider_only_as_the_default_profile() -> None:
+    sources = (
+        (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8"),
+    )
+
+    for source in sources:
+        normalized = _normalized_prose(source)
+        assert "provider-only por padrão" in normalized
+        assert "govbr_demo_page=true seleciona a composição completa" in normalized
 
 
 def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
