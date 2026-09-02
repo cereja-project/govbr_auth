@@ -18,13 +18,14 @@ Salve ``myapp.py`` com a fachada pública e inclua o router na aplicação:
 
     from dotenv import load_dotenv
     from fastapi import FastAPI
-    from fastapi.responses import HTMLResponse
+    from fastapi.responses import JSONResponse
 
-    from govbr_auth.fastapi import GovBrAuth
+    from govbr_auth.fastapi import AuthContext, GovBrAuth
     from govbr_auth.runtime import GovBrApplicationSettings
 
-    async def authenticated(context):
-        return HTMLResponse(f"Autenticado: {context.user.name or context.user.sub}")
+    async def authenticated(context: AuthContext) -> JSONResponse:
+        # context.user contém o perfil OIDC validado para a sessão da aplicação.
+        return JSONResponse({"authenticated": True})
 
     load_dotenv()
     settings = GovBrApplicationSettings.from_environment()
@@ -160,9 +161,9 @@ Abra ``http://localhost:8000/govbr-auth-demo``, clique em
 navegador será redirecionado para as rotas FakeGov
 montadas na própria aplicação. O backend troca o código, busca JWKS e consulta
 ``userinfo`` usando ``FakeGovHttpTransport``. O callback retorna somente
-o nome ou subject validado para tornar o fluxo local observável; CPF, senha,
-tokens e segredos não são exibidos. Veja :doc:`communication-flow` para o
-diagrama completo.
+``{"authenticated": true}`` e mantém as claims validadas no backend; CPF,
+senha, tokens e segredos não são exibidos. Veja :doc:`communication-flow` para
+o diagrama completo.
 
 Página de demonstração
 ----------------------

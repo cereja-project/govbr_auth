@@ -103,7 +103,9 @@ def test_readme_fastapi_quickstart_runs_as_a_python_program(
     )
 
     probe = """
+import asyncio
 import runpy
+from types import SimpleNamespace
 import uvicorn
 from govbr_auth.runtime import GovBrProvider
 
@@ -135,6 +137,17 @@ assert calls[0][1] == {
 assert namespace['settings'].demo_page is True
 assert namespace['settings'].runtime.provider is GovBrProvider.FAKE
 assert '/govbr-auth-demo' in route_paths(namespace['app'])
+
+malicious_context = SimpleNamespace(
+    user=SimpleNamespace(
+        name='<script>alert(1)</script>',
+        sub='<script>alert(1)</script>',
+    )
+)
+response = asyncio.run(namespace['authenticated'](malicious_context))
+assert response.media_type == 'application/json'
+assert b'<script>' not in response.body
+assert response.body == b'{"authenticated":true}'
 """
     result = subprocess.run(
         [sys.executable, "-c", probe],

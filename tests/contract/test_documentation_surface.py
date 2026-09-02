@@ -347,6 +347,16 @@ def test_readme_leads_with_an_executable_configurable_application() -> None:
     assert all(guidance in source for guidance in required_guidance)
 
 
+def test_fastapi_quickstarts_do_not_render_untrusted_claims_as_html() -> None:
+    sources = (
+        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+    )
+
+    assert all("HTMLResponse" not in source for source in sources)
+    assert all('JSONResponse({"authenticated": True})' in source for source in sources)
+
+
 def test_readme_communication_section_embeds_animation_and_links_static_flow() -> None:
     source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     animated_embed = (

@@ -98,14 +98,15 @@ Salve o bloco completo abaixo como `myapp.py`:
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 
-from govbr_auth.fastapi import GovBrAuth
+from govbr_auth.fastapi import AuthContext, GovBrAuth
 from govbr_auth.runtime import GovBrApplicationSettings
 
 
-async def authenticated(context):
-    return HTMLResponse(f"Autenticado: {context.user.name or context.user.sub}")
+async def authenticated(context: AuthContext) -> JSONResponse:
+    # context.user contém o perfil OIDC validado para a sessão da aplicação.
+    return JSONResponse({"authenticated": True})
 
 
 def create_app(settings: GovBrApplicationSettings) -> FastAPI:
@@ -227,9 +228,9 @@ O callback `authenticated` recebe um `AuthContext` já validado:
 
 Nesse ponto, a aplicação pode criar sua sessão, emitir seu próprio cookie,
 atualizar o perfil local ou redirecionar para uma área autenticada. O exemplo
-exibe o nome ou o subject validado somente para tornar o fluxo local
-observável; CPF, senha, tokens e segredos não são exibidos. O arquivo de
-usuários aceita apenas dados fictícios: não use credenciais reais.
+responde somente `{"authenticated": true}` e mantém as claims validadas no
+backend; CPF, senha, tokens e segredos não são exibidos. O arquivo de usuários
+aceita apenas dados fictícios: não use credenciais reais.
 
 Para trocar o FakeGov pelo provedor oficial, mantenha `myapp.py` e altere apenas
 `GOVBR_PROVIDER` e as variáveis oficiais descritas em
