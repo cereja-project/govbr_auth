@@ -5,6 +5,13 @@ O provedor local é opcional e nunca é ativado pelo cliente oficial. Instale o
 extra ``govbr-auth[fake]``. No caminho comum, selecione ``GOVBR_PROVIDER=fake``
 e use ``GovBrAuth``; as factories abaixo atendem topologias avançadas.
 
+``python -m govbr_auth.fake`` executa a topologia isolada ``provider-only`` sem
+flag adicional. A página da aplicação é um opt-in dos adapters por
+``GOVBR_DEMO_PAGE=true`` e fica em ``/govbr-auth-demo``. Carregue-a com
+``GovBrApplicationSettings.from_environment()``. Com ``demo_page=false``, a
+rota não é injetada; o provedor oficial usa a mesma página sem simulação. A
+rota é fixa, portanto verificar colisões é responsabilidade do integrador.
+
 .. autoclass:: govbr_auth.fake.FakeGovSimulator
 
 .. autofunction:: govbr_auth.fake.create_fake_gov_simulator

@@ -5,9 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 
-from examples.example_settings import runtime_settings
+from examples.example_settings import application_settings
 from govbr_auth.flask import GovBrAuth
-from govbr_auth.runtime import GovBrApplicationSettings
 
 
 def create_app() -> Flask:
@@ -21,7 +20,7 @@ def create_app() -> Flask:
     # The Flask consumer stays the same; fake mode changes only provider wiring.
     auth = GovBrAuth(
         on_success=authenticated,
-        settings=GovBrApplicationSettings(runtime=runtime_settings()),
+        settings=application_settings(),
     )
     auth.register(application)
     return application

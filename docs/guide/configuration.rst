@@ -18,6 +18,27 @@ mas inativas para o provider selecionado, emitem um warning contendo somente
 os nomes; valores e segredos não são incluídos. Endpoints oficiais combinados
 com ``GOVBR_PROVIDER=fake`` permanecem um erro de configuração.
 
+Página de demonstração
+----------------------
+
+``GovBrApplicationSettings.from_environment()`` agrega a configuração neutra
+do runtime e a apresentação opt-in dos adapters. Para testar a aplicação com a
+página integrada:
+
+.. code-block:: text
+
+   GOVBR_PROVIDER=fake
+   GOVBR_DEMO_PAGE=true
+
+``GOVBR_DEMO_PAGE`` aceita somente ``true`` ou ``false``. Com
+``demo_page=false`` (o default), nenhuma rota de demonstração é injetada. Com
+o opt-in, os adapters registram a rota fixa ``/govbr-auth-demo``. Essa rota
+pode colidir com um caminho da aplicação; avaliar e evitar a colisão é
+responsabilidade do integrador.
+
+O provedor oficial usa a mesma página sem simulação: o botão redireciona para
+os endpoints oficiais configurados.
+
 Provedor oficial
 ----------------
 
@@ -115,15 +136,19 @@ troca. Rotacionar a secret invalida os fluxos que ainda estiverem em andamento.
 FakeGov
 -------
 
-``GOVBR_FAKE_END_TO_END`` aceita apenas ``true`` ou ``false``. Host, porta,
-prefixo e fonte de usuários podem ser alterados por ``GOVBR_FAKE_HOST``,
+Host, porta, prefixo e fonte de usuários podem ser alterados por
+``GOVBR_FAKE_HOST``,
 ``GOVBR_FAKE_PORT``, ``GOVBR_FAKE_PROVIDER_PREFIX`` e
 ``GOVBR_FAKE_USERS_FILE``. O host precisa ser ``localhost``, ``127.0.0.1`` ou
-``::1``.
+``::1``. Sem flag adicional, ``python -m govbr_auth.fake`` continua
+``provider-only`` e não injeta uma página na aplicação consumidora.
 
 Configuração explícita
 ----------------------
 
-Aplicações avançadas podem construir ``GovBrRuntimeSettings`` e passá-lo a
-``GovBrAuth``. O caminho comum deve preferir variáveis de ambiente e a fachada
-do adapter escolhido, mantendo a composição em um único lugar.
+Aplicações comuns devem construir ``GovBrApplicationSettings`` e passá-lo a
+``GovBrAuth``. O caminho por ambiente usa
+``GovBrApplicationSettings.from_environment()`` e mantém a composição em um
+único lugar. Aplicações avançadas podem construir ``GovBrRuntimeSettings`` e
+passar o runtime já criado com ``GovBrAuth(runtime=runtime, demo_page=True,
+on_success=authenticated)``.

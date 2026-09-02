@@ -204,11 +204,13 @@ def test_environment_example_documents_every_supported_variable() -> None:
     )
     supported_variables = {
         "GOVBR_PROVIDER",
+        "GOVBR_DEMO_PAGE",
         *_OFFICIAL_OAUTH_FIELDS,
         *_FAKE_FIELDS,
     }
     expected_variables = {
         "GOVBR_PROVIDER",
+        "GOVBR_DEMO_PAGE",
         "GOVBR_ENVIRONMENT",
         "GOVBR_AUTHORIZATION_URL",
         "GOVBR_TOKEN_URL",
@@ -235,12 +237,8 @@ def test_environment_example_documents_every_supported_variable() -> None:
         "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS",
         "GOVBR_FAKE_USERS_FILE",
     }
-    temporarily_documented_variables = {"GOVBR_FAKE_END_TO_END"}
-
     assert supported_variables == expected_variables
-    assert documented_variables == (
-        expected_variables | temporarily_documented_variables
-    )
+    assert documented_variables == expected_variables
 
 
 def test_transaction_secret_documentation_explains_generation_and_storage() -> None:
@@ -332,12 +330,15 @@ def test_readme_leads_with_an_executable_configurable_application() -> None:
     source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     required_guidance = (
         "from dotenv import load_dotenv",
-        "GovBrRuntimeSettings.from_environment()",
+        "GovBrApplicationSettings.from_environment()",
         'if __name__ == "__main__":',
         "uvicorn.run(",
         "python myapp.py",
+        "GovBrApplicationSettings(",
         "GovBrRuntimeSettings(",
         "GovBrProvider.FAKE",
+        "demo_page=True",
+        "/govbr-auth-demo",
         "context.user",
         "context.claims",
         "context.tokens",
@@ -422,19 +423,20 @@ def test_animated_authentication_flow_is_accessible_and_motion_safe() -> None:
     )
 
 
-def test_sphinx_quickstart_keeps_the_optional_fake_launcher() -> None:
+def test_sphinx_quickstart_keeps_the_provider_only_fake_launcher() -> None:
     source = (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8")
 
     assert 'pip install "govbr-auth[fake]"' in source
     assert "python -m govbr_auth.fake" in source
-    assert "http://localhost:8000" in source
+    assert "provider-only" in source
+    assert "/govbr-auth-demo" in source
 
 
 def test_fastapi_fake_quickstart_install_is_complete_for_uvicorn() -> None:
     required_guidance = (
         'pip install "govbr-auth[fastapi,fake]"',
         "python myapp.py",
-        "http://localhost:8000/auth/govbr/login",
+        "http://localhost:8000/govbr-auth-demo",
     )
     source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -468,6 +470,35 @@ def test_entry_docs_quote_the_launcher_button_label_verbatim() -> None:
         False,
         False,
     )
+
+
+def test_public_docs_publish_only_the_application_demo_page_contract() -> None:
+    sources = _published_documents() | {
+        PROJECT_ROOT / ".env.example",
+        PROJECT_ROOT / "README.md",
+        PROJECT_ROOT / "examples" / "example_settings.py",
+        PROJECT_ROOT / "examples" / "example_fastapi.py",
+        PROJECT_ROOT / "examples" / "example_django.py",
+        PROJECT_ROOT / "examples" / "example_flask.py",
+    }
+    combined = "\n".join(document.read_text(encoding="utf-8") for document in sources)
+    normalized = _normalized_prose(combined)
+
+    for required_symbol in (
+        "GOVBR_DEMO_PAGE",
+        "/govbr-auth-demo",
+        "GovBrApplicationSettings.from_environment()",
+        "Entrar com gov.br",
+    ):
+        assert required_symbol in combined
+    assert "GOVBR_FAKE_END_TO_END" not in combined
+    assert "fake_end_to_end" not in combined
+    assert "abra http://localhost:8000 " not in normalized
+    assert "demo_page=false" in normalized
+    assert "provedor oficial usa a mesma página" in normalized
+    assert "provider-only" in normalized
+    assert "rota fixa" in normalized
+    assert "responsabilidade do integrador" in normalized
 
 
 def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
@@ -918,7 +949,8 @@ def test_docs_explain_both_fake_intents_and_official_provider() -> None:
         term in source
         for term in (
             "Usar FakeGov no meu app",
-            "Executar end-to-end",
+            "Página de demonstração",
+            "provider-only",
             "Uso avançado",
             "provedor oficial",
         )
@@ -968,6 +1000,9 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "from govbr_auth.django import GovBrAuth" in source
     assert "from govbr_auth.flask import GovBrAuth" in source
     assert "GOVBR_PROVIDER=fake" in source
+    assert "GOVBR_DEMO_PAGE=true" in source
+    assert "GovBrApplicationSettings.from_environment()" in source
+    assert "/govbr-auth-demo" in source
     assert "app.include_router(auth.router)" in source
     assert "urlpatterns = auth.urlpatterns" in source
     assert "auth.register(app)" in source

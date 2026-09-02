@@ -16,16 +16,20 @@ Salve ``myapp.py`` com a fachada pública e inclua o router na aplicação:
 
 .. code-block:: python
 
+    from dotenv import load_dotenv
     from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
-    from govbr_auth.fastapi import AuthContext, GovBrAuth
+    from fastapi.responses import HTMLResponse
 
+    from govbr_auth.fastapi import GovBrAuth
+    from govbr_auth.runtime import GovBrApplicationSettings
+
+    async def authenticated(context):
+        return HTMLResponse(f"Autenticado: {context.user.name or context.user.sub}")
+
+    load_dotenv()
+    settings = GovBrApplicationSettings.from_environment()
     app = FastAPI()
-
-    async def authenticated(context: AuthContext):
-        return JSONResponse({"authenticated": True})
-
-    auth = GovBrAuth(on_success=authenticated)
+    auth = GovBrAuth(settings=settings, on_success=authenticated)
     app.include_router(auth.router)
 
 Essa aplicação não cria um cliente OAuth, uma rota de callback ou uma factory
@@ -55,8 +59,11 @@ Salve ``django_app.py`` em um diretório vazio:
 
 .. code-block:: python
 
+    from dotenv import load_dotenv
     from django.http import JsonResponse
+
     from govbr_auth.django import GovBrAuth
+    from govbr_auth.runtime import GovBrApplicationSettings
 
     SECRET_KEY = "fake-local-only"
     DEBUG = True
@@ -66,7 +73,9 @@ Salve ``django_app.py`` em um diretório vazio:
     def authenticated(context, request):
         return JsonResponse({"authenticated": True})
 
-    auth = GovBrAuth(on_success=authenticated)
+    load_dotenv()
+    settings = GovBrApplicationSettings.from_environment()
+    auth = GovBrAuth(settings=settings, on_success=authenticated)
     urlpatterns = auth.urlpatterns
 
 .. quickstart-django:end
@@ -74,6 +83,7 @@ Salve ``django_app.py`` em um diretório vazio:
 Depois de criar ``fake-users.local.json`` como indicado abaixo, execute::
 
     $env:GOVBR_PROVIDER = "fake"
+    $env:GOVBR_DEMO_PAGE = "true"
     $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     python -m django runserver 127.0.0.1:8000 --settings=django_app
 
@@ -90,15 +100,20 @@ Salve ``flask_app.py`` em um diretório vazio:
 
 .. code-block:: python
 
+    from dotenv import load_dotenv
     from flask import Flask, jsonify
-    from govbr_auth.flask import GovBrAuth
 
+    from govbr_auth.flask import GovBrAuth
+    from govbr_auth.runtime import GovBrApplicationSettings
+
+    load_dotenv()
+    settings = GovBrApplicationSettings.from_environment()
     app = Flask(__name__)
 
     def authenticated(context, request):
         return jsonify({"authenticated": True})
 
-    auth = GovBrAuth(on_success=authenticated)
+    auth = GovBrAuth(settings=settings, on_success=authenticated)
     auth.register(app)
 
 .. quickstart-flask:end
@@ -106,6 +121,7 @@ Salve ``flask_app.py`` em um diretório vazio:
 Depois de criar ``fake-users.local.json``, execute::
 
     $env:GOVBR_PROVIDER = "fake"
+    $env:GOVBR_DEMO_PAGE = "true"
     $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     $env:GOVBR_FAKE_PORT = "5000"
     flask --app flask_app:app run --port 5000
@@ -125,6 +141,7 @@ No POSIX::
     {"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
     JSON
     export GOVBR_PROVIDER=fake
+    export GOVBR_DEMO_PAGE=true
     export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"
     uvicorn myapp:app --reload
 
@@ -134,51 +151,57 @@ No PowerShell::
     {"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
     '@ | Set-Content -Encoding UTF8 .\fake-users.local.json
     $env:GOVBR_PROVIDER = "fake"
+    $env:GOVBR_DEMO_PAGE = "true"
     $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
     uvicorn myapp:app --reload
 
-Abra ``http://localhost:8000/auth/govbr/login``, use CPF ``11122233344`` e
-senha ``senha-ficticia``. O navegador será redirecionado para as rotas FakeGov
+Abra ``http://localhost:8000/govbr-auth-demo``, clique em
+**Entrar com gov.br**, use CPF ``11122233344`` e senha ``senha-ficticia``. O
+navegador será redirecionado para as rotas FakeGov
 montadas na própria aplicação. O backend troca o código, busca JWKS e consulta
 ``userinfo`` usando ``FakeGovHttpTransport``. O callback retorna somente
-``{"authenticated": true}``; CPF, senha, tokens e segredos não são exibidos em
-respostas HTTP. Veja :doc:`communication-flow` para o diagrama completo.
+o nome ou subject validado para tornar o fluxo local observável; CPF, senha,
+tokens e segredos não são exibidos. Veja :doc:`communication-flow` para o
+diagrama completo.
 
-Executar o launcher end-to-end
-------------------------------
+Página de demonstração
+----------------------
 
-Para experimentar página inicial, aplicação e FakeGov em um único processo:
+``GOVBR_DEMO_PAGE=true`` habilita a página fixa ``/govbr-auth-demo`` na
+aplicação consumidora. O mesmo opt-in vale nos adapters FastAPI, Django e
+Flask. Com ``demo_page=false`` (o default), nenhuma rota de demonstração é
+injetada.
+
+O provedor oficial usa a mesma página: o botão inicia o redirect real, sem
+simulação. A rota fixa pode colidir com uma rota existente; verificar essa
+colisão antes de habilitar a página é responsabilidade do integrador.
+
+Em composições avançadas que já possuem um runtime, configure a apresentação
+sem recriar o núcleo:
+
+.. code-block:: python
+
+   auth = GovBrAuth(
+       runtime=runtime,
+       demo_page=True,
+       on_success=authenticated,
+   )
+
+Executar o launcher provider-only
+---------------------------------
+
+O launcher isolado executa somente o provedor FakeGov e não injeta uma página
+na aplicação consumidora:
 
 Instale o launcher::
 
     pip install "govbr-auth[fake]"
 
-No POSIX::
-
-    GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
-
-No PowerShell::
-
-    $env:GOVBR_FAKE_END_TO_END = "true"
     python -m govbr_auth.fake
 
-Abra ``http://localhost:8000``, clique em **Entrar com gov.br** e informe um
-usuário fictício. O launcher é uma demonstração local; aplicações reais
-usam ``GovBrAuth`` diretamente e preservam o mesmo runtime consumidor.
-
-Para remover a variável da sessão após o teste no PowerShell::
-
-    Remove-Item Env:GOVBR_FAKE_END_TO_END
-
-Somente o servidor FakeGov
----------------------------
-
-Sem a variável end-to-end, o launcher publica apenas o provedor local::
-
-    python -m govbr_auth.fake
-
-Esse perfil não possui página inicial em ``/`` e atende aplicações web próprias
-que precisam apontar para um provedor local.
+Sem qualquer flag adicional, esse perfil permanece ``provider-only`` e atende
+aplicações web próprias que precisam apontar para um provedor local. Para o
+fluxo completo pela aplicação, use ``GovBrAuth`` com ``GOVBR_DEMO_PAGE=true``.
 
 Usar o provedor oficial
 -----------------------
@@ -189,7 +212,8 @@ apontar para o callback da API, por exemplo
 redirect URI, endpoints OAuth/OIDC e ``GOVBR_TRANSACTION_SECRET`` conforme
 :doc:`configuration`, então execute a mesma aplicação FastAPI. O fluxo de
 login permanece igual; somente o runtime passa a conversar com o Gov.br
-oficial. O FakeGov não é fallback automático.
+oficial. ``/govbr-auth-demo`` continua disponível quando habilitada, agora sem
+simulação. O FakeGov não é fallback automático.
 
 O backend pode ser executado com múltiplos workers sem armazenamento
 compartilhado. Configure a mesma secret ``GOVBR_TRANSACTION_SECRET`` em todos

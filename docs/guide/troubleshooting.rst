@@ -20,8 +20,21 @@ Provider ou booleano inválido
 -----------------------------
 
 ``GOVBR_PROVIDER`` aceita apenas ``official`` e ``fake``.
-``GOVBR_FAKE_END_TO_END`` aceita exatamente ``true`` ou ``false`` em
+``GOVBR_DEMO_PAGE`` aceita exatamente ``true`` ou ``false`` em
 minúsculas. Corrija a variável e reinicie o processo.
+
+Página de demonstração ausente ou em conflito
+---------------------------------------------
+
+Carregue ``GovBrApplicationSettings.from_environment()`` e configure
+``GOVBR_DEMO_PAGE=true`` para injetar ``/govbr-auth-demo``. Com
+``demo_page=false``, nenhuma rota é adicionada. O provedor oficial usa a mesma
+página sem simulação.
+
+A rota é fixa. Se a aplicação já registrou esse caminho, remova a duplicidade
+antes de habilitar o opt-in; evitar a colisão é responsabilidade do integrador.
+O comando ``python -m govbr_auth.fake`` permanece ``provider-only`` e não cria
+essa página na aplicação consumidora.
 
 Variável desconhecida ou inativa
 --------------------------------

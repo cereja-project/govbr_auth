@@ -7,10 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Added
+- `GovBrApplicationSettings` agrega a configuração neutra do runtime e o
+  opt-in de apresentação `GOVBR_DEMO_PAGE=true` para a rota fixa
+  `/govbr-auth-demo` nos adapters FastAPI, Django e Flask.
+
 ### Changed
 - O início rápido do README agora parte de um `myapp.py` FastAPI completo e
   executável, mostra configuração por `.env` ou pelas classes públicas e
   explica como consumir `AuthContext` sem expor tokens ou dados pessoais.
+- A mesma página de demonstração funciona com FakeGov ou com o provedor
+  oficial; na topologia isolada, `python -m govbr_auth.fake` permanece
+  explicitamente provider-only sem flag adicional.
+
+### Removed
+- A configuração incompatível e ainda não publicada
+  `GOVBR_FAKE_END_TO_END`/`fake_end_to_end` foi removida em favor do opt-in
+  agregado `GOVBR_DEMO_PAGE`.
 
 ### Fixed
 - Os adapters FastAPI, Django e Flask agora registram o callback oficial no

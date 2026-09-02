@@ -95,37 +95,28 @@ Salve o bloco completo abaixo como `myapp.py`:
 
 <!-- quickstart-fastapi:start -->
 ```python
-from pathlib import Path
-
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from govbr_auth.fastapi import AuthContext, GovBrAuth
-from govbr_auth.runtime import GovBrApplicationSettings, GovBrRuntimeSettings
+from fastapi.responses import HTMLResponse
+
+from govbr_auth.fastapi import GovBrAuth
+from govbr_auth.runtime import GovBrApplicationSettings
 
 
-load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
+async def authenticated(context):
+    return HTMLResponse(f"Autenticado: {context.user.name or context.user.sub}")
 
 
-async def authenticated(context: AuthContext) -> JSONResponse:
-    # context.user contém o perfil OIDC validado. Use o subject como vínculo
-    # com a conta local e mantenha dados pessoais somente no backend.
-    return JSONResponse({"authenticated": bool(context.user.subject)})
+def create_app(settings: GovBrApplicationSettings) -> FastAPI:
+    app = FastAPI()
+    auth = GovBrAuth(settings=settings, on_success=authenticated)
+    app.include_router(auth.router)
+    return app
 
 
-def create_app(settings: GovBrRuntimeSettings) -> FastAPI:
-    application = FastAPI()
-    auth = GovBrAuth(
-        on_success=authenticated,
-        settings=GovBrApplicationSettings(runtime=settings),
-        expose_tokens=False,
-    )
-    application.include_router(auth.router)
-    return application
-
-
-settings = GovBrRuntimeSettings.from_environment()
+load_dotenv()
+settings = GovBrApplicationSettings.from_environment()
 app = create_app(settings)
 
 
@@ -137,12 +128,13 @@ if __name__ == "__main__":
 ### 2. Escolha como configurar
 
 Para carregar por variáveis de ambiente, crie `.env`. O `myapp.py` chama
-`load_dotenv` e depois `GovBrRuntimeSettings.from_environment()`, portanto o
+`load_dotenv` e depois `GovBrApplicationSettings.from_environment()`, portanto o
 mesmo código funciona no terminal, em containers e em serviços que injetam
 variáveis diretamente:
 
 ```dotenv
 GOVBR_PROVIDER=fake
+GOVBR_DEMO_PAGE=true
 GOVBR_FAKE_USERS_FILE=./fake-users.local.json
 ```
 
@@ -152,11 +144,20 @@ pela composição explícita abaixo. O restante da aplicação permanece igual:
 
 <!-- settings-fake:start -->
 ```python
-from govbr_auth.runtime import GovBrProvider
+from pathlib import Path
 
-settings = GovBrRuntimeSettings(
-    provider=GovBrProvider.FAKE,
-    fake_users_file=Path("fake-users.local.json"),
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
+
+settings = GovBrApplicationSettings(
+    runtime=GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_users_file=Path("fake-users.local.json"),
+    ),
+    demo_page=True,
 )
 app = create_app(settings)
 ```
@@ -172,22 +173,29 @@ from os import environ
 
 from pydantic import SecretStr
 from govbr_auth.core import GovBrSettings, ProviderEnvironment
-from govbr_auth.runtime import GovBrProvider
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 
-settings = GovBrRuntimeSettings(
-    provider=GovBrProvider.OFFICIAL,
-    oauth=GovBrSettings(
-        environment=ProviderEnvironment.STAGING,
-        authorization_url="https://sso.staging.acesso.gov.br/authorize",
-        token_url="https://sso.staging.acesso.gov.br/token",
-        userinfo_url="https://sso.staging.acesso.gov.br/userinfo/",
-        client_id=environ["GOVBR_CLIENT_ID"],
-        client_secret=SecretStr(environ["GOVBR_CLIENT_SECRET"]),
-        redirect_uri=environ["GOVBR_REDIRECT_URI"],
-        transaction_secret=SecretStr(environ["GOVBR_TRANSACTION_SECRET"]),
-        issuer="https://sso.staging.acesso.gov.br/",
-        jwks_url="https://sso.staging.acesso.gov.br/jwk",
+settings = GovBrApplicationSettings(
+    runtime=GovBrRuntimeSettings(
+        provider=GovBrProvider.OFFICIAL,
+        oauth=GovBrSettings(
+            environment=ProviderEnvironment.STAGING,
+            authorization_url="https://sso.staging.acesso.gov.br/authorize",
+            token_url="https://sso.staging.acesso.gov.br/token",
+            userinfo_url="https://sso.staging.acesso.gov.br/userinfo/",
+            client_id=environ["GOVBR_CLIENT_ID"],
+            client_secret=SecretStr(environ["GOVBR_CLIENT_SECRET"]),
+            redirect_uri=environ["GOVBR_REDIRECT_URI"],
+            transaction_secret=SecretStr(environ["GOVBR_TRANSACTION_SECRET"]),
+            issuer="https://sso.staging.acesso.gov.br/",
+            jwks_url="https://sso.staging.acesso.gov.br/jwk",
+        ),
     ),
+    demo_page=True,
 )
 app = create_app(settings)
 ```
@@ -199,9 +207,15 @@ app = create_app(settings)
 python myapp.py
 ```
 
-Abra `http://localhost:8000/auth/govbr/login`, entre com as
-[credenciais de teste](#credenciais-de-teste) e conclua o callback. No FakeGov,
-a tela exibe o botão **Entrar com gov.br**.
+Abra `http://localhost:8000/govbr-auth-demo` e clique em
+**Entrar com gov.br**. Entre com as
+[credenciais de teste](#credenciais-de-teste) e conclua o callback.
+
+`GOVBR_DEMO_PAGE=true` injeta essa rota fixa nos adapters FastAPI, Django e
+Flask. Com `demo_page=false` (o default), nenhuma página é injetada. Habilitar
+`/govbr-auth-demo` em uma aplicação que já usa esse caminho pode causar
+colisão; verificar e evitar a colisão da rota fixa é responsabilidade do
+integrador.
 
 O callback `authenticated` recebe um `AuthContext` já validado:
 
@@ -213,9 +227,9 @@ O callback `authenticated` recebe um `AuthContext` já validado:
 
 Nesse ponto, a aplicação pode criar sua sessão, emitir seu próprio cookie,
 atualizar o perfil local ou redirecionar para uma área autenticada. O exemplo
-responde somente `{"authenticated": true}`; CPF, senha, tokens e segredos não
-são exibidos em respostas HTTP. O arquivo de usuários aceita apenas dados
-fictícios: não use credenciais reais.
+exibe o nome ou o subject validado somente para tornar o fluxo local
+observável; CPF, senha, tokens e segredos não são exibidos. O arquivo de
+usuários aceita apenas dados fictícios: não use credenciais reais.
 
 Para trocar o FakeGov pelo provedor oficial, mantenha `myapp.py` e altere apenas
 `GOVBR_PROVIDER` e as variáveis oficiais descritas em
@@ -256,6 +270,7 @@ o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado por
 | Variável | Valores | Efeito |
 | --- | --- | --- |
 | `GOVBR_PROVIDER` | `official` (default), `fake` | Escolhe os endpoints do provedor e o transporte HTTP interno |
+| `GOVBR_DEMO_PAGE` | `true`, `false` (default) | Injeta a rota fixa `/govbr-auth-demo` nos adapters quando habilitada |
 | `GOVBR_ENVIRONMENT` | `production`, `staging`, `local` | Identifica o ambiente do provedor; endpoints oficiais incompatíveis impedem a inicialização |
 | `GOVBR_FAKE_USERS_FILE` | Caminho para um JSON fora do Git | Substitui os usuários defaults do FakeGov |
 | `GOVBR_TRANSACTION_SECRET` | Segredo gerado uma única vez | Obrigatório no provedor oficial; o mesmo valor em todas as instâncias |
@@ -292,6 +307,11 @@ loopback; a biblioteca não gerencia certificados nem inicia esse proxy.
 Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
 fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente
 a composição selecionada pela configuração muda.
+
+O provedor oficial usa a mesma página `/govbr-auth-demo`: o botão inicia o
+redirect real, sem simulação. Em código avançado que já constrói o runtime,
+habilite a apresentação separadamente com
+`GovBrAuth(runtime=runtime, demo_page=True, on_success=authenticated)`.
 
 ## Customizar usuários
 

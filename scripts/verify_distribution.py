@@ -38,6 +38,9 @@ async def verify_http_boundaries():
             follow_redirects=False,
         ) as client:
             assert (await client.get("/auth/govbr/login")).status_code == 302
+            demo = await client.get("/govbr-auth-demo")
+            assert demo.status_code == 200
+            assert "Entrar com gov.br" in demo.text
 
     fake_app = create_fake_app()
     async with httpx.AsyncClient(
@@ -52,6 +55,13 @@ async def verify_http_boundaries():
 asyncio.run(verify_http_boundaries())
 print(f"verified govbr-auth {govbr_auth.__version__} from {govbr_auth.__file__}")
 """
+
+_DEMO_DOCUMENTATION_SYMBOLS = (
+    "GOVBR_DEMO_PAGE",
+    "/govbr-auth-demo",
+    "GovBrApplicationSettings.from_environment()",
+    "Entrar com gov.br",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +111,15 @@ def _rst_quickstart(source: str, name: str) -> str:
     return textwrap.dedent(code).strip() + "\n"
 
 
+def _validate_demo_documentation(source: str, document_name: str) -> None:
+    """Require every packaged entry guide to describe the demo-page surface."""
+    for symbol in _DEMO_DOCUMENTATION_SYMBOLS:
+        if symbol not in source:
+            raise ValueError(
+                f"{document_name} is missing demo documentation symbol: {symbol}"
+            )
+
+
 def _install_profile(python: Path, wheel: Path, profile: DistributionProfile) -> None:
     extras = ",".join(profile.extras)
     subprocess.run(
@@ -122,6 +141,8 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
     resolved_wheel = wheel.resolve(strict=True)
     readme_source = readme.resolve(strict=True).read_text(encoding="utf-8")
     guide_source = guide.resolve(strict=True).read_text(encoding="utf-8")
+    _validate_demo_documentation(readme_source, readme.name)
+    _validate_demo_documentation(guide_source, guide.name)
     snippets = {
         "fastapi": _markdown_quickstart(readme_source),
         "django": _rst_quickstart(guide_source, "django"),
@@ -148,7 +169,7 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
         )
         child_environment = {
             **os.environ,
-            "GOVBR_DEMO_PAGE": "false",
+            "GOVBR_DEMO_PAGE": "true",
             "GOVBR_FAKE_USERS_FILE": str(users_file),
             "GOVBR_PROVIDER": "fake",
             "PYTHONNOUSERSITE": "1",
@@ -177,17 +198,22 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
             elif profile.name == "django":
                 command = (
                     str(python),
-                    "-m",
-                    "django",
-                    "check",
-                    "--settings=django_app",
+                    "-c",
+                    "import os; "
+                    "os.environ['DJANGO_SETTINGS_MODULE'] = 'django_app'; "
+                    "import django; django.setup(); "
+                    "from django.core.management import call_command; "
+                    "call_command('check'); "
+                    "from django_app import urlpatterns; "
+                    "assert any(str(pattern.pattern) == 'govbr-auth-demo' "
+                    "for pattern in urlpatterns)",
                 )
             else:
                 command = (
                     str(python),
                     "-c",
                     "from flask_app import app; "
-                    "assert any(rule.rule == '/auth/govbr/login' "
+                    "assert any(rule.rule == '/govbr-auth-demo' "
                     "for rule in app.url_map.iter_rules())",
                 )
             subprocess.run(

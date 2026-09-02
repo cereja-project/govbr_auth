@@ -6,7 +6,11 @@ import re
 import subprocess
 import sys
 
-from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 
 PROJECT_ROOT = Path(__file__).parents[2]
 QUICKSTART = re.compile(
@@ -37,7 +41,9 @@ def test_readme_fastapi_quickstart_opens_the_fake_login(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     (tmp_path / ".env").write_text(
-        "GOVBR_PROVIDER=fake\n" "GOVBR_FAKE_USERS_FILE=./fake-users.local.json\n",
+        "GOVBR_PROVIDER=fake\n"
+        "GOVBR_DEMO_PAGE=true\n"
+        "GOVBR_FAKE_USERS_FILE=./fake-users.local.json\n",
         encoding="utf-8",
     )
 
@@ -52,6 +58,9 @@ async def verify():
             base_url='http://127.0.0.1:8000',
             follow_redirects=False,
         ) as client:
+            demo = await client.get('/govbr-auth-demo')
+            assert demo.status_code == 200
+            assert 'Entrar com gov.br' in demo.text
             login = await client.get('/auth/govbr/login')
             assert login.status_code == 302
             provider = await client.get(login.headers['location'])
@@ -88,16 +97,31 @@ def test_readme_fastapi_quickstart_runs_as_a_python_program(
     match = QUICKSTART.search(readme)
     assert match is not None, "README quickstart markers are missing"
     (tmp_path / "myapp.py").write_text(match.group(1), encoding="utf-8")
-    (tmp_path / ".env").write_text("GOVBR_PROVIDER=fake\n", encoding="utf-8")
+    (tmp_path / ".env").write_text(
+        "GOVBR_PROVIDER=fake\nGOVBR_DEMO_PAGE=true\n",
+        encoding="utf-8",
+    )
 
     probe = """
 import runpy
 import uvicorn
+from govbr_auth.runtime import GovBrProvider
 
 calls = []
 
 def record_run(application, **options):
     calls.append((application, options))
+
+def route_paths(application):
+    paths = set()
+    pending = list(application.routes)
+    while pending:
+        route = pending.pop()
+        if path := getattr(route, 'path', None):
+            paths.add(path)
+        elif included := getattr(route, 'original_router', None):
+            pending.extend(included.routes)
+    return paths
 
 uvicorn.run = record_run
 namespace = runpy.run_path('myapp.py', run_name='__main__')
@@ -108,6 +132,9 @@ assert calls[0][1] == {
     'port': 8000,
     'log_level': 'info',
 }
+assert namespace['settings'].demo_page is True
+assert namespace['settings'].runtime.provider is GovBrProvider.FAKE
+assert '/govbr-auth-demo' in route_paths(namespace['app'])
 """
     result = subprocess.run(
         [sys.executable, "-c", probe],
@@ -135,6 +162,8 @@ def test_readme_explicit_fake_settings_block_is_executable() -> None:
     assert match is not None, "README explicit FakeGov settings markers are missing"
     namespace = {
         "Path": Path,
+        "GovBrApplicationSettings": GovBrApplicationSettings,
+        "GovBrProvider": GovBrProvider,
         "GovBrRuntimeSettings": GovBrRuntimeSettings,
         "create_app": lambda settings: settings,
     }
@@ -142,8 +171,10 @@ def test_readme_explicit_fake_settings_block_is_executable() -> None:
     exec(compile(match.group(1), "README.md", "exec"), namespace)
 
     settings = namespace["settings"]
-    assert isinstance(settings, GovBrRuntimeSettings)
-    assert settings.provider is GovBrProvider.FAKE
+    assert isinstance(settings, GovBrApplicationSettings)
+    assert settings.demo_page is True
+    assert settings.runtime.provider is GovBrProvider.FAKE
+    assert settings.runtime.fake_users_file == Path("fake-users.local.json")
     assert namespace["app"] is settings
 
 
@@ -160,6 +191,7 @@ def test_readme_explicit_official_settings_block_is_executable(
     )
     monkeypatch.setenv("GOVBR_TRANSACTION_SECRET", "test-transaction-secret")
     namespace = {
+        "GovBrApplicationSettings": GovBrApplicationSettings,
         "GovBrRuntimeSettings": GovBrRuntimeSettings,
         "create_app": lambda settings: settings,
     }
@@ -167,8 +199,9 @@ def test_readme_explicit_official_settings_block_is_executable(
     exec(compile(match.group(1), "README.md", "exec"), namespace)
 
     settings = namespace["settings"]
-    assert isinstance(settings, GovBrRuntimeSettings)
-    assert settings.provider is GovBrProvider.OFFICIAL
-    assert settings.oauth is not None
-    assert settings.oauth.environment.value == "staging"
+    assert isinstance(settings, GovBrApplicationSettings)
+    assert settings.demo_page is True
+    assert settings.runtime.provider is GovBrProvider.OFFICIAL
+    assert settings.runtime.oauth is not None
+    assert settings.runtime.oauth.environment.value == "staging"
     assert namespace["app"] is settings

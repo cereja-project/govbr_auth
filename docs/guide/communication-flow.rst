@@ -61,17 +61,24 @@ localmente.
 O FakeGov simula as respostas do provedor; as regras de segurança continuam
 sendo responsabilidade do core e do fluxo da API.
 
-Launcher end-to-end
--------------------
+Página de demonstração da aplicação
+-----------------------------------
 
-O comando abaixo adiciona uma página inicial de demonstração para tornar o
-primeiro teste manual imediato::
+``GovBrApplicationSettings.from_environment()`` lê o opt-in da aplicação:
 
-    GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
+.. code-block:: text
 
-Essa página inicial é um frontend temporário de demonstração. Em uma
-aplicação real, ela é substituída pelo frontend da aplicação, que chama a API.
-A API e o FakeGov continuam no mesmo processo.
+   GOVBR_PROVIDER=fake
+   GOVBR_DEMO_PAGE=true
+
+O adapter injeta ``/govbr-auth-demo`` e apresenta o botão
+**Entrar com gov.br**. Com ``demo_page=false``, a rota não é injetada. O
+provedor oficial usa a mesma página sem simulação e redireciona para o Gov.br.
+A rota fixa pode colidir com uma rota existente, e verificar essa colisão é
+responsabilidade do integrador.
+
+O launcher ``python -m govbr_auth.fake`` permanece ``provider-only`` sem flag
+adicional: ele publica o provedor local, não a página da aplicação.
 
 FakeGov compartilhado
 ---------------------
@@ -96,6 +103,6 @@ Escolha do modo
     Monta o FakeGov na mesma API e usa ``FakeGovHttpTransport`` para as
     chamadas do backend.
 
-``GOVBR_FAKE_END_TO_END=true``
-    Ativa a página inicial de demonstração do launcher. Não é necessário em
-    uma aplicação que já possui seu próprio frontend.
+``GOVBR_DEMO_PAGE=true``
+    Habilita a página fixa ``/govbr-auth-demo`` na aplicação consumidora. É um
+    opt-in independente do provider selecionado.

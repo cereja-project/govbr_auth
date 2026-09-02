@@ -5,9 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from django.http import JsonResponse
 
-from examples.example_settings import runtime_settings
+from examples.example_settings import application_settings
 from govbr_auth.django import GovBrAuth
-from govbr_auth.runtime import GovBrApplicationSettings
 
 load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
 
@@ -20,6 +19,6 @@ def authenticated(context, request):
 # The Django consumer stays the same; fake mode changes only provider wiring.
 auth = GovBrAuth(
     on_success=authenticated,
-    settings=GovBrApplicationSettings(runtime=runtime_settings()),
+    settings=application_settings(),
 )
 urlpatterns = auth.urlpatterns

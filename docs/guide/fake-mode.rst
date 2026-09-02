@@ -27,18 +27,29 @@ Monte a fachada do adaptador na API:
 
 .. code-block:: python
 
+    from dotenv import load_dotenv
     from fastapi import FastAPI
     from govbr_auth.fastapi import AuthContext, GovBrAuth
+    from govbr_auth.runtime import GovBrApplicationSettings
 
+    load_dotenv()
+    settings = GovBrApplicationSettings.from_environment()
     app = FastAPI()
 
     async def authenticated(context: AuthContext):
         return {"authenticated": True, "subject": context.user.sub}
 
-    auth = GovBrAuth(on_success=authenticated)
+    auth = GovBrAuth(settings=settings, on_success=authenticated)
     app.include_router(auth.router)
 
-Inicie a API com ``GOVBR_PROVIDER=fake``. O frontend da aplicação continua
+Inicie a API com:
+
+.. code-block:: text
+
+   GOVBR_PROVIDER=fake
+   GOVBR_DEMO_PAGE=true
+
+O frontend da aplicação continua
 chamando a API normalmente. A biblioteca monta as rotas do FakeGov junto ao
 adaptador e usa ``FakeGovHttpTransport`` para as chamadas de backend; o código
 da aplicação não precisa criar factories do provedor. O app continua no mesmo
@@ -54,31 +65,38 @@ troque apenas o extra de instalação e a montagem do adapter:
 O fluxo completo entre frontend, API, FakeGov e runtime está em
 :doc:`communication-flow`.
 
-Executar end-to-end
--------------------------
+Página de demonstração
+----------------------
 
-O launcher é uma conveniência para demonstrar o fluxo sem uma aplicação
-frontend separada. Ele cria uma página inicial de demonstração, a API do
-consumidor e o FakeGov no mesmo processo. Essa página inicial não transforma o
-FakeGov em frontend: ela apenas substitui temporariamente o frontend real para
-permitir um teste manual imediato.
+``GOVBR_DEMO_PAGE=true`` injeta ``/govbr-auth-demo`` no adapter. Abra essa
+rota e clique em **Entrar com gov.br**. Com ``demo_page=false`` (o default),
+nenhuma página é injetada. O provedor oficial usa a mesma página sem simulação;
+somente o destino OAuth/OIDC muda.
 
-No POSIX::
+A rota é fixa e pode colidir com um caminho existente. Conferir a composição e
+evitar essa colisão é responsabilidade do integrador que habilita a página.
 
-    GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
+Em código avançado, se a aplicação já criou o runtime, mantenha a apresentação
+como decisão separada:
 
-No PowerShell::
+.. code-block:: python
 
-    $env:GOVBR_FAKE_END_TO_END = "true"
+   auth = GovBrAuth(
+       runtime=runtime,
+       demo_page=True,
+       on_success=authenticated,
+   )
+
+Launcher provider-only
+----------------------
+
+O launcher isolado permanece ``provider-only`` sem qualquer flag adicional::
+
     python -m govbr_auth.fake
 
-Abra ``http://localhost:8000`` e complete o login. Para publicar somente o
-servidor/provedor FakeGov, sem a página inicial de demonstração::
-
-    python -m govbr_auth.fake
-
-Esse perfil continua limitado a loopback. Portanto, a versão atual não deve
-ser tratada como um serviço FakeGov compartilhado entre máquinas.
+Ele publica apenas o provedor local e não cria ``/govbr-auth-demo``. Esse perfil
+continua limitado a loopback e não deve ser tratado como um serviço FakeGov
+compartilhado entre máquinas.
 
 FakeGov compartilhado
 ---------------------
@@ -142,6 +160,8 @@ Core
 Uso avançado
 ------------
 
+``GovBrApplicationSettings`` agrega ``GovBrRuntimeSettings`` e o opt-in da
+página. ``GovBrApplicationSettings.from_environment()`` é o caminho comum.
 ``GovBrRuntimeSettings`` e ``create_govbr_runtime`` formam o núcleo neutro de
 framework. ``create_fake_gov_simulator`` cria o grafo canônico do simulador.
 As factories ``create_fake_govbr_router`` e ``create_fake_govbr_app`` atendem

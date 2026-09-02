@@ -23,22 +23,35 @@ def _snippet(name: str) -> str:
 
 
 @pytest.mark.parametrize(
-    ("name", "command"),
+    ("name", "commands"),
     (
-        ("django", ("-m", "django", "check", "--settings=django_app")),
+        (
+            "django",
+            (
+                ("-m", "django", "check", "--settings=django_app"),
+                (
+                    "-c",
+                    "from django_app import urlpatterns; "
+                    "assert any(str(pattern.pattern) == 'govbr-auth-demo' "
+                    "for pattern in urlpatterns)",
+                ),
+            ),
+        ),
         (
             "flask",
             (
-                "-c",
-                "from flask_app import app; "
-                "assert any(rule.rule == '/auth/govbr/login' "
-                "for rule in app.url_map.iter_rules())",
+                (
+                    "-c",
+                    "from flask_app import app; "
+                    "assert any(rule.rule == '/govbr-auth-demo' "
+                    "for rule in app.url_map.iter_rules())",
+                ),
             ),
         ),
     ),
 )
 def test_documented_framework_quickstart_is_executable(
-    tmp_path: Path, name: str, command: tuple[str, ...]
+    tmp_path: Path, name: str, commands: tuple[tuple[str, ...], ...]
 ) -> None:
     (tmp_path / f"{name}_app.py").write_text(_snippet(name), encoding="utf-8")
     users = tmp_path / "fake-users.local.json"
@@ -51,17 +64,19 @@ def test_documented_framework_quickstart_is_executable(
         **os.environ,
         "GOVBR_FAKE_USERS_FILE": str(users),
         "GOVBR_PROVIDER": "fake",
+        "GOVBR_DEMO_PAGE": "true",
         "PYTHONPATH": str(PROJECT_ROOT),
         "PYTHONUTF8": "1",
     }
 
-    result = subprocess.run(
-        [sys.executable, *command],
-        cwd=tmp_path,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    for command in commands:
+        result = subprocess.run(
+            [sys.executable, *command],
+            cwd=tmp_path,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
-    assert result.returncode == 0, result.stdout + result.stderr
+        assert result.returncode == 0, result.stdout + result.stderr
