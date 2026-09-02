@@ -1,4 +1,4 @@
-<p align="left-top">
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo-light.svg">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg">
