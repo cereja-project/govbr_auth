@@ -16,6 +16,8 @@ Salve ``myapp.py`` com a fachada pública e inclua o router na aplicação:
 
 .. code-block:: python
 
+    from pathlib import Path
+
     from dotenv import load_dotenv
     from fastapi import FastAPI
     from fastapi.responses import JSONResponse
@@ -27,7 +29,7 @@ Salve ``myapp.py`` com a fachada pública e inclua o router na aplicação:
         # context.user contém o perfil OIDC validado para a sessão da aplicação.
         return JSONResponse({"authenticated": True})
 
-    load_dotenv()
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     settings = GovBrApplicationSettings.from_environment()
     app = FastAPI()
     auth = GovBrAuth(settings=settings, on_success=authenticated)
@@ -60,6 +62,8 @@ Salve ``django_app.py`` em um diretório vazio:
 
 .. code-block:: python
 
+    from pathlib import Path
+
     from dotenv import load_dotenv
     from django.http import JsonResponse
 
@@ -74,7 +78,7 @@ Salve ``django_app.py`` em um diretório vazio:
     def authenticated(context, request):
         return JsonResponse({"authenticated": True})
 
-    load_dotenv()
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     settings = GovBrApplicationSettings.from_environment()
     auth = GovBrAuth(settings=settings, on_success=authenticated)
     urlpatterns = auth.urlpatterns
@@ -101,13 +105,15 @@ Salve ``flask_app.py`` em um diretório vazio:
 
 .. code-block:: python
 
+    from pathlib import Path
+
     from dotenv import load_dotenv
     from flask import Flask, jsonify
 
     from govbr_auth.flask import GovBrAuth
     from govbr_auth.runtime import GovBrApplicationSettings
 
-    load_dotenv()
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     settings = GovBrApplicationSettings.from_environment()
     app = Flask(__name__)
 
@@ -198,11 +204,30 @@ Instale o launcher::
 
     pip install "govbr-auth[fake]"
 
+O launcher lê as variáveis do processo e o arquivo ``.env`` do diretório atual
+com ``override=False``. Se a mesma sessão ou o ``.env`` habilitou a página da
+aplicação, desative o opt-in antes de iniciar o perfil isolado. Atualize o
+``.env``:
+
+.. code-block:: text
+
+   GOVBR_DEMO_PAGE=false
+
+No POSIX, defina também a variável do processo, que prevalece sobre o valor do
+``.env``, e execute::
+
+    export GOVBR_DEMO_PAGE=false
     python -m govbr_auth.fake
 
-Sem qualquer flag adicional, esse perfil permanece ``provider-only`` e atende
-aplicações web próprias que precisam apontar para um provedor local. Para o
-fluxo completo pela aplicação, use ``GovBrAuth`` com ``GOVBR_DEMO_PAGE=true``.
+No PowerShell::
+
+    $env:GOVBR_DEMO_PAGE = "false"
+    python -m govbr_auth.fake
+
+Com o opt-in desativado, esse perfil permanece ``provider-only`` e atende
+aplicações web próprias que precisam apontar para um provedor local. Para
+retomar o fluxo completo pela aplicação, use ``GovBrAuth`` e volte a configurar
+``GOVBR_DEMO_PAGE=true``.
 
 Usar o provedor oficial
 -----------------------

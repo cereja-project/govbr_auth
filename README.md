@@ -95,6 +95,8 @@ Salve o bloco completo abaixo como `myapp.py`:
 
 <!-- quickstart-fastapi:start -->
 ```python
+from pathlib import Path
+
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -116,7 +118,7 @@ def create_app(settings: GovBrApplicationSettings) -> FastAPI:
     return app
 
 
-load_dotenv()
+load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
 settings = GovBrApplicationSettings.from_environment()
 app = create_app(settings)
 
@@ -128,10 +130,10 @@ if __name__ == "__main__":
 
 ### 2. Escolha como configurar
 
-Para carregar por variáveis de ambiente, crie `.env`. O `myapp.py` chama
-`load_dotenv` e depois `GovBrApplicationSettings.from_environment()`, portanto o
-mesmo código funciona no terminal, em containers e em serviços que injetam
-variáveis diretamente:
+Para carregar por variáveis de ambiente, crie `.env`. O `myapp.py` carrega
+somente `Path.cwd() / ".env"`, sem procurar arquivos em diretórios ancestrais,
+e preserva variáveis que já existem no processo com `override=False`. Em
+seguida, `GovBrApplicationSettings.from_environment()` aplica a configuração:
 
 ```dotenv
 GOVBR_PROVIDER=fake

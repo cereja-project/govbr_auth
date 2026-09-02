@@ -27,12 +27,14 @@ Monte a fachada do adaptador na API:
 
 .. code-block:: python
 
+    from pathlib import Path
+
     from dotenv import load_dotenv
     from fastapi import FastAPI
     from govbr_auth.fastapi import AuthContext, GovBrAuth
     from govbr_auth.runtime import GovBrApplicationSettings
 
-    load_dotenv()
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     settings = GovBrApplicationSettings.from_environment()
     app = FastAPI()
 
@@ -90,8 +92,23 @@ como decisão separada:
 Launcher provider-only
 ----------------------
 
-O launcher isolado permanece ``provider-only`` sem qualquer flag adicional::
+O launcher lê as variáveis do processo e o arquivo ``.env`` do diretório atual
+com ``override=False``. Depois de usar a composição completa, desative o opt-in
+também no ``.env``:
 
+.. code-block:: text
+
+   GOVBR_DEMO_PAGE=false
+
+No POSIX, defina a variável do processo para que ``false`` prevaleça mesmo se o
+``.env`` ainda contiver outro valor::
+
+    export GOVBR_DEMO_PAGE=false
+    python -m govbr_auth.fake
+
+No PowerShell::
+
+    $env:GOVBR_DEMO_PAGE = "false"
     python -m govbr_auth.fake
 
 Ele publica apenas o provedor local e não cria ``/govbr-auth-demo``. Esse perfil

@@ -593,6 +593,48 @@ def test_launcher_docs_qualify_provider_only_as_the_default_profile() -> None:
         assert "govbr_demo_page=true seleciona a composição completa" in normalized
 
 
+@pytest.mark.parametrize(
+    ("document", "heading"),
+    (
+        (
+            DOCS_ROOT / "guide" / "quick-start.rst",
+            "Executar o launcher provider-only",
+        ),
+        (
+            DOCS_ROOT / "guide" / "fake-mode.rst",
+            "Launcher provider-only",
+        ),
+    ),
+    ids=("quick-start", "fake-mode"),
+)
+def test_provider_only_launcher_sequence_disables_the_demo_page_in_each_shell(
+    document: Path,
+    heading: str,
+) -> None:
+    source = document.read_text(encoding="utf-8")
+    launcher_section = source.split(heading, maxsplit=1)[1]
+    dotenv_step = ".. code-block:: text\n\n" "   GOVBR_DEMO_PAGE=false"
+    posix_step = "export GOVBR_DEMO_PAGE=false"
+    powershell_step = '$env:GOVBR_DEMO_PAGE = "false"'
+    launcher_command = "python -m govbr_auth.fake"
+
+    assert dotenv_step in launcher_section
+    assert posix_step in launcher_section
+    assert powershell_step in launcher_section
+    assert launcher_section.count(launcher_command) >= 2
+    assert launcher_section.index(posix_step) < launcher_section.index(
+        launcher_command,
+        launcher_section.index(posix_step),
+    )
+    assert launcher_section.index(powershell_step) < launcher_section.index(
+        launcher_command,
+        launcher_section.index(powershell_step),
+    )
+    assert "launcher lê as variáveis do processo e o arquivo .env" in _normalized_prose(
+        launcher_section
+    )
+
+
 def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
     source = (DOCS_ROOT / "guide" / "communication-flow.rst").read_text(
         encoding="utf-8"
