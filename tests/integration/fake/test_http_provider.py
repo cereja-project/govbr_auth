@@ -229,8 +229,8 @@ def simulator_with_marked_http_application(
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
 
@@ -361,9 +361,12 @@ async def test_router_consumes_canonical_fake_runtime() -> None:
 
     settings = GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_end_to_end=True,
     )
-    runtime = create_fake_gov_simulator(settings, clock=lambda: FIXED_NOW)
+    runtime = create_fake_gov_simulator(
+        settings,
+        prefix=settings.fake_provider_prefix,
+        clock=lambda: FIXED_NOW,
+    )
     application = FastAPI()
     application.include_router(
         create_fake_govbr_router(runtime, clock=lambda: FIXED_NOW)
@@ -421,8 +424,8 @@ async def test_app_publishes_canonical_fake_runtime_endpoint() -> None:
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
     application = create_fake_govbr_app(runtime, clock=lambda: FIXED_NOW)
@@ -472,8 +475,8 @@ def test_runtime_router_rejects_prefix_that_diverges_from_canonical_endpoints() 
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
 
@@ -495,8 +498,8 @@ def test_simulator_factories_reject_divergent_http_application(factory) -> None:
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
 

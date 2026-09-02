@@ -1,6 +1,7 @@
 """Application assembly helpers for the local Fake Gov.br launcher."""
 
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, Request
@@ -8,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 
 from govbr_auth.fastapi import AuthContext, GovBrAuth
-from govbr_auth.presentation import render_error, render_home, render_success
+from govbr_auth.presentation import render_error, render_success
 from govbr_auth.core import (
     ExpiredTransactionError,
     GovBrAuthError,
@@ -22,11 +23,12 @@ def create_end_to_end_app(
     runtime,
     *,
     clock: Callable[[], datetime],
-    render_success_page: Callable[[object], str] = render_success,
-    render_error_page: Callable[..., str] = render_error,
-    render_home_page: Callable[..., str] = render_home,
+    render_success_page: Callable[[object], str] | None = None,
+    render_error_page: Callable[..., str] | None = None,
 ) -> FastAPI:
     """Assemble the consumer facade and its embedded fake provider profile."""
+    render_success_page = render_success_page or render_success
+    render_error_page = render_error_page or render_error
 
     async def authenticated(context: AuthContext) -> HTMLResponse:
         return HTMLResponse(
@@ -44,21 +46,27 @@ def create_end_to_end_app(
 
     auth = GovBrAuth(
         runtime=runtime,
+        demo_page=True,
         on_success=authenticated,
         on_error=authentication_failed,
         clock=clock,
     )
-    fake_runtime = runtime.fake
-    if fake_runtime is None:
+    if runtime.fake is None:
         raise RuntimeError("end-to-end launcher requires the fake provider runtime")
-    application = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
-    @application.get("/", include_in_schema=False)
-    async def home() -> HTMLResponse:
-        return HTMLResponse(
-            render_home_page(credentials=fake_runtime.credentials),
-            headers={"Cache-Control": "no-store"},
-        )
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        try:
+            yield
+        finally:
+            await runtime.aclose()
+
+    application = FastAPI(
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
 
     @application.exception_handler(RequestValidationError)
     async def invalid_callback(

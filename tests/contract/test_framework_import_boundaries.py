@@ -111,7 +111,6 @@ def test_fake_runtime_exposes_one_neutral_http_application_without_frameworks() 
         runtime = create_govbr_runtime(
             GovBrRuntimeSettings(
                 provider=GovBrProvider.FAKE,
-                fake_end_to_end=True,
                 fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
             ),
             fake_transport_factory=lambda _: httpx.MockTransport(

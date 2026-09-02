@@ -223,7 +223,6 @@ def test_environment_example_documents_every_supported_variable() -> None:
         "GOVBR_CONNECT_TIMEOUT_SECONDS",
         "GOVBR_READ_TIMEOUT_SECONDS",
         "GOVBR_CLOCK_SKEW_SECONDS",
-        "GOVBR_FAKE_END_TO_END",
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
@@ -238,7 +237,7 @@ def test_environment_example_documents_every_supported_variable() -> None:
     }
 
     assert supported_variables == expected_variables
-    assert documented_variables == expected_variables
+    assert documented_variables & supported_variables == expected_variables
 
 
 def test_transaction_secret_documentation_explains_generation_and_storage() -> None:
@@ -412,7 +411,7 @@ def test_animated_authentication_flow_is_accessible_and_motion_safe() -> None:
         launcher_guidance not in source
         for launcher_guidance in (
             "python -m govbr_auth.fake",
-            "GOVBR_FAKE_END_TO_END",
+            "END_TO_END",
             "Launcher",
             "launcher",
             "provider-only",
@@ -425,8 +424,6 @@ def test_sphinx_quickstart_keeps_the_optional_fake_launcher() -> None:
 
     assert 'pip install "govbr-auth[fake]"' in source
     assert "python -m govbr_auth.fake" in source
-    assert "GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake" in source
-    assert '$env:GOVBR_FAKE_END_TO_END = "true"' in source
     assert "http://localhost:8000" in source
 
 

@@ -11,6 +11,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
 
+from govbr_auth.application_settings import GovBrApplicationSettings
 from govbr_auth.fake.http.routes import build_fake_govbr_routes
 from govbr_auth.fake.http.application import (
     FakeGovHttpApplication,
@@ -26,7 +27,6 @@ from govbr_auth.fake.runtime import (
 )
 from govbr_auth.fastapi import utc_now
 from govbr_auth.fake.launcher import create_end_to_end_app
-from govbr_auth.presentation import render_error, render_home, render_success
 from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntimeSettings,
@@ -113,18 +113,19 @@ def create_fake_govbr_app(
 
 
 def create_fake_app(
-    settings: GovBrRuntimeSettings | None = None,
+    settings: GovBrApplicationSettings | None = None,
     *,
     clock: Callable[[], datetime] = utc_now,
     user_repository: FakeUserRepository | None = None,
 ) -> FastAPI:
     """Create the provider-only or complete local fake application profile."""
-    resolved_settings = settings or _launcher_settings()
-    if resolved_settings.provider is not GovBrProvider.FAKE:
+    resolved = settings or _launcher_settings()
+    if resolved.runtime.provider is not GovBrProvider.FAKE:
         raise ValueError("fake launcher requires the fake provider")
-    if not resolved_settings.fake_end_to_end:
+    if not resolved.demo_page:
         runtime = create_fake_gov_simulator(
-            resolved_settings,
+            resolved.runtime,
+            prefix="",
             clock=clock,
             user_repository=user_repository,
         )
@@ -135,18 +136,12 @@ def create_fake_app(
         )
 
     runtime = create_govbr_runtime(
-        resolved_settings,
+        resolved.runtime,
         fake_transport_factory=lambda fake: _fake_asgi_transport(fake, clock=clock),
         clock=clock,
         user_repository=user_repository,
     )
-    return create_end_to_end_app(
-        runtime,
-        clock=clock,
-        render_success_page=render_success,
-        render_error_page=render_error,
-        render_home_page=render_home,
-    )
+    return create_end_to_end_app(runtime, clock=clock)
 
 
 def run() -> None:
@@ -158,8 +153,8 @@ def run() -> None:
     uvicorn.run(
         "govbr_auth.fake:create_fake_app",
         factory=True,
-        host=settings.fake_host,
-        port=settings.fake_port,
+        host=settings.runtime.fake_host,
+        port=settings.runtime.fake_port,
     )
 
 
@@ -172,11 +167,11 @@ def _fake_asgi_transport(
     return FakeGovHttpTransport(runtime, clock=clock)
 
 
-def _launcher_settings() -> GovBrRuntimeSettings:
+def _launcher_settings() -> GovBrApplicationSettings:
     """Default this explicit fake entry point without changing library defaults."""
     environ = dict(os.environ)
     environ.setdefault("GOVBR_PROVIDER", GovBrProvider.FAKE.value)
-    return GovBrRuntimeSettings.from_environment(environ)
+    return GovBrApplicationSettings.from_environment(environ)
 
 
 def _as_http_runtime(

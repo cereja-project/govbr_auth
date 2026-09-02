@@ -16,6 +16,7 @@ from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import EncryptedTransactionCodec
 from govbr_auth.fastapi import create_govbr_router
 from govbr_auth.runtime import (
+    GovBrApplicationSettings,
     GovBrClient,
     GovBrProvider,
     GovBrRuntimeSettings,
@@ -45,7 +46,6 @@ def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GOVBR_CONNECT_TIMEOUT_SECONDS",
         "GOVBR_READ_TIMEOUT_SECONDS",
         "GOVBR_CLOCK_SKEW_SECONDS",
-        "GOVBR_FAKE_END_TO_END",
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
@@ -84,7 +84,6 @@ def fake_settings() -> GovBrRuntimeSettings:
     """Provide complete settings for an embedded fake provider."""
     return GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_end_to_end=True,
         fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
     )
 
@@ -109,13 +108,20 @@ def test_runtime_settings_select_fake_explicitly(
     assert settings.provider is GovBrProvider.FAKE
 
 
-def test_runtime_settings_parse_explicit_false_end_to_end() -> None:
-    """The canonical false spelling must keep the provider-only profile."""
-    settings = GovBrRuntimeSettings.from_environment(
-        {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_END_TO_END": "false"}
-    )
+def test_removed_end_to_end_variable_fails_in_portuguese() -> None:
+    """The removed launcher switch must fail closed without exposing its value."""
+    with pytest.raises(ValueError) as captured:
+        GovBrApplicationSettings.from_environment(
+            {
+                "GOVBR_PROVIDER": "fake",
+                "GOVBR_FAKE_END_TO_END": "true",
+            }
+        )
 
-    assert settings.fake_end_to_end is False
+    assert str(captured.value) == (
+        "Configuração Gov.br inválida: variável não suportada: "
+        "GOVBR_FAKE_END_TO_END."
+    )
 
 
 def test_runtime_settings_build_official_oauth_from_environment() -> None:
@@ -236,7 +242,8 @@ def test_runtime_settings_explains_http_dns_redirect_in_portuguese() -> None:
 def test_runtime_settings_reject_unknown_govbr_variable() -> None:
     """A misspelled GOVBR variable must not disappear behind a default."""
     with pytest.raises(
-        ValueError, match="unknown GOVBR configuration.*GOVBR_FAKE_PORRT"
+        ValueError,
+        match="Configuração.*variável não suportada: GOVBR_FAKE_PORRT",
     ) as captured:
         GovBrRuntimeSettings.from_environment(
             {
@@ -298,15 +305,6 @@ def test_fake_environment_rejects_official_endpoint_variables(variable: str) -> 
                 "GOVBR_PROVIDER": "fake",
                 variable: "https://sso.example.test/endpoint",
             }
-        )
-
-
-@pytest.mark.parametrize("value", ["1", "yes", "enabled", ""])
-def test_runtime_settings_reject_noncanonical_end_to_end(value: str) -> None:
-    """Truth-like strings must not accidentally activate the fake flow."""
-    with pytest.raises(ValueError, match="Configuração.*GOVBR_FAKE_END_TO_END"):
-        GovBrRuntimeSettings.from_environment(
-            {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_END_TO_END": value}
         )
 
 
@@ -374,22 +372,20 @@ def test_end_to_end_settings_reject_invalid_fake_provider_prefix(
     with pytest.raises(ValidationError, match="fake provider prefix"):
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
             fake_provider_prefix=prefix,
         )
 
 
 def test_embedded_runtime_revalidates_fake_provider_prefix() -> None:
     """Consumer embedding must validate a prefix unused by provider-only mode."""
-    settings = GovBrRuntimeSettings(
-        provider=GovBrProvider.FAKE,
-        fake_provider_prefix="//example.test/fake-govbr",
+    settings = GovBrRuntimeSettings(provider=GovBrProvider.FAKE).model_copy(
+        update={"fake_provider_prefix": "//example.test/fake-govbr"}
     )
 
     def fail_if_factory_called(_):
         raise AssertionError("invalid prefix must fail before transport composition")
 
-    with pytest.raises(ValidationError, match="fake provider prefix"):
+    with pytest.raises(ValueError, match="prefix"):
         create_govbr_runtime(
             settings,
             fake_transport_factory=fail_if_factory_called,
@@ -573,18 +569,36 @@ def test_fake_consumer_runtime_mounts_provider_below_configured_prefix(
     fake_settings: GovBrRuntimeSettings,
 ) -> None:
     """Embedded consumers must not collide with application root routes."""
-    provider_only_settings = fake_settings.model_copy(update={"fake_end_to_end": False})
-
     runtime = create_govbr_runtime(
-        provider_only_settings,
+        fake_settings,
         fake_transport_factory=lambda _: httpx.MockTransport(
             lambda __: httpx.Response(500)
         ),
     )
 
     assert runtime.fake is not None
-    assert runtime.fake.prefix == provider_only_settings.fake_provider_prefix
+    assert runtime.fake.prefix == fake_settings.fake_provider_prefix
     assert runtime.fake.endpoints.authorize.endswith("/fake-govbr/authorize")
+
+
+@pytest.mark.asyncio
+async def test_embedded_fake_runtime_always_uses_configured_provider_prefix(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """Embedded runtimes must never expose provider endpoints at the root."""
+    runtime = create_govbr_runtime(
+        fake_settings,
+        fake_transport_factory=lambda fake: httpx.MockTransport(
+            lambda request: httpx.Response(500)
+        ),
+    )
+
+    try:
+        assert runtime.fake is not None
+        assert runtime.fake.prefix == fake_settings.fake_provider_prefix
+        assert runtime.fake.endpoints.authorize.endswith("/fake-govbr/authorize")
+    finally:
+        await runtime.aclose()
 
 
 def test_fake_runtime_requires_transport_factory_before_allocating_http(

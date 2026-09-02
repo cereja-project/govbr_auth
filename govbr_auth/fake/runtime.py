@@ -24,6 +24,7 @@ from govbr_auth.fake.stores import (
     InMemoryAuthorizationCodeReplayStore,
 )
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
 
 class FakeUserRepository(
@@ -92,16 +93,18 @@ _DEFAULT_USERS = (
 def create_fake_gov_simulator(
     settings: GovBrRuntimeSettings,
     *,
+    prefix: str,
     clock: Callable[[], datetime],
     user_repository: FakeUserRepository | None = None,
 ) -> FakeGovSimulator:
     """Compose one fake provider without importing an HTTP framework."""
     if settings.provider is not GovBrProvider.FAKE:
         raise ValueError("fake simulator requires the fake provider")
+    if not _is_canonical_path_prefix(prefix, allow_empty=True):
+        raise ValueError("prefix must be an empty string or a canonical path")
 
     settings = GovBrRuntimeSettings.model_validate(settings.model_dump())
     repository, credentials = _resolve_repository(settings, user_repository)
-    prefix = settings.fake_provider_prefix if settings.fake_end_to_end else ""
     endpoints = _fake_endpoints(settings, prefix=prefix)
     redirect_uri = settings.fake_redirect_uri or _default_redirect_uri(settings)
     provider_settings = FakeGovBrSettings(

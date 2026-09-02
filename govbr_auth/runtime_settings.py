@@ -40,7 +40,6 @@ class GovBrRuntimeSettings(BaseModel):
 
     provider: GovBrProvider = GovBrProvider.OFFICIAL
     oauth: GovBrSettings | None = None
-    fake_end_to_end: bool = False
     fake_host: str = "127.0.0.1"
     fake_port: int = 8000
     fake_provider_prefix: str = "/fake-govbr"
@@ -52,18 +51,6 @@ class GovBrRuntimeSettings(BaseModel):
     fake_access_token_ttl_seconds: PositiveInt = 600
     fake_id_token_ttl_seconds: PositiveInt = 300
     fake_users_file: Path | None = None
-
-    @field_validator("fake_end_to_end", mode="before")
-    @classmethod
-    def validate_fake_end_to_end(cls, value: object) -> bool:
-        """Accept only canonical environment boolean spellings."""
-        if isinstance(value, bool):
-            return value
-        if value == "true":
-            return True
-        if value == "false":
-            return False
-        raise ValueError("must be 'true' or 'false'")
 
     @field_validator("fake_host")
     @classmethod
@@ -82,12 +69,11 @@ class GovBrRuntimeSettings(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_mounted_fake_provider_prefix(self) -> "GovBrRuntimeSettings":
-        """Require one unambiguous path prefix when fake routes are mounted."""
-        if not self.fake_end_to_end:
-            return self
-        prefix = self.fake_provider_prefix
-        if not _is_canonical_path_prefix(prefix):
+    def validate_fake_provider_prefix(self) -> "GovBrRuntimeSettings":
+        """Require one unambiguous path prefix for fake-provider embedding."""
+        if self.provider is GovBrProvider.FAKE and not _is_canonical_path_prefix(
+            self.fake_provider_prefix
+        ):
             raise ValueError(
                 "fake provider prefix must be a non-root path without a trailing "
                 "slash, query, fragment, or absolute URL"
@@ -138,10 +124,7 @@ def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
             ),
         )
         values.update(_prefixed_values(environ, _FAKE_FIELDS))
-        if (
-            values.get("fake_end_to_end") == "true"
-            and "fake_redirect_uri" not in values
-        ):
+        if "fake_redirect_uri" not in values:
             values["fake_redirect_uri"] = _default_fake_redirect_uri(values)
 
     return values
@@ -185,7 +168,9 @@ def _reject_unknown_govbr_variables(environ: Mapping[str, str]) -> None:
     )
     if unknown:
         raise ValueError(
-            "unknown GOVBR configuration variable(s): " + ", ".join(unknown)
+            "Configuração Gov.br inválida: variável não suportada: "
+            + ", ".join(unknown)
+            + "."
         )
 
 
@@ -258,7 +243,6 @@ _OFFICIAL_ENDPOINT_FIELDS = frozenset(
 )
 
 _FAKE_FIELDS = {
-    "GOVBR_FAKE_END_TO_END": "fake_end_to_end",
     "GOVBR_FAKE_HOST": "fake_host",
     "GOVBR_FAKE_PORT": "fake_port",
     "GOVBR_FAKE_PROVIDER_PREFIX": "fake_provider_prefix",

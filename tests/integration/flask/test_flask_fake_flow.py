@@ -47,7 +47,6 @@ def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -
             settings=GovBrApplicationSettings(
                 runtime=GovBrRuntimeSettings(
                     provider=GovBrProvider.FAKE,
-                    fake_end_to_end=True,
                 )
             ),
             on_success=authenticated,

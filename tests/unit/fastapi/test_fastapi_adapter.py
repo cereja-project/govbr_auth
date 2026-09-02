@@ -109,7 +109,6 @@ def fake_application_settings(*, demo_page: bool = False) -> GovBrApplicationSet
     return GovBrApplicationSettings(
         runtime=GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
         demo_page=demo_page,
     )

@@ -120,13 +120,9 @@ def _create_fake_consumer_runtime(
 
     from govbr_auth.fake.runtime import create_fake_gov_simulator
 
-    effective_settings = settings
-    if not settings.fake_end_to_end:
-        values = settings.model_dump()
-        values["fake_end_to_end"] = True
-        effective_settings = GovBrRuntimeSettings.model_validate(values)
     fake = create_fake_gov_simulator(
-        effective_settings,
+        settings,
+        prefix=settings.fake_provider_prefix,
         clock=clock,
         user_repository=user_repository,
     )
@@ -137,7 +133,7 @@ def _create_fake_consumer_runtime(
         raise TypeError("fake transport factory must return AsyncBaseTransport")
     owned_http = httpx.AsyncClient(transport=transport)
     return GovBrRuntime(
-        settings=effective_settings,
+        settings=settings,
         client=create_client(owned_http),
         provider=GovBrProvider.FAKE,
         fake=fake,

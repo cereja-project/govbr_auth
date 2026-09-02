@@ -1,6 +1,7 @@
 """Exercise the unified local Fake Gov.br launcher profiles."""
 
 import json
+import os
 from pathlib import Path
 from typing import get_type_hints
 import runpy
@@ -13,6 +14,7 @@ import pytest
 from fastapi import FastAPI
 from pydantic import SecretStr
 
+from govbr_auth.application_settings import GovBrApplicationSettings
 from govbr_auth.fake import FakeUser, InMemoryFakeUserRepository, create_fake_app
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
@@ -27,7 +29,7 @@ def isolate_fake_launcher_environment(
     """Keep launcher profiles and user sources explicit in every test."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GOVBR_PROVIDER", "fake")
-    monkeypatch.delenv("GOVBR_FAKE_END_TO_END", raising=False)
+    monkeypatch.delenv("GOVBR_DEMO_PAGE", raising=False)
     monkeypatch.delenv("GOVBR_FAKE_USERS_FILE", raising=False)
     for variable in (
         "GOVBR_AUTHORIZATION_URL",
@@ -115,11 +117,11 @@ def route_paths(app: FastAPI) -> set[str]:
     return paths
 
 
-def end_to_end_settings() -> GovBrRuntimeSettings:
+def end_to_end_settings() -> GovBrApplicationSettings:
     """Return the explicit embedded consumer/provider launcher profile."""
-    return GovBrRuntimeSettings(
-        provider=GovBrProvider.FAKE,
-        fake_end_to_end=True,
+    return GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
+        demo_page=True,
     )
 
 
@@ -142,23 +144,40 @@ async def complete_fake_flow(
     return await client.get(provider_result.headers["location"])
 
 
-def test_launcher_defaults_to_provider_only(monkeypatch) -> None:
+def test_launcher_defaults_to_provider_only() -> None:
     """The default fake profile must not expose consumer or documentation routes."""
-    monkeypatch.setenv("GOVBR_PROVIDER", "fake")
-    monkeypatch.delenv("GOVBR_FAKE_END_TO_END", raising=False)
-
-    app = create_fake_app(clock=fixed_clock)
+    app = create_fake_app(
+        settings=GovBrApplicationSettings(
+            runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
+        ),
+        clock=fixed_clock,
+    )
 
     assert route_paths(app) == {"/authorize", "/login", "/token", "/userinfo", "/jwk"}
-    assert "/" not in route_paths(app)
+
+
+def test_launcher_demo_profile_uses_fixed_demo_route() -> None:
+    """The demo launcher must expose the adapter route without taking application root."""
+    app = create_fake_app(
+        settings=GovBrApplicationSettings(
+            runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
+            demo_page=True,
+        ),
+        clock=fixed_clock,
+    )
+
+    paths = route_paths(app)
+    assert "/govbr-auth-demo" in paths
+    assert "/" not in paths
+    assert "/auth/govbr/login" in paths
+    assert "/fake-govbr/authorize" in paths
 
 
 def test_explicit_settings_precede_process_environment(monkeypatch) -> None:
     """Explicit settings must determine the graph before process configuration."""
-    monkeypatch.setenv("GOVBR_FAKE_END_TO_END", "true")
-    settings = GovBrRuntimeSettings(
-        provider=GovBrProvider.FAKE,
-        fake_end_to_end=False,
+    monkeypatch.setenv("GOVBR_DEMO_PAGE", "true")
+    settings = GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
     )
 
     app = create_fake_app(settings=settings, clock=fixed_clock)
@@ -182,9 +201,11 @@ def test_end_to_end_rejects_official_provider_before_runtime_allocation(
     """The fake launcher must reject a wrong provider before composing resources."""
     import govbr_auth.fake.fastapi as fake_fastapi
 
-    settings = GovBrRuntimeSettings.model_construct(
-        provider=GovBrProvider.OFFICIAL,
-        fake_end_to_end=True,
+    settings = GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings.model_construct(
+            provider=GovBrProvider.OFFICIAL,
+        ),
+        demo_page=True,
     )
     runtime_calls: list[object] = []
 
@@ -213,7 +234,7 @@ async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form
             base_url="http://127.0.0.1:8000",
             follow_redirects=False,
         ) as client:
-            home = await client.get("/")
+            home = await client.get("/govbr-auth-demo")
             login = await client.get("/auth/govbr/login")
             authorize = await client.get(login.headers["location"])
             form = parse_fake_login_form(authorize.text)
@@ -221,7 +242,7 @@ async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form
     assert home.status_code == 200
     assert home.headers["cache-control"] == "no-store"
     assert "SIMULAÇÃO LOCAL" in home.text
-    assert "Credenciais da demo" in home.text
+    assert "FakeGov" in home.text
     assert "Ana Demo" not in home.text
     assert "ana-demo" not in home.text
     assert "12345678901" not in home.text
@@ -334,7 +355,7 @@ async def test_end_to_end_uses_json_repository_without_exposing_credentials(
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("GOVBR_FAKE_END_TO_END", "true")
+    monkeypatch.setenv("GOVBR_DEMO_PAGE", "true")
     monkeypatch.setenv("GOVBR_FAKE_USERS_FILE", str(source))
     app = create_fake_app(clock=fixed_clock)
 
@@ -344,7 +365,7 @@ async def test_end_to_end_uses_json_repository_without_exposing_credentials(
             base_url="http://127.0.0.1:8000",
             follow_redirects=False,
         ) as client:
-            home = await client.get("/")
+            home = await client.get("/govbr-auth-demo")
             callback = await complete_fake_flow(
                 client,
                 cpf="11122233344",
@@ -382,7 +403,7 @@ async def test_end_to_end_explicit_repository_precedes_environment(
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("GOVBR_FAKE_END_TO_END", "true")
+    monkeypatch.setenv("GOVBR_DEMO_PAGE", "true")
     monkeypatch.setenv("GOVBR_FAKE_USERS_FILE", str(source))
     repository = InMemoryFakeUserRepository(
         (
@@ -404,7 +425,7 @@ async def test_end_to_end_explicit_repository_precedes_environment(
             base_url="http://127.0.0.1:8000",
             follow_redirects=False,
         ) as client:
-            home = await client.get("/")
+            home = await client.get("/govbr-auth-demo")
             callback = await complete_fake_flow(
                 client,
                 cpf="55566677788",
@@ -414,7 +435,7 @@ async def test_end_to_end_explicit_repository_precedes_environment(
     assert callback.status_code == 200
     assert "Explicit User" in callback.text
     assert "Environment User" not in callback.text
-    assert "Credenciais da demo" not in home.text
+    assert "FakeGov" in home.text
     assert "explicit-secret" not in home.text
 
 
@@ -425,6 +446,31 @@ def test_create_fake_app_exposes_public_repository_contract() -> None:
     assert get_type_hints(create_fake_app)["user_repository"] == (
         FakeUserRepository | None
     )
+
+
+@pytest.mark.asyncio
+async def test_demo_launcher_closes_its_runtime_after_lifespan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The launcher must release the HTTP client that it allocates."""
+    import govbr_auth.fake.fastapi as fake_fastapi
+
+    create_runtime = fake_fastapi.create_govbr_runtime
+    allocated = []
+
+    def record_runtime(*args, **kwargs):
+        runtime = create_runtime(*args, **kwargs)
+        allocated.append(runtime)
+        return runtime
+
+    monkeypatch.setattr(fake_fastapi, "create_govbr_runtime", record_runtime)
+    app = create_fake_app(settings=end_to_end_settings(), clock=fixed_clock)
+
+    assert len(allocated) == 1
+    assert allocated[0].is_closed is False
+    async with app.router.lifespan_context(app):
+        assert allocated[0].is_closed is False
+    assert allocated[0].is_closed is True
 
 
 @pytest.mark.asyncio
@@ -470,7 +516,7 @@ async def test_end_to_end_invalid_state_never_exposes_submitted_code() -> None:
 async def test_end_to_end_internal_error_never_exposes_exception_text(mocker) -> None:
     """Unexpected rendering failures must return a fixed opaque error page."""
     mocker.patch(
-        "govbr_auth.fake.fastapi.render_success",
+        "govbr_auth.fake.launcher.render_success",
         side_effect=RuntimeError("sensitive internal"),
     )
     app = create_fake_app(settings=end_to_end_settings(), clock=fixed_clock)
@@ -521,7 +567,7 @@ def test_launcher_reads_complete_fake_configuration_from_dotenv(
         "\n".join(
             (
                 "GOVBR_PROVIDER=fake",
-                "GOVBR_FAKE_END_TO_END=true",
+                "GOVBR_DEMO_PAGE=true",
                 "GOVBR_FAKE_HOST=localhost",
                 "GOVBR_FAKE_PORT=8123",
                 "GOVBR_FAKE_PROVIDER_PREFIX=/provider",
@@ -538,7 +584,7 @@ def test_launcher_reads_complete_fake_configuration_from_dotenv(
         encoding="utf-8",
     )
     for variable in (
-        "GOVBR_FAKE_END_TO_END",
+        "GOVBR_DEMO_PAGE",
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
@@ -555,24 +601,25 @@ def test_launcher_reads_complete_fake_configuration_from_dotenv(
     monkeypatch.chdir(tmp_path)
 
     uvicorn_run = mocker.patch("uvicorn.run")
+    mocker.patch.dict(os.environ, {}, clear=False)
     from govbr_auth.fake.fastapi import _launcher_settings, run
 
     run()
     settings = _launcher_settings()
 
-    assert settings.provider is GovBrProvider.FAKE
-    assert settings.fake_end_to_end is True
-    assert settings.fake_host == "localhost"
-    assert settings.fake_port == 8123
-    assert settings.fake_provider_prefix == "/provider"
-    assert settings.fake_client_id == "dotenv-client"
-    assert settings.fake_client_secret.get_secret_value() == "dotenv-secret"
-    assert str(settings.fake_redirect_uri) == "http://localhost:8123/callback"
-    assert settings.fake_request_ttl_seconds == 11
-    assert settings.fake_authorization_code_ttl_seconds == 12
-    assert settings.fake_access_token_ttl_seconds == 13
-    assert settings.fake_id_token_ttl_seconds == 14
-    assert settings.fake_users_file == users_file
+    assert settings.runtime.provider is GovBrProvider.FAKE
+    assert settings.demo_page is True
+    assert settings.runtime.fake_host == "localhost"
+    assert settings.runtime.fake_port == 8123
+    assert settings.runtime.fake_provider_prefix == "/provider"
+    assert settings.runtime.fake_client_id == "dotenv-client"
+    assert settings.runtime.fake_client_secret.get_secret_value() == "dotenv-secret"
+    assert str(settings.runtime.fake_redirect_uri) == "http://localhost:8123/callback"
+    assert settings.runtime.fake_request_ttl_seconds == 11
+    assert settings.runtime.fake_authorization_code_ttl_seconds == 12
+    assert settings.runtime.fake_access_token_ttl_seconds == 13
+    assert settings.runtime.fake_id_token_ttl_seconds == 14
+    assert settings.runtime.fake_users_file == users_file
     uvicorn_run.assert_called_once_with(
         "govbr_auth.fake:create_fake_app",
         factory=True,
@@ -601,13 +648,14 @@ def test_launcher_process_environment_precedes_dotenv(
     run()
     settings = _launcher_settings()
 
-    assert settings.fake_host == "127.0.0.1"
-    assert settings.fake_port == 9000
+    assert settings.runtime.fake_host == "127.0.0.1"
+    assert settings.runtime.fake_port == 9000
 
 
 def test_launcher_rejects_invalid_dotenv_value(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    mocker,
 ) -> None:
     """An invalid dotenv value must fail instead of activating a default."""
     (tmp_path / ".env").write_text(
@@ -616,6 +664,7 @@ def test_launcher_rejects_invalid_dotenv_value(
     )
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("GOVBR_FAKE_PORT", raising=False)
+    mocker.patch.dict(os.environ, {}, clear=False)
 
     from govbr_auth.fake.fastapi import run
 

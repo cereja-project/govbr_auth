@@ -31,7 +31,6 @@ def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GOVBR_CONNECT_TIMEOUT_SECONDS",
         "GOVBR_READ_TIMEOUT_SECONDS",
         "GOVBR_CLOCK_SKEW_SECONDS",
-        "GOVBR_FAKE_END_TO_END",
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
@@ -54,7 +53,6 @@ def test_example_settings_preserve_complete_fake_environment(
     users_file = tmp_path / "fake-users.json"
     configured = {
         "GOVBR_PROVIDER": "fake",
-        "GOVBR_FAKE_END_TO_END": "false",
         "GOVBR_FAKE_HOST": "localhost",
         "GOVBR_FAKE_PORT": "8123",
         "GOVBR_FAKE_PROVIDER_PREFIX": "/provider",
@@ -73,7 +71,6 @@ def test_example_settings_preserve_complete_fake_environment(
     settings = runtime_settings()
 
     assert settings.provider.value == "fake"
-    assert settings.fake_end_to_end is False
     assert settings.fake_host == "localhost"
     assert settings.fake_port == 8123
     assert settings.fake_provider_prefix == "/provider"
