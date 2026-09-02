@@ -6,7 +6,9 @@ import pytest
 from govbr_auth.core import GovBrUser
 from govbr_auth.fake.credentials import FakeLoginCredential
 from govbr_auth.presentation import (
+    DEMO_PAGE_PATH,
     render_error,
+    render_demo_page,
     render_home,
     render_page,
     render_primary_action,
@@ -15,6 +17,41 @@ from govbr_auth.presentation import (
     render_success,
     responsive_css,
 )
+from govbr_auth.runtime import GovBrProvider
+
+
+def test_official_demo_page_has_neutral_copy_and_configured_login() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.OFFICIAL,
+        login_path="/oauth/govbr/login",
+    )
+
+    assert DEMO_PAGE_PATH == "/govbr-auth-demo"
+    assert 'href="/oauth/govbr/login"' in page
+    assert ">Entrar com gov.br<" in page
+    assert "Provedor oficial Gov.br" in page
+    assert "SIMULAÇÃO" not in page
+    assert "credenciais fictícias" not in page
+    assert "ambiente local" not in page
+
+
+def test_fake_demo_page_identifies_simulation_without_credentials() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+    )
+
+    assert "FakeGov" in page
+    assert "SIMULAÇÃO LOCAL" in page
+    assert "Não use credenciais reais" in page
+    for forbidden in (
+        "12345678901",
+        "ana-demo",
+        "fake_client_secret",
+        "access_token",
+        "id_token",
+    ):
+        assert forbidden not in page
 
 
 def test_shared_shell_preserves_accessibility_and_simulation_identity() -> None:

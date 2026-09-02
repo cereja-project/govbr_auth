@@ -4,10 +4,13 @@ from base64 import b64encode
 from functools import lru_cache
 from html import escape
 from importlib.resources import files
-from typing import Literal, Protocol
+from typing import Final, Literal, Protocol
 from urllib.parse import urlsplit
 
 from govbr_auth.core import GovBrUser
+from govbr_auth.runtime_settings import GovBrProvider
+
+DEMO_PAGE_PATH: Final[str] = "/govbr-auth-demo"
 
 _ERROR_GUIDANCE = {
     "govbr_auth_error": "Não foi possível concluir a autenticação. Tente novamente mais tarde.",
@@ -278,6 +281,62 @@ def render_primary_action(*, href: str, label: str) -> str:
     """Render a safely escaped primary action for an internal absolute path."""
     _validate_internal_absolute_path(href)
     return f'<a class="primary" href="{escape(href, quote=True)}">{escape(label)}</a>'
+
+
+def render_demo_page(*, provider: GovBrProvider, login_path: str) -> str:
+    """Render a provider-neutral authentication demonstration page."""
+    action = render_primary_action(
+        href=login_path,
+        label="Entrar com gov.br",
+    )
+    if provider is GovBrProvider.FAKE:
+        badge = render_simulation_badge()
+        provider_copy = (
+            "<strong>FakeGov</strong> simula o provedor somente para testes. "
+            "Não use credenciais reais."
+        )
+        footer = "Ambiente de simulação. Não use credenciais reais."
+    else:
+        badge = ""
+        provider_copy = (
+            "<strong>Provedor oficial Gov.br</strong> configurado para esta aplicação."
+        )
+        footer = "Integração de autenticação Gov.br."
+    return _render_demo_shell(
+        badge=badge,
+        provider_copy=provider_copy,
+        action=action,
+        footer=footer,
+    )
+
+
+def _render_demo_shell(
+    *, badge: str, provider_copy: str, action: str, footer: str
+) -> str:
+    """Wrap the provider demonstration content in the shared visual shell."""
+    return f"""<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demonstração de autenticação Gov.br</title>
+<style>{responsive_css()}</style>
+</head>
+<body>
+<header class="site-header"><div class="container brand-row">
+{_render_brand_signature()}{badge}
+</div></header>
+<main class="container">
+<section class="hero" aria-labelledby="page-title">
+<p class="eyebrow">Demonstração de autenticação</p>
+<h1 id="page-title">Entrar com gov.br</h1>
+<p class="lead">{provider_copy}</p>
+{action}
+</section>
+</main>
+<footer class="site-footer"><div class="container">{footer}</div></footer>
+</body>
+</html>"""
 
 
 def _validate_internal_absolute_path(href: str) -> None:
