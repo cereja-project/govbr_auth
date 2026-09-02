@@ -342,3 +342,31 @@ def test_django_demo_page_argument_conflicts_with_application_settings() -> None
             on_success=lambda context, request: HttpResponse(status=204),
             clock=lambda: FIXED_NOW,
         )
+
+
+def test_django_demo_page_rejects_callback_collision_only_when_enabled() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    runtime = _runtime(
+        ContractClient({"sub": "subject"}),
+        redirect_uri="https://consumer.example.test/govbr-auth-demo",
+    )
+    auth = GovBrAuth(
+        runtime=runtime,
+        demo_page=False,
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+    match = resolve("/govbr-auth-demo", urlconf=tuple(auth.urlpatterns))
+
+    assert match.func(RequestFactory().get("/govbr-auth-demo")).status_code == 400
+    with pytest.raises(
+        ValueError,
+        match="redirect URI callback path must differ from the demo page path",
+    ):
+        GovBrAuth(
+            runtime=runtime,
+            demo_page=True,
+            on_success=lambda context, request: HttpResponse(status=204),
+            clock=lambda: FIXED_NOW,
+        )

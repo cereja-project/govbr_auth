@@ -9,6 +9,7 @@ from urllib.parse import unquote
 import httpx
 
 from govbr_auth.adapters._lifecycle import RuntimeOwner
+from govbr_auth.presentation import DEMO_PAGE_PATH
 from govbr_auth.runtime import (
     GovBrApplicationSettings,
     GovBrProvider,
@@ -45,6 +46,11 @@ def create_adapter_runtime(
 
     if runtime is None:
         application_settings = settings or GovBrApplicationSettings.from_environment()
+        _validate_demo_page_callback(
+            application_settings.runtime,
+            prefix,
+            application_settings.demo_page,
+        )
         owner = _create_owned_adapter_runtime(
             application_settings.runtime,
             prefix=prefix,
@@ -55,6 +61,7 @@ def create_adapter_runtime(
         return owner, application_settings.demo_page
 
     _validate_runtime_callback(runtime, prefix)
+    _validate_demo_page_callback(runtime.settings, prefix, demo_page)
     return RuntimeOwner(runtime=runtime, owns_runtime=False), demo_page
 
 
@@ -105,6 +112,17 @@ def adapter_settings_callback_path(
     if callback_path == login_path:
         raise ValueError("redirect URI callback path must differ from the login path")
     return callback_path
+
+
+def _validate_demo_page_callback(
+    settings: GovBrRuntimeSettings,
+    prefix: str,
+    demo_page: bool,
+) -> None:
+    if demo_page and adapter_settings_callback_path(settings, prefix) == DEMO_PAGE_PATH:
+        raise ValueError(
+            "redirect URI callback path must differ from the demo page path"
+        )
 
 
 def _route_path(encoded_path: str) -> str:

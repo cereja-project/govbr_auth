@@ -837,3 +837,35 @@ def test_fastapi_demo_page_argument_conflicts_with_application_settings() -> Non
             on_success=lambda context: Response(status_code=204),
             clock=lambda: FIXED_NOW,
         )
+
+
+@pytest.mark.asyncio
+async def test_fastapi_demo_page_rejects_callback_collision_only_when_enabled() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    runtime = client_runtime(
+        RecordingClient(),
+        redirect_uri="https://consumer.example.test/govbr-auth-demo",
+    )
+    auth = GovBrAuth(
+        runtime=runtime,
+        demo_page=False,
+        on_success=lambda context: Response(status_code=204),
+        clock=lambda: FIXED_NOW,
+    )
+    app = FastAPI()
+    app.include_router(auth.router)
+
+    callback = await request(app, "/govbr-auth-demo")
+
+    assert callback.status_code == 422
+    with pytest.raises(
+        ValueError,
+        match="redirect URI callback path must differ from the demo page path",
+    ):
+        GovBrAuth(
+            runtime=runtime,
+            demo_page=True,
+            on_success=lambda context: Response(status_code=204),
+            clock=lambda: FIXED_NOW,
+        )
