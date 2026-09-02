@@ -38,6 +38,7 @@ def test_fastapi_adapter_import_does_not_require_asgiref() -> None:
 def test_neutral_modules_import_with_frameworks_blocked() -> None:
     code = dedent("""
         import builtins
+        import sys
 
         blocked = {"fastapi", "django", "flask", "starlette", "werkzeug", "asgiref"}
         real_import = builtins.__import__
@@ -58,8 +59,11 @@ def test_neutral_modules_import_with_frameworks_blocked() -> None:
 
         builtins.__import__ = guarded_import
         import govbr_auth.core.client
+        import govbr_auth.application_settings
         import govbr_auth.runtime
         import govbr_auth.fake.runtime
+
+        assert not blocked.intersection(sys.modules)
         """)
     result = subprocess.run(
         [sys.executable, "-c", code],

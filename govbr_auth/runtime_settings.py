@@ -277,6 +277,7 @@ _KNOWN_ENVIRONMENT_VARIABLES = frozenset(
 )
 _ENVIRONMENT_NAMES_BY_FIELD = {
     "provider": "GOVBR_PROVIDER",
+    "demo_page": "GOVBR_DEMO_PAGE",
     **{field_name: name for name, field_name in _OFFICIAL_OAUTH_FIELDS.items()},
     **{field_name: name for name, field_name in _FAKE_FIELDS.items()},
 }
