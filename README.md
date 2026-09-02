@@ -12,20 +12,18 @@
 [![Core](https://img.shields.io/badge/Core-async%20OAuth%2FOIDC-0f766e.svg)](#instalação)
 [![FakeGov](https://img.shields.io/badge/FakeGov-local-0f766e.svg)](#teste-a-integração-sem-depender-do-govbr)
 
-Uma biblioteca autenticamente pythônica para integração com o Login Único gov.br. Seu core assíncrono OAuth 2.0/OpenID Connect é independente de framework e cuida das partes sensíveis do fluxo - PKCE, nonce, state criptografado e stateless, troca de tokens, validação de assinatura e claims do ID Token e consulta ao userinfo - deixando para a aplicação uma API menor, segura e previsível. Adapters opcionais integram esse mesmo core ao FastAPI, Django e Flask.
+# Autenticamente pythônica
 
-Inclui o FakeGov, um simulador local que permite desenvolver, testar e depurar o fluxo completo de autenticação antes da homologação oficial, reduzindo dependências externas, acelerando o setup do ambiente e encurtando o ciclo de desenvolvimento.
+Uma biblioteca moderna e robusta para integração com o Login Único gov.br. Seu *core* assíncrono OAuth 2.0/OpenID Connect é independente de framework e cuida das partes mais sensíveis do fluxo - PKCE, nonce, state criptografado, troca de tokens, validação de assinatura, claims do ID Token e consulta ao userinfo -, entregando para a aplicação uma API enxuta, segura e previsível. Adapters opcionais conectam esse mesmo *core* ao FastAPI, Django e Flask.
 
-O fluxo OAuth é stateless no backend: funciona com múltiplos workers, sem
-armazenamento compartilhado, desde que todos usem a mesma secret
-`GOVBR_TRANSACTION_SECRET`.
+E como a cereja do bolo, o projeto inclui o **FakeGov**, um simulador para ambientes de desenvolvimento e teste que permite depurar o fluxo completo de autenticação antes da homologação oficial. Isso reduz dependências externas, acelera o setup e encurta o ciclo de desenvolvimento da equipe.
 
+O fluxo OAuth é 100% *stateless* no backend: funciona com múltiplos *workers* e sem armazenamento compartilhado, bastando que todos utilizem a mesma secret `GOVBR_TRANSACTION_SECRET`.
 
 > [!IMPORTANT]
-> 1. Este é um projeto open source independente, sem manutenção, homologação ou
-> endosso do Governo Federal.
-> 
-> 2. O FakeGov é um simulador para testes end-to-end, não o utilize para além deste propósito.
+> 1. Este é um projeto open source independente, sem manutenção, homologação ou endosso do Governo Federal.
+> 2. O FakeGov é estritamente um simulador para testes end-to-end e desenvolvimento. Jamais o exponha em ambientes de produção.
+
 
 ## Índice
 
