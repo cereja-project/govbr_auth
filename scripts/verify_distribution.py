@@ -23,6 +23,11 @@ import httpx
 
 import govbr_auth
 from govbr_auth.fake.fastapi import create_fake_app
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 from myapp import app as fastapi_app
 
 
@@ -42,7 +47,11 @@ async def verify_http_boundaries():
             assert demo.status_code == 200
             assert "Entrar com gov.br" in demo.text
 
-    fake_app = create_fake_app()
+    provider_only_settings = GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
+        demo_page=False,
+    )
+    fake_app = create_fake_app(provider_only_settings)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fake_app),
         base_url="http://127.0.0.1:8000",

@@ -83,9 +83,18 @@ def test_distribution_profiles_install_each_documented_extra_in_isolation() -> N
 def test_fastapi_distribution_probe_targets_provider_only_jwks(
     fastapi_distribution_execution: tuple[str, dict[str, str]],
 ) -> None:
-    """The standalone FakeGov probe must use the root JWKS endpoint."""
+    """The standalone FakeGov probe must ignore the demo-enabled environment."""
     probe, _ = fastapi_distribution_execution
 
+    assert "from govbr_auth.runtime import (" in probe
+    assert "GovBrApplicationSettings," in probe
+    assert "GovBrProvider," in probe
+    assert "GovBrRuntimeSettings," in probe
+    assert "provider_only_settings = GovBrApplicationSettings(" in probe
+    assert "runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE)," in probe
+    assert "demo_page=False," in probe
+    assert "fake_app = create_fake_app(provider_only_settings)" in probe
+    assert "fake_app = create_fake_app()" not in probe
     assert 'client.get("/jwk")' in probe
     assert "/fake-govbr/jwk" not in probe
 
