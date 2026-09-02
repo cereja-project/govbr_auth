@@ -7,6 +7,11 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Changed
+- O início rápido do README agora parte de um `myapp.py` FastAPI completo e
+  executável, mostra configuração por `.env` ou pelas classes públicas e
+  explica como consumir `AuthContext` sem expor tokens ou dados pessoais.
+
 ### Fixed
 - Os adapters FastAPI, Django e Flask agora registram o callback oficial no
   caminho configurado por `GOVBR_REDIRECT_URI`, mantendo o prefixo do adapter

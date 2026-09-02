@@ -312,45 +312,71 @@ def test_user_docs_do_not_reference_the_removed_transaction_store() -> None:
     assert "cifrados no state" in diagram
 
 
-def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
-    required_commands = (
-        'pip install "govbr-auth[fake]"',
-        "python -m govbr_auth.fake",
-        "GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake",
-        '$env:GOVBR_FAKE_END_TO_END = "true"',
-        "http://localhost:8000",
-    )
-    sources = (
-        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
-        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+def test_readme_leads_with_an_executable_configurable_application() -> None:
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    required_guidance = (
+        "from dotenv import load_dotenv",
+        "GovBrRuntimeSettings.from_environment()",
+        'if __name__ == "__main__":',
+        "uvicorn.run(",
+        "python myapp.py",
+        "GovBrRuntimeSettings(",
+        "GovBrProvider.FAKE",
+        "context.user",
+        "context.claims",
+        "context.tokens",
     )
 
-    assert tuple(
-        tuple(command in source for command in required_commands) for source in sources
-    ) == (
-        (True, True, True, True, True),
-        (True, True, True, True, True),
+    assert all(guidance in source for guidance in required_guidance)
+
+
+def test_readme_communication_section_embeds_the_canonical_flow() -> None:
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    exact_embed = (
+        "![Fluxo de autenticação OAuth/OIDC entre navegador, aplicação e provedor]"
+        "(https://raw.githubusercontent.com/cereja-project/govbr_auth/main/"
+        "docs/media/authentication-sequence.svg)"
     )
+    section = re.search(
+        r"^## Como a comunicação funciona\s*$.*?(?=^## |\Z)",
+        source,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+
+    assert section is not None
+    assert exact_embed in section.group()
+    assert source.count(exact_embed) == 1
+    assert all(
+        launcher_guidance not in source
+        for launcher_guidance in (
+            "python -m govbr_auth.fake",
+            "GOVBR_FAKE_END_TO_END",
+            "Launcher",
+            "launcher",
+            "provider-only",
+        )
+    )
+
+
+def test_sphinx_quickstart_keeps_the_optional_fake_launcher() -> None:
+    source = (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8")
+
+    assert 'pip install "govbr-auth[fake]"' in source
+    assert "python -m govbr_auth.fake" in source
+    assert "GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake" in source
+    assert '$env:GOVBR_FAKE_END_TO_END = "true"' in source
+    assert "http://localhost:8000" in source
 
 
 def test_fastapi_fake_quickstart_install_is_complete_for_uvicorn() -> None:
     required_guidance = (
         'pip install "govbr-auth[fastapi,fake]"',
-        "uvicorn myapp:app --reload",
+        "python myapp.py",
         "http://localhost:8000/auth/govbr/login",
     )
-    sources = (
-        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
-        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
-    )
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert tuple(
-        tuple(guidance in source for guidance in required_guidance)
-        for source in sources
-    ) == (
-        (True, True, True),
-        (True, True, True),
-    )
+    assert all(guidance in source for guidance in required_guidance)
 
 
 def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
@@ -362,7 +388,7 @@ def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
     assert "docs/media/fakegov-flow.svg" in source
     assert "**FakeGov**" in source
     assert "Instalar" in source
-    assert "Iniciar" in source
+    assert "Configurar" in source
     assert "Entrar" in source
     assert "Concluir" in source
 
@@ -801,23 +827,25 @@ def test_fake_mode_guide_documents_the_supported_installation_matrix() -> None:
     assert 'pip install "govbr-auth[fake]"' not in source
 
 
-def test_installable_fake_command_is_an_exact_line_in_every_instruction() -> None:
-    sources = (
-        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
-        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
-        (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8"),
+def test_installable_fake_commands_are_exact_lines_in_every_instruction() -> None:
+    instructions = (
+        (
+            (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+            'pip install "govbr-auth[fastapi,fake]"',
+        ),
+        (
+            (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+            'pip install "govbr-auth[fake]"',
+        ),
+        (
+            (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8"),
+            'pip install "govbr-auth[fake]"',
+        ),
     )
 
-    assert tuple(
-        any(
-            'pip install "govbr-auth[fake]"' == line.strip()
-            for line in source.splitlines()
-        )
-        for source in sources
-    ) == (
-        True,
-        True,
-        True,
+    assert all(
+        any(command == line.strip() for line in source.splitlines())
+        for source, command in instructions
     )
 
 
@@ -847,31 +875,25 @@ def test_docs_explain_both_fake_intents_and_official_provider() -> None:
 def test_fake_credentials_journey_is_documented_in_every_entry_guide(
     document: Path,
 ) -> None:
-    required_guidance = (
+    common_guidance = (
         "GOVBR_FAKE_USERS_FILE",
         "fake-users.local.json",
         '"users"',
         '"cpf": "11122233344"',
         '"password": "senha-ficticia"',
-        'export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"',
-        '$env:GOVBR_FAKE_USERS_FILE = "$PWD\\fake-users.local.json"',
         "não use credenciais reais",
-        "python -m govbr_auth.fake",
     )
 
     source = document.read_text(encoding="utf-8")
 
-    assert tuple(guidance in source for guidance in required_guidance) == (
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-    )
+    assert all(guidance in source for guidance in common_guidance)
+    if document == PROJECT_ROOT / "README.md":
+        assert "python myapp.py" in source
+        assert "GOVBR_PROVIDER=fake" in source
+    else:
+        assert 'export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"' in source
+        assert '$env:GOVBR_FAKE_USERS_FILE = "$PWD\\fake-users.local.json"' in source
+        assert "python -m govbr_auth.fake" in source
 
 
 def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
