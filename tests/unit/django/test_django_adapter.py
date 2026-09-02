@@ -25,7 +25,12 @@ from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings
-from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntime,
+    GovBrRuntimeSettings,
+)
 
 FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 
@@ -87,6 +92,16 @@ def _route(auth: object, suffix: str):
         pattern.callback
         for pattern in auth.urlpatterns
         if str(pattern.pattern).endswith(suffix)
+    )
+
+
+def _fake_application_settings(*, demo_page: bool = False) -> GovBrApplicationSettings:
+    return GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_end_to_end=True,
+        ),
+        demo_page=demo_page,
     )
 
 
@@ -189,10 +204,7 @@ def test_django_fake_runtime_adds_provider_patterns_without_fastapi() -> None:
     from govbr_auth.django import GovBrAuth
 
     auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
+        settings=_fake_application_settings(),
         on_success=lambda context, request: HttpResponse(status=204),
         clock=lambda: FIXED_NOW,
     )
@@ -231,10 +243,7 @@ def test_django_fake_runtime_passes_simulator_http_application_to_provider_patte
     )
 
     auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
+        settings=_fake_application_settings(),
         on_success=lambda context, request: HttpResponse(status=204),
         clock=lambda: FIXED_NOW,
     )
@@ -245,3 +254,91 @@ def test_django_fake_runtime_passes_simulator_http_application_to_provider_patte
         assert mounted == [(runtime, runtime.http_application, auth._clock)]
     finally:
         auth.close()
+
+
+def test_django_demo_page_is_absent_by_default_for_borrowed_runtime() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(ContractClient({"sub": "subject"})),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    with pytest.raises(Resolver404):
+        resolve("/govbr-auth-demo", urlconf=tuple(auth.urlpatterns))
+
+
+def test_django_demo_page_is_opt_in_with_native_response() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(ContractClient({"sub": "subject"})),
+        demo_page=True,
+        prefix="/oauth/govbr",
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    match = resolve("/govbr-auth-demo", urlconf=tuple(auth.urlpatterns))
+    response = match.func(RequestFactory().get("/govbr-auth-demo"))
+    body = response.content.decode("utf-8")
+
+    assert response.status_code == 200
+    assert response["Cache-Control"] == "no-store"
+    assert response["Content-Type"].startswith("text/html")
+    assert "Provedor oficial Gov.br" in body
+    assert 'href="/oauth/govbr/login"' in body
+
+
+def test_django_fake_settings_without_demo_page_keep_provider_patterns() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        settings=_fake_application_settings(),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    try:
+        paths = {str(pattern.pattern) for pattern in auth.urlpatterns}
+        assert "govbr-auth-demo" not in paths
+        assert "fake-govbr/login" in paths
+    finally:
+        auth.close()
+
+
+def test_django_fake_settings_can_publish_credential_free_demo_page() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        settings=_fake_application_settings(demo_page=True),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    try:
+        match = resolve("/govbr-auth-demo", urlconf=tuple(auth.urlpatterns))
+        response = match.func(RequestFactory().get("/govbr-auth-demo"))
+        body = response.content.decode("utf-8")
+        assert response.status_code == 200
+        assert response["Cache-Control"] == "no-store"
+        assert response["Content-Type"].startswith("text/html")
+        assert "FakeGov" in body
+        assert "Não use credenciais reais." in body
+        assert "11122233344" not in body
+        assert "senha-ficticia" not in body
+    finally:
+        auth.close()
+
+
+def test_django_demo_page_argument_conflicts_with_application_settings() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    with pytest.raises(TypeError, match="demo_page must be configured in settings"):
+        GovBrAuth(
+            settings=_fake_application_settings(),
+            demo_page=True,
+            on_success=lambda context, request: HttpResponse(status=204),
+            clock=lambda: FIXED_NOW,
+        )

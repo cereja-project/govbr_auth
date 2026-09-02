@@ -13,7 +13,12 @@ from pydantic import SecretStr
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
-from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntime,
+    GovBrRuntimeSettings,
+)
 
 FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 
@@ -75,6 +80,44 @@ def route_paths(app: FastAPI) -> set[str]:
         if included_router is not None:
             pending.extend(included_router.routes)
     return paths
+
+
+def test_application_settings_reject_missing_official_oauth_before_route_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import govbr_auth.fastapi as fastapi_adapter
+    import govbr_auth.runtime as runtime_module
+    from govbr_auth.fastapi import GovBrAuth
+
+    allocated_routers: list[object] = []
+    allocated_http_clients: list[object] = []
+    original_router = fastapi_adapter.APIRouter
+
+    def record_router(*args, **kwargs):
+        router = original_router(*args, **kwargs)
+        allocated_routers.append(router)
+        return router
+
+    def record_http_client(*args, **kwargs):
+        del args, kwargs
+        allocated_http_clients.append(object())
+        raise AssertionError("HTTP client must not be allocated")
+
+    monkeypatch.setattr(fastapi_adapter, "APIRouter", record_router)
+    monkeypatch.setattr(runtime_module.httpx, "AsyncClient", record_http_client)
+    settings = GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
+    )
+
+    with pytest.raises(ValueError, match="official runtime requires OAuth settings"):
+        GovBrAuth(
+            settings=settings,
+            on_success=lambda context: Response(status_code=204),
+            clock=lambda: FIXED_NOW,
+        )
+
+    assert allocated_routers == []
+    assert allocated_http_clients == []
 
 
 @pytest.mark.asyncio

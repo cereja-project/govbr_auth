@@ -18,7 +18,8 @@ from govbr_auth.authentication import AuthenticationContext, AuthenticationServi
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.django import create_fake_govbr_urlpatterns
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
-from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
+from govbr_auth.runtime import GovBrApplicationSettings, GovBrRuntime
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
 if TYPE_CHECKING:
@@ -41,8 +42,9 @@ class GovBrAuth:
         self,
         *,
         on_success: AuthSuccessHandler,
-        settings: GovBrRuntimeSettings | None = None,
+        settings: GovBrApplicationSettings | None = None,
         runtime: GovBrRuntime | None = None,
+        demo_page: bool = False,
         on_error: AuthErrorHandler | None = None,
         expose_tokens: bool = False,
         prefix: str = "/auth/govbr",
@@ -52,12 +54,14 @@ class GovBrAuth:
         if not _is_canonical_path_prefix(prefix, allow_empty=True):
             raise ValueError("prefix must be an empty string or a canonical path")
         self._prefix = prefix.lstrip("/")
+        self._login_path = f"{prefix}/login" if prefix else "/login"
         self._clock = clock
         self._on_success = on_success
         self._on_error = on_error
-        self._owner = create_adapter_runtime(
+        self._owner, self._demo_page_enabled = create_adapter_runtime(
             settings=settings,
             runtime=runtime,
+            demo_page=demo_page,
             prefix=prefix,
             clock=clock,
             user_repository=user_repository,
@@ -95,6 +99,14 @@ class GovBrAuth:
                 name="govbr-auth-callback",
             ),
         ]
+        if self._demo_page_enabled:
+            patterns.append(
+                path(
+                    DEMO_PAGE_PATH.lstrip("/"),
+                    self._demo_page,
+                    name="govbr-auth-demo",
+                )
+            )
         fake_runtime = self._owner.runtime.fake
         if fake_runtime is not None:
             patterns.extend(
@@ -105,6 +117,17 @@ class GovBrAuth:
                 )
             )
         return patterns
+
+    def _demo_page(self, request: HttpRequest) -> HttpResponse:
+        del request
+        return HttpResponse(
+            render_demo_page(
+                provider=self._owner.runtime.provider,
+                login_path=self._login_path,
+            ),
+            content_type="text/html; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
 
     def _login(self, request: HttpRequest) -> HttpResponseRedirect:
         authorization = self._service.authorization_url(now=self._clock())

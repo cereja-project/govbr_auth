@@ -13,7 +13,11 @@ from govbr_auth.fake import runtime as runtime_module
 from govbr_auth.fake.credentials import FakeLoginCredential
 from govbr_auth.fastapi import GovBrAuth
 from govbr_auth.fake.runtime import create_fake_gov_simulator
-from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 
 NOW = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
 
@@ -282,7 +286,10 @@ async def test_fake_facade_routes_and_transport_share_one_http_application(
         del context
         return Response(status_code=204)
 
-    auth = GovBrAuth(settings=fake_settings, on_success=success_handler)
+    auth = GovBrAuth(
+        settings=GovBrApplicationSettings(runtime=fake_settings),
+        on_success=success_handler,
+    )
 
     try:
         assert len(application_calls) == 1

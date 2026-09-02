@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from flask import Blueprint, Flask, jsonify, redirect, request
+from flask import Blueprint, Flask, Response, jsonify, redirect, request
 
 from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
@@ -16,7 +16,8 @@ from govbr_auth.authentication import AuthenticationContext, AuthenticationServi
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.flask import create_fake_govbr_blueprint
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
-from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
+from govbr_auth.runtime import GovBrApplicationSettings, GovBrRuntime
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
 if TYPE_CHECKING:
@@ -39,8 +40,9 @@ class GovBrAuth:
         self,
         *,
         on_success: AuthSuccessHandler,
-        settings: GovBrRuntimeSettings | None = None,
+        settings: GovBrApplicationSettings | None = None,
         runtime: GovBrRuntime | None = None,
+        demo_page: bool = False,
         on_error: AuthErrorHandler | None = None,
         expose_tokens: bool = False,
         prefix: str = "/auth/govbr",
@@ -52,9 +54,10 @@ class GovBrAuth:
         self._clock = clock
         self._on_success = on_success
         self._on_error = on_error
-        self._owner = create_adapter_runtime(
+        self._owner, demo_page_enabled = create_adapter_runtime(
             settings=settings,
             runtime=runtime,
+            demo_page=demo_page,
             prefix=prefix,
             clock=clock,
             user_repository=user_repository,
@@ -67,7 +70,7 @@ class GovBrAuth:
             self._owner.runtime.client,
             expose_tokens=expose_tokens,
         )
-        self._blueprint = self._build_blueprint(prefix)
+        self._blueprint = self._build_blueprint(prefix, demo_page_enabled)
         fake_runtime = self._owner.runtime.fake
         self._fake_blueprint = (
             create_fake_govbr_blueprint(
@@ -94,7 +97,7 @@ class GovBrAuth:
         if self._fake_blueprint is not None:
             application.register_blueprint(self._fake_blueprint)
 
-    def _build_blueprint(self, prefix: str) -> Blueprint:
+    def _build_blueprint(self, prefix: str, demo_page_enabled: bool) -> Blueprint:
         blueprint = Blueprint("govbr_auth", __name__)
         login_path = f"{prefix}/login" if prefix else "/login"
         callback_path = adapter_callback_path(self._owner.runtime, prefix)
@@ -103,6 +106,19 @@ class GovBrAuth:
         def login():
             authorization = self._service.authorization_url(now=self._clock())
             return redirect(authorization.url)
+
+        if demo_page_enabled:
+
+            @blueprint.get(DEMO_PAGE_PATH)
+            def demo():
+                return Response(
+                    render_demo_page(
+                        provider=self._owner.runtime.provider,
+                        login_path=login_path,
+                    ),
+                    content_type="text/html; charset=utf-8",
+                    headers={"Cache-Control": "no-store"},
+                )
 
         @blueprint.route(callback_path, methods=["GET", "POST"])
         def callback():

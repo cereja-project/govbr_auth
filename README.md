@@ -102,7 +102,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from govbr_auth.fastapi import AuthContext, GovBrAuth
-from govbr_auth.runtime import GovBrRuntimeSettings
+from govbr_auth.runtime import GovBrApplicationSettings, GovBrRuntimeSettings
 
 
 load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
@@ -118,7 +118,7 @@ def create_app(settings: GovBrRuntimeSettings) -> FastAPI:
     application = FastAPI()
     auth = GovBrAuth(
         on_success=authenticated,
-        settings=settings,
+        settings=GovBrApplicationSettings(runtime=settings),
         expose_tokens=False,
     )
     application.include_router(auth.router)

@@ -7,7 +7,11 @@ from urllib.parse import urlsplit
 from flask import Flask, jsonify
 
 from govbr_auth.flask import GovBrAuth
-from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+from govbr_auth.runtime import (
+    GovBrApplicationSettings,
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 
 FIXED_NOW = datetime(2026, 8, 25, 12, tzinfo=UTC)
 
@@ -40,9 +44,11 @@ def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -
 
     try:
         auth = GovBrAuth(
-            settings=GovBrRuntimeSettings(
-                provider=GovBrProvider.FAKE,
-                fake_end_to_end=True,
+            settings=GovBrApplicationSettings(
+                runtime=GovBrRuntimeSettings(
+                    provider=GovBrProvider.FAKE,
+                    fake_end_to_end=True,
+                )
             ),
             on_success=authenticated,
             clock=lambda: FIXED_NOW,

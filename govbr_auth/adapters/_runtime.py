@@ -10,6 +10,7 @@ import httpx
 
 from govbr_auth.adapters._lifecycle import RuntimeOwner
 from govbr_auth.runtime import (
+    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
@@ -26,41 +27,63 @@ if TYPE_CHECKING:
 
 def create_adapter_runtime(
     *,
-    settings: GovBrRuntimeSettings | None,
+    settings: GovBrApplicationSettings | None,
     runtime: GovBrRuntime | None,
+    demo_page: bool,
+    prefix: str,
+    clock: Callable[[], datetime],
+    user_repository: "FakeUserRepository | None",
+    fake_transport_factory: Callable[["FakeGovSimulator"], httpx.AsyncBaseTransport],
+) -> tuple[RuntimeOwner, bool]:
+    """Create or borrow one canonical runtime for a framework adapter."""
+    if settings is not None and runtime is not None:
+        raise TypeError("settings and runtime are mutually exclusive")
+    if settings is not None and demo_page:
+        raise TypeError("demo_page must be configured in settings")
+    if not _is_canonical_path_prefix(prefix, allow_empty=True):
+        raise ValueError("prefix must be an empty string or a canonical path")
+
+    if runtime is None:
+        application_settings = settings or GovBrApplicationSettings.from_environment()
+        owner = _create_owned_adapter_runtime(
+            application_settings.runtime,
+            prefix=prefix,
+            clock=clock,
+            user_repository=user_repository,
+            fake_transport_factory=fake_transport_factory,
+        )
+        return owner, application_settings.demo_page
+
+    _validate_runtime_callback(runtime, prefix)
+    return RuntimeOwner(runtime=runtime, owns_runtime=False), demo_page
+
+
+def _create_owned_adapter_runtime(
+    settings: GovBrRuntimeSettings,
+    *,
     prefix: str,
     clock: Callable[[], datetime],
     user_repository: "FakeUserRepository | None",
     fake_transport_factory: Callable[["FakeGovSimulator"], httpx.AsyncBaseTransport],
 ) -> RuntimeOwner:
-    """Create or borrow one canonical runtime for a framework adapter."""
-    if settings is not None and runtime is not None:
-        raise TypeError("settings and runtime are mutually exclusive")
-    if not _is_canonical_path_prefix(prefix, allow_empty=True):
-        raise ValueError("prefix must be an empty string or a canonical path")
-
-    if runtime is None:
-        resolved_settings = settings or GovBrRuntimeSettings.from_environment()
-        if resolved_settings.provider is GovBrProvider.FAKE:
-            resolved_settings = _settings_for_fake_callback(resolved_settings, prefix)
-        adapter_settings_callback_path(resolved_settings, prefix)
-        if resolved_settings.provider is GovBrProvider.FAKE:
-            runtime = create_govbr_runtime(
-                resolved_settings,
-                fake_transport_factory=fake_transport_factory,
-                clock=clock,
-                user_repository=user_repository,
-            )
-        else:
-            runtime = create_govbr_runtime(
-                resolved_settings,
-                clock=clock,
-                user_repository=user_repository,
-            )
-        return RuntimeOwner(runtime=runtime, owns_runtime=True)
-
-    _validate_runtime_callback(runtime, prefix)
-    return RuntimeOwner(runtime=runtime, owns_runtime=False)
+    resolved_settings = settings
+    if resolved_settings.provider is GovBrProvider.FAKE:
+        resolved_settings = _settings_for_fake_callback(resolved_settings, prefix)
+    adapter_settings_callback_path(resolved_settings, prefix)
+    if resolved_settings.provider is GovBrProvider.FAKE:
+        runtime = create_govbr_runtime(
+            resolved_settings,
+            fake_transport_factory=fake_transport_factory,
+            clock=clock,
+            user_repository=user_repository,
+        )
+    else:
+        runtime = create_govbr_runtime(
+            resolved_settings,
+            clock=clock,
+            user_repository=user_repository,
+        )
+    return RuntimeOwner(runtime=runtime, owns_runtime=True)
 
 
 def adapter_callback_path(runtime: GovBrRuntime, prefix: str) -> str:
