@@ -57,6 +57,11 @@ def create_adapter_runtime(
         return owner, application_settings.demo_page
 
     _validate_adapter_prefix(prefix)
+    _validate_fake_provider_prefix_collision(
+        runtime.settings,
+        prefix,
+        runtime=runtime,
+    )
     _validate_runtime_callback(runtime, prefix)
     _validate_demo_page_callback(runtime.settings, prefix, demo_page)
     return RuntimeOwner(runtime=runtime, owns_runtime=False), demo_page
@@ -93,6 +98,7 @@ def prepare_adapter_runtime_settings(
     """Validate callback topology before allocating adapter runtime resources."""
     _validate_adapter_prefix(prefix)
     settings = application_settings.runtime
+    _validate_fake_provider_prefix_collision(settings, prefix)
     _validate_demo_page_callback(
         settings,
         prefix,
@@ -107,6 +113,23 @@ def prepare_adapter_runtime_settings(
 def _validate_adapter_prefix(prefix: str) -> None:
     if not _is_canonical_path_prefix(prefix, allow_empty=True):
         raise ValueError("prefix must be an empty string or a canonical path")
+
+
+def _validate_fake_provider_prefix_collision(
+    settings: GovBrRuntimeSettings,
+    prefix: str,
+    *,
+    runtime: GovBrRuntime | None = None,
+) -> None:
+    provider_prefixes = set()
+    if settings.provider is GovBrProvider.FAKE:
+        provider_prefixes.add(settings.fake_provider_prefix)
+    if runtime is not None and runtime.fake is not None:
+        provider_prefixes.add(runtime.fake.prefix)
+    if prefix in provider_prefixes:
+        raise ValueError(
+            "o prefixo do FakeGov deve ser diferente do prefixo do adapter"
+        )
 
 
 def adapter_callback_path(runtime: GovBrRuntime, prefix: str) -> str:

@@ -18,6 +18,7 @@ from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
+    create_govbr_runtime,
 )
 
 FIXED_NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
@@ -111,6 +112,19 @@ def fake_application_settings(*, demo_page: bool = False) -> GovBrApplicationSet
             provider=GovBrProvider.FAKE,
         ),
         demo_page=demo_page,
+    )
+
+
+def colliding_fake_runtime() -> GovBrRuntime:
+    return create_govbr_runtime(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_provider_prefix="/auth/govbr",
+        ),
+        fake_transport_factory=lambda _: httpx.MockTransport(
+            lambda __: httpx.Response(500)
+        ),
+        clock=lambda: FIXED_NOW,
     )
 
 
@@ -868,3 +882,56 @@ async def test_fastapi_demo_page_rejects_callback_collision_only_when_enabled() 
             on_success=lambda context: Response(status_code=204),
             clock=lambda: FIXED_NOW,
         )
+
+
+def test_fastapi_rejects_owned_fake_prefix_collision_before_runtime_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import govbr_auth.adapters._runtime as adapter_runtime
+    from govbr_auth.fastapi import GovBrAuth
+
+    allocations: list[object] = []
+
+    def allocate_runtime(*args, **kwargs):
+        allocations.append((args, kwargs))
+        raise AssertionError("runtime must not be allocated")
+
+    monkeypatch.setattr(adapter_runtime, "create_govbr_runtime", allocate_runtime)
+    settings = GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_provider_prefix="/auth/govbr",
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="o prefixo do FakeGov deve ser diferente do prefixo do adapter",
+    ):
+        GovBrAuth(
+            settings=settings,
+            on_success=lambda context: Response(status_code=204),
+            clock=lambda: FIXED_NOW,
+        )
+
+    assert allocations == []
+
+
+@pytest.mark.asyncio
+async def test_fastapi_rejects_borrowed_fake_prefix_collision() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    runtime = colliding_fake_runtime()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="o prefixo do FakeGov deve ser diferente do prefixo do adapter",
+        ):
+            GovBrAuth(
+                runtime=runtime,
+                on_success=lambda context: Response(status_code=204),
+                clock=lambda: FIXED_NOW,
+            )
+    finally:
+        await runtime.aclose()

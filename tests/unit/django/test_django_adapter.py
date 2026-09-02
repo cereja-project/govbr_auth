@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 from django.conf import settings
 from django.http import HttpResponse
@@ -30,6 +31,7 @@ from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
+    create_govbr_runtime,
 )
 
 FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
@@ -101,6 +103,19 @@ def _fake_application_settings(*, demo_page: bool = False) -> GovBrApplicationSe
             provider=GovBrProvider.FAKE,
         ),
         demo_page=demo_page,
+    )
+
+
+def _colliding_fake_runtime() -> GovBrRuntime:
+    return create_govbr_runtime(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_provider_prefix="/auth/govbr",
+        ),
+        fake_transport_factory=lambda _: httpx.MockTransport(
+            lambda __: httpx.Response(500)
+        ),
+        clock=lambda: FIXED_NOW,
     )
 
 
@@ -369,3 +384,63 @@ def test_django_demo_page_rejects_callback_collision_only_when_enabled() -> None
             on_success=lambda context, request: HttpResponse(status=204),
             clock=lambda: FIXED_NOW,
         )
+
+
+def test_django_rejects_owned_fake_prefix_collision_before_duplicate_post_route() -> (
+    None
+):
+    from govbr_auth.django import GovBrAuth
+
+    settings = GovBrApplicationSettings(
+        runtime=GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_provider_prefix="/auth/govbr",
+        )
+    )
+    auth = None
+    raised = None
+
+    try:
+        try:
+            auth = GovBrAuth(
+                settings=settings,
+                on_success=lambda context, request: HttpResponse(status=204),
+                clock=lambda: FIXED_NOW,
+            )
+        except ValueError as error:
+            raised = error
+
+        if auth is not None:
+            match = resolve("/auth/govbr/login", urlconf=tuple(auth.urlpatterns))
+            response = match.func(RequestFactory().post("/auth/govbr/login"))
+            assert (
+                response.status_code != 302
+            ), "a rota de login do consumidor sombreou o POST do FakeGov"
+    finally:
+        if auth is not None:
+            auth.close()
+
+    assert isinstance(raised, ValueError)
+    assert str(raised) == (
+        "o prefixo do FakeGov deve ser diferente do prefixo do adapter"
+    )
+
+
+def test_django_rejects_borrowed_fake_prefix_collision() -> None:
+    from govbr_auth.adapters._sync import run_sync
+    from govbr_auth.django import GovBrAuth
+
+    runtime = _colliding_fake_runtime()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="o prefixo do FakeGov deve ser diferente do prefixo do adapter",
+        ):
+            GovBrAuth(
+                runtime=runtime,
+                on_success=lambda context, request: HttpResponse(status=204),
+                clock=lambda: FIXED_NOW,
+            )
+    finally:
+        run_sync(runtime.aclose)
