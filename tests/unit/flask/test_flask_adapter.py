@@ -331,6 +331,46 @@ def test_flask_demo_page_argument_conflicts_with_application_settings() -> None:
         )
 
 
+def test_flask_direct_demo_page_rejects_before_environment_or_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import govbr_auth.adapters._runtime as adapter_runtime
+    from govbr_auth.flask import GovBrAuth
+
+    environment_reads: list[object] = []
+    runtime_allocations: list[object] = []
+
+    def load_environment() -> GovBrApplicationSettings:
+        environment_reads.append(object())
+        return GovBrApplicationSettings(
+            runtime=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
+        )
+
+    def allocate_runtime(*args, **kwargs) -> GovBrRuntime:
+        runtime_allocations.append((args, kwargs))
+        return _runtime(ContractClient({"sub": "subject"}))
+
+    monkeypatch.setattr(
+        adapter_runtime.GovBrApplicationSettings,
+        "from_environment",
+        load_environment,
+    )
+    monkeypatch.setattr(adapter_runtime, "create_govbr_runtime", allocate_runtime)
+
+    captured_error = None
+    try:
+        GovBrAuth(
+            demo_page=True,
+            on_success=lambda context, request: ("", 204),
+            clock=lambda: FIXED_NOW,
+        )
+    except TypeError as error:
+        captured_error = error
+
+    assert (environment_reads, runtime_allocations) == ([], [])
+    assert str(captured_error) == "demo_page must be configured in settings"
+
+
 def test_flask_demo_page_rejects_callback_collision_only_when_enabled() -> None:
     from govbr_auth.flask import GovBrAuth
 

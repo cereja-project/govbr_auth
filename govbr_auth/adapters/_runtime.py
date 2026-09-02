@@ -39,7 +39,7 @@ def create_adapter_runtime(
     """Create or borrow one canonical runtime for a framework adapter."""
     if settings is not None and runtime is not None:
         raise TypeError("settings and runtime are mutually exclusive")
-    if settings is not None and demo_page:
+    if runtime is None and demo_page:
         raise TypeError("demo_page must be configured in settings")
 
     if runtime is None:
