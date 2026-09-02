@@ -55,6 +55,20 @@ def _contrast_ratio(first: str, second: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def _composite_color(foreground: str, background: str, opacity: float) -> str:
+    foreground_channels = tuple(
+        int(foreground[index : index + 2], 16) for index in (1, 3, 5)
+    )
+    background_channels = tuple(
+        int(background[index : index + 2], 16) for index in (1, 3, 5)
+    )
+    channels = tuple(
+        round(front * opacity + back * (1 - opacity))
+        for front, back in zip(foreground_channels, background_channels)
+    )
+    return "#" + "".join(f"{channel:02x}" for channel in channels)
+
+
 def _svg_paint_values(source: str) -> set[str]:
     root = ET.fromstring(source)
     values: set[str] = set()
@@ -330,10 +344,16 @@ def test_readme_leads_with_an_executable_configurable_application() -> None:
     assert all(guidance in source for guidance in required_guidance)
 
 
-def test_readme_communication_section_embeds_the_canonical_flow() -> None:
+def test_readme_communication_section_embeds_animation_and_links_static_flow() -> None:
     source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    exact_embed = (
-        "![Fluxo de autenticação OAuth/OIDC entre navegador, aplicação e provedor]"
+    animated_embed = (
+        "![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação "
+        "e provedor]"
+        "(https://raw.githubusercontent.com/cereja-project/govbr_auth/main/"
+        "docs/media/authentication-sequence-animated.svg)"
+    )
+    static_link = (
+        "[Ver versão estática do fluxo]"
         "(https://raw.githubusercontent.com/cereja-project/govbr_auth/main/"
         "docs/media/authentication-sequence.svg)"
     )
@@ -344,8 +364,50 @@ def test_readme_communication_section_embeds_the_canonical_flow() -> None:
     )
 
     assert section is not None
-    assert exact_embed in section.group()
-    assert source.count(exact_embed) == 1
+    assert animated_embed in section.group()
+    assert static_link in section.group()
+    assert source.count(animated_embed) == 1
+    assert source.count(static_link) == 1
+
+
+def test_animated_authentication_flow_is_accessible_and_motion_safe() -> None:
+    source = (DOCS_ROOT / "media" / "authentication-sequence-animated.svg").read_text(
+        encoding="utf-8"
+    )
+    root = ET.fromstring(source)
+    namespace = "{http://www.w3.org/2000/svg}"
+    styles = root.findall(f".//{namespace}style")
+    phases = {
+        element.attrib["id"]
+        for element in root.findall(f".//{namespace}g")
+        if element.attrib.get("id", "").startswith("phase-")
+    }
+
+    assert root.attrib["role"] == "img"
+    assert root.attrib["aria-labelledby"] == "title desc"
+    assert root.find(f"{namespace}title") is not None
+    assert root.find(f"{namespace}desc") is not None
+    assert len(styles) == 1
+    stylesheet = styles[0].text or ""
+    phase_rule = re.search(r"\.phase\s*\{(?P<body>[^}]*)\}", stylesheet)
+    reduced_motion_rule = re.search(
+        r"@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*"
+        r"\.phase\s*\{(?P<body>[^}]*)\}",
+        stylesheet,
+    )
+
+    assert phase_rule is not None
+    opacity_match = re.search(r"opacity:\s*(?P<opacity>[\d.]+)", phase_rule["body"])
+    assert opacity_match is not None
+    inactive_text = _composite_color(
+        "#0f172a", "#f8fafc", float(opacity_match["opacity"])
+    )
+    assert _contrast_ratio(inactive_text, "#f8fafc") >= 4.5
+    assert reduced_motion_rule is not None
+    assert "animation: none" in reduced_motion_rule["body"]
+    assert "opacity: 1" in reduced_motion_rule["body"]
+    assert phases == {f"phase-{number}" for number in range(1, 9)}
+    assert root.findall(f".//{namespace}script") == []
     assert all(
         launcher_guidance not in source
         for launcher_guidance in (

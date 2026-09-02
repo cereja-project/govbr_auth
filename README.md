@@ -262,7 +262,9 @@ o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado por
 
 ## Como a comunicação funciona
 
-![Fluxo de autenticação OAuth/OIDC entre navegador, aplicação e provedor](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence.svg)
+![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação e provedor](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence-animated.svg)
+
+[Ver versão estática do fluxo](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence.svg)
 
 A aplicação expõe `/auth/govbr/login`. Com o provedor oficial, a rota de
 callback usa exatamente o caminho de `GOVBR_REDIRECT_URI`; por exemplo,
