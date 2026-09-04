@@ -1,12 +1,15 @@
 """Specify the reduced v1 adapter and runtime configuration surface."""
 
 from pathlib import Path
+import inspect
 
 import pytest
 from fastapi.responses import Response
 
 import govbr_auth.runtime as runtime_module
 from govbr_auth.fastapi import GovBrAuth
+from govbr_auth.django import GovBrAuth as DjangoGovBrAuth
+from govbr_auth.flask import GovBrAuth as FlaskGovBrAuth
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -41,3 +44,11 @@ def test_fastapi_does_not_accept_demo_page_argument() -> None:
 def test_application_settings_module_and_runtime_export_are_removed() -> None:
     assert not (PROJECT_ROOT / "govbr_auth" / "application_settings.py").exists()
     assert not hasattr(runtime_module, "GovBrApplicationSettings")
+
+
+def test_framework_adapters_share_the_small_runtime_surface() -> None:
+    for adapter in (GovBrAuth, DjangoGovBrAuth, FlaskGovBrAuth):
+        parameters = inspect.signature(adapter).parameters
+        assert "settings" in parameters
+        assert "runtime" in parameters
+        assert "demo_page" not in parameters

@@ -59,6 +59,7 @@ def test_neutral_modules_import_with_frameworks_blocked() -> None:
 
         builtins.__import__ = guarded_import
         import govbr_auth.core.client
+        import govbr_auth.adapters._application
         import govbr_auth.runtime
         import govbr_auth.fake.runtime
 
