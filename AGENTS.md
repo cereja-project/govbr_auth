@@ -82,7 +82,7 @@ python -m flake8 govbr_auth tests examples scripts --count --select=E9,F63,F7,F8
 Gere wheel e sdist com `python -m build` usando um diretório de saída externo e
 valide os artefatos com Twine e `scripts/verify_distribution.py`. Para exercitar
 o fluxo local completo, configure `GOVBR_PROVIDER=fake` e
-`GOVBR_DEMO_PAGE=true`, então execute `python -m govbr_auth.fake`.
+execute `python -m govbr_auth.fake`.
 
 ## Código Python
 
