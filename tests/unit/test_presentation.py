@@ -288,6 +288,42 @@ def test_home_omits_credentials_for_external_repository() -> None:
     assert "Credenciais da demo" not in render_home(credentials=())
 
 
+def test_demo_page_opens_native_auth_window_and_updates_on_completion() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+        interactive=True,
+    )
+
+    assert "window.open" in page
+    assert "window.location.origin" in page
+    assert 'event.data.type !== "govbr-authentication-completed"' in page
+    assert 'id="demo-success"' in page
+    assert "iframe" not in page
+
+
+def test_interactive_demo_repeat_flow_returns_to_demo_home() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+        interactive=True,
+    )
+
+    assert '<a class="primary" href="/">Repetir o fluxo</a>' in page
+    assert '<a class="primary" href="/auth/govbr/login">Repetir o fluxo</a>' not in page
+
+
+def test_demo_page_is_a_plain_link_for_consumers_by_default() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+    )
+
+    assert 'href="/auth/govbr/login"' in page
+    assert "window.open" not in page
+    assert 'id="demo-success"' not in page
+
+
 def test_success_masks_cpf_and_escapes_identity() -> None:
     user = GovBrUser(
         sub="12345678901",
@@ -301,9 +337,18 @@ def test_success_masks_cpf_and_escapes_identity() -> None:
     assert "12345678901" not in page
     assert "<b>Ana</b>" not in page
     assert "ana@example.test" in page
-    assert 'href="/auth/govbr/login"' in page
+    assert 'href="/"' in page
     assert "access_token" not in page
     assert "id_token" not in page
+    assert 'type: "govbr-authentication-completed"' in page
+    assert "window.opener" in page
+
+
+def test_success_repeat_flow_returns_to_the_demo_home() -> None:
+    page = render_success(GovBrUser(sub="12345678901", name="Ana"))
+
+    assert 'href="/"' in page
+    assert 'href="/auth/govbr/login"' not in page
 
 
 def test_result_pages_use_semantic_feedback_without_color_only_meaning() -> None:

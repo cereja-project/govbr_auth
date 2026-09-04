@@ -283,11 +283,17 @@ def render_primary_action(*, href: str, label: str) -> str:
     return f'<a class="primary" href="{escape(href, quote=True)}">{escape(label)}</a>'
 
 
-def render_demo_page(*, provider: GovBrProvider, login_path: str) -> str:
+def render_demo_page(
+    *,
+    provider: GovBrProvider,
+    login_path: str,
+    interactive: bool = False,
+) -> str:
     """Render a provider-neutral authentication demonstration page."""
-    action = render_primary_action(
-        href=login_path,
-        label="Entrar com GOV.BR",
+    action = (
+        _render_demo_login_action(login_path)
+        if interactive
+        else render_primary_action(href=login_path, label="Entrar com GOV.BR")
     )
     if provider is GovBrProvider.FAKE:
         badge = render_simulation_badge()
@@ -306,14 +312,42 @@ def render_demo_page(*, provider: GovBrProvider, login_path: str) -> str:
         badge=badge,
         provider_copy=provider_copy,
         action=action,
+        interactive=interactive,
+        login_path=login_path if interactive else None,
         footer=footer,
     )
 
 
+def _render_demo_login_action(login_path: str) -> str:
+    """Render the demo action with a hook for its native-window behavior."""
+    _validate_internal_absolute_path(login_path)
+    return (
+        f'<a class="primary" data-govbr-login href="{escape(login_path, quote=True)}">'
+        "Entrar com GOV.BR</a>"
+    )
+
+
 def _render_demo_shell(
-    *, badge: str, provider_copy: str, action: str, footer: str
+    *,
+    badge: str,
+    provider_copy: str,
+    action: str,
+    interactive: bool,
+    login_path: str | None,
+    footer: str,
 ) -> str:
     """Wrap the provider demonstration content in the shared visual shell."""
+    if interactive and login_path is None:
+        raise ValueError("interactive demo requires a login path")
+    success_panel = _render_demo_success_panel() if interactive else ""
+    interaction_status = (
+        '<p id="auth-status" class="message warning" role="status" '
+        'aria-live="polite" hidden></p>'
+        if interactive
+        else ""
+    )
+    interaction_script = _render_demo_interaction_script() if interactive else ""
+    home_id = ' id="demo-home"' if interactive else ""
     return f"""<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -327,16 +361,80 @@ def _render_demo_shell(
 {_render_brand_signature()}{badge}
 </div></header>
 <main class="container">
-<section class="hero" aria-labelledby="page-title">
+<section{home_id} class="hero" aria-labelledby="page-title">
 <p class="eyebrow">Demonstração de autenticação</p>
 <h1 id="page-title">Entrar com GOV.BR</h1>
 <p class="lead">{provider_copy}</p>
 {action}
 </section>
+{success_panel}
+{interaction_status}
 </main>
 <footer class="site-footer"><div class="container">{footer}</div></footer>
+{interaction_script}
 </body>
 </html>"""
+
+
+def _render_demo_success_panel() -> str:
+    """Render the safe success state shown by the opener window."""
+    return (
+        '<section id="demo-success" class="result" '
+        'aria-labelledby="demo-success-title" hidden>'
+        '<div class="success-mark" aria-hidden="true">✓</div>'
+        '<h2 id="demo-success-title" tabindex="-1">Autenticação concluída</h2>'
+        '<p class="message success" role="status">'
+        "O callback foi validado com sucesso pelo backend.</p>"
+        '<p class="lead">Nenhum token foi exposto ao navegador.</p>'
+        f'{render_primary_action(href="/", label="Repetir o fluxo")}'
+        "</section>"
+    )
+
+
+def _render_demo_interaction_script() -> str:
+    """Render the opener-side bridge for the dedicated local demo."""
+    return """<script>
+(() => {
+  const loginLink = document.querySelector("[data-govbr-login]");
+  const home = document.getElementById("demo-home");
+  const success = document.getElementById("demo-success");
+  const status = document.getElementById("auth-status");
+  const successTitle = document.getElementById("demo-success-title");
+  let authWindow = null;
+
+  if (!loginLink || !home || !success || !status || !successTitle) return;
+
+  loginLink.addEventListener("click", (event) => {
+    if (
+      event.button !== 0 || event.metaKey || event.ctrlKey ||
+      event.shiftKey || event.altKey
+    ) return;
+    event.preventDefault();
+    authWindow = window.open(
+      loginLink.href,
+      "govbr-authentication",
+      "popup,width=520,height=720,resizable=yes,scrollbars=yes"
+    );
+    if (!authWindow) {
+      window.location.assign(loginLink.href);
+      return;
+    }
+    status.hidden = false;
+    status.textContent = "Conclua a autenticação na nova guia ou janela.";
+    authWindow.focus();
+  });
+
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin || event.source !== authWindow) return;
+    if (!event.data || event.data.type !== "govbr-authentication-completed") return;
+    if (authWindow && !authWindow.closed) authWindow.close();
+    home.hidden = true;
+    success.hidden = false;
+    status.hidden = true;
+    successTitle.focus();
+  });
+})();
+</script>"""
 
 
 def _validate_internal_absolute_path(href: str) -> None:
@@ -432,7 +530,7 @@ def render_success(user: GovBrUser) -> str:
     name = escape(user.name or "Usuário de demonstração")
     email = escape(user.email or "não informado")
     masked_cpf = _mask_cpf(user.sub)
-    return render_page(
+    page = render_page(
         title="Autenticação concluída",
         layout="wide",
         body=(
@@ -446,9 +544,23 @@ def render_success(user: GovBrUser) -> str:
             f"<div><dt>CPF</dt><dd>{masked_cpf}</dd></div>"
             f"<div><dt>E-mail</dt><dd>{email}</dd></div>"
             "</dl>"
-            f'{render_primary_action(href="/auth/govbr/login", label="Repetir o fluxo")}'
+            f'{render_primary_action(href="/", label="Repetir o fluxo")}'
             "</section>"
         ),
+    )
+    return page.replace(
+        "</body>",
+        (
+            "<script>"
+            "(() => {"
+            "if (!window.opener || window.opener === window) return;"
+            'window.opener.postMessage({ type: "govbr-authentication-completed" }, '
+            "window.location.origin);"
+            "window.setTimeout(() => window.close(), 100);"
+            "})();"
+            "</script></body>"
+        ),
+        1,
     )
 
 

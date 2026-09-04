@@ -17,6 +17,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - O callback agora trata erros OAuth, valida o `state` e retorna mensagens
   públicas sem reproduzir `error_description` do provedor.
 - A documentação e a demonstração usam o rótulo oficial `Entrar com GOV.BR`.
+- O launcher FakeGov abre a autenticação em uma guia ou janela nativa e
+  atualiza a página original após a conclusão do callback; os adapters mantêm
+  o callback definido pela aplicação consumidora.
 
 ### Fixed
 - O endpoint de logout do FakeGov agora valida destinos registrados e conclui

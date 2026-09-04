@@ -38,7 +38,8 @@ Monte o adapter normalmente:
 Configure ``GOVBR_PROVIDER=fake`` e, opcionalmente,
 ``GOVBR_FAKE_USERS_FILE``. O adapter monta as rotas FakeGov na própria API e
 usa ``FakeGovHttpTransport`` para as chamadas internas. No modo fake, o adapter
-também monta a página visual demo na raiz ``/``.
+também monta a página inicial demo na raiz ``/`` e mantém a resposta do callback
+definida pelo ``on_success`` da aplicação.
 
 Launcher end-to-end
 -------------------
@@ -47,9 +48,11 @@ Para executar o fluxo completo com a página de demonstração, use::
 
     python -m govbr_auth.fake
 
-O launcher monta consumidor, FakeGov e a página demo na raiz ``/`` em loopback.
-O caminho ``/govbr-auth-demo`` permanece disponível como alias. O launcher
-não deve ser exposto na rede. A seleção fake é explícita no launcher, mas o
+O launcher monta consumidor, FakeGov e a página demo interativa na raiz ``/``
+em loopback. O botão abre a autenticação em uma nova guia ou janela nativa; ao
+final, o callback comunica somente a conclusão à página original, que exibe o
+estado de sucesso. O caminho ``/govbr-auth-demo`` permanece disponível como
+alias. O launcher não deve ser exposto na rede. A seleção fake é explícita no launcher, mas o
 provedor nunca é fallback automático para uma aplicação oficial. O provedor
 oficial permanece disponível na mesma aplicação com ``GOVBR_PROVIDER=official``.
 O provedor oficial usa os endpoints oficiais configurados.

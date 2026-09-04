@@ -318,6 +318,9 @@ async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form
     assert home.headers["cache-control"] == "no-store"
     assert "SIMULAÇÃO LOCAL" in home.text
     assert "FakeGov" in home.text
+    assert "window.open" in home.text
+    assert 'id="demo-success"' in home.text
+    assert "iframe" not in home.text
     assert "Ana Demo" not in home.text
     assert "ana-demo" not in home.text
     assert "12345678901" not in home.text

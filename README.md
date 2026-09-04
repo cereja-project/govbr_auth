@@ -240,9 +240,12 @@ Abra `http://localhost:8000/auth/govbr/login`. Entre com as
 [credenciais de teste](#credenciais-de-teste) e conclua o callback.
 
 O adapter registra as rotas de autenticação. Quando o provedor é FakeGov, ele
-também registra a página visual de demonstração na raiz `/`; com o provedor
-oficial, essa página não é criada. O launcher (`python -m govbr_auth.fake`) é
-apenas um atalho para iniciar uma aplicação FakeGov completa.
+também registra a página inicial de demonstração na raiz `/`; com o provedor
+oficial, essa página não é criada. O callback continua sob controle da
+aplicação e, neste exemplo, responde JSON. Para a experiência visual completa,
+use o launcher (`python -m govbr_auth.fake`): o botão abre a autenticação em
+uma nova guia ou janela nativa e a página original muda para o estado de
+sucesso quando o callback é validado.
 
 O callback `authenticated` recebe um `AuthContext` já validado:
 
