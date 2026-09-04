@@ -13,7 +13,6 @@ from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
@@ -75,13 +74,8 @@ def _runtime(
     )
 
 
-def _fake_application_settings(*, demo_page: bool = False) -> GovBrApplicationSettings:
-    return GovBrApplicationSettings(
-        runtime=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-        ),
-        demo_page=demo_page,
-    )
+def _fake_runtime_settings() -> GovBrRuntimeSettings:
+    return GovBrRuntimeSettings(provider=GovBrProvider.FAKE)
 
 
 def _colliding_fake_runtime() -> GovBrRuntime:
@@ -184,7 +178,7 @@ def test_flask_fake_runtime_adds_provider_routes() -> None:
     from govbr_auth.flask import GovBrAuth
 
     auth = GovBrAuth(
-        settings=_fake_application_settings(),
+        settings=_fake_runtime_settings(),
         on_success=lambda context, request: ("", 204),
         clock=lambda: FIXED_NOW,
     )
@@ -227,7 +221,7 @@ def test_flask_fake_runtime_passes_simulator_http_application_to_provider_bluepr
     )
 
     auth = GovBrAuth(
-        settings=_fake_application_settings(),
+        settings=_fake_runtime_settings(),
         on_success=lambda context, request: ("", 204),
         clock=lambda: FIXED_NOW,
     )
@@ -240,174 +234,12 @@ def test_flask_fake_runtime_passes_simulator_http_application_to_provider_bluepr
         auth.close()
 
 
-def test_flask_demo_page_is_absent_by_default_for_borrowed_runtime() -> None:
-    from govbr_auth.flask import GovBrAuth
-
-    auth = GovBrAuth(
-        runtime=_runtime(ContractClient({"sub": "subject"})),
-        on_success=lambda context, request: ("", 204),
-        clock=lambda: FIXED_NOW,
-    )
-    application = Flask(__name__)
-    auth.register(application)
-
-    assert application.test_client().get("/govbr-auth-demo").status_code == 404
-
-
-def test_flask_demo_page_is_opt_in_with_native_response() -> None:
-    from govbr_auth.flask import GovBrAuth
-
-    auth = GovBrAuth(
-        runtime=_runtime(ContractClient({"sub": "subject"})),
-        demo_page=True,
-        prefix="/oauth/govbr",
-        on_success=lambda context, request: ("", 204),
-        clock=lambda: FIXED_NOW,
-    )
-    application = Flask(__name__)
-    auth.register(application)
-
-    response = application.test_client().get("/govbr-auth-demo")
-
-    assert response.status_code == 200
-    assert response.headers["Cache-Control"] == "no-store"
-    assert response.headers["Content-Type"].startswith("text/html")
-    assert "Provedor oficial Gov.br" in response.text
-    assert 'href="/oauth/govbr/login"' in response.text
-
-
-def test_flask_fake_settings_without_demo_page_keep_provider_routes() -> None:
-    from govbr_auth.flask import GovBrAuth
-
-    auth = GovBrAuth(
-        settings=_fake_application_settings(),
-        on_success=lambda context, request: ("", 204),
-        clock=lambda: FIXED_NOW,
-    )
-    application = Flask(__name__)
-    auth.register(application)
-
-    try:
-        paths = {rule.rule for rule in application.url_map.iter_rules()}
-        assert "/govbr-auth-demo" not in paths
-        assert "/fake-govbr/login" in paths
-    finally:
-        auth.close()
-
-
-def test_flask_fake_settings_can_publish_credential_free_demo_page() -> None:
-    from govbr_auth.flask import GovBrAuth
-
-    auth = GovBrAuth(
-        settings=_fake_application_settings(demo_page=True),
-        on_success=lambda context, request: ("", 204),
-        clock=lambda: FIXED_NOW,
-    )
-    application = Flask(__name__)
-    auth.register(application)
-
-    try:
-        response = application.test_client().get("/govbr-auth-demo")
-        assert response.status_code == 200
-        assert response.headers["Cache-Control"] == "no-store"
-        assert response.headers["Content-Type"].startswith("text/html")
-        assert "FakeGov" in response.text
-        assert "Não use credenciais reais." in response.text
-        assert "11122233344" not in response.text
-        assert "senha-ficticia" not in response.text
-    finally:
-        auth.close()
-
-
-def test_flask_demo_page_argument_conflicts_with_application_settings() -> None:
-    from govbr_auth.flask import GovBrAuth
-
-    with pytest.raises(TypeError, match="demo_page must be configured in settings"):
-        GovBrAuth(
-            settings=_fake_application_settings(),
-            demo_page=True,
-            on_success=lambda context, request: ("", 204),
-            clock=lambda: FIXED_NOW,
-        )
-
-
-def test_flask_direct_demo_page_rejects_before_environment_or_allocation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import govbr_auth.adapters._runtime as adapter_runtime
-    from govbr_auth.flask import GovBrAuth
-
-    environment_reads: list[object] = []
-    runtime_allocations: list[object] = []
-
-    def load_environment() -> GovBrApplicationSettings:
-        environment_reads.append(object())
-        return GovBrApplicationSettings(
-            runtime=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
-        )
-
-    def allocate_runtime(*args, **kwargs) -> GovBrRuntime:
-        runtime_allocations.append((args, kwargs))
-        return _runtime(ContractClient({"sub": "subject"}))
-
-    monkeypatch.setattr(
-        adapter_runtime.GovBrApplicationSettings,
-        "from_environment",
-        load_environment,
-    )
-    monkeypatch.setattr(adapter_runtime, "create_govbr_runtime", allocate_runtime)
-
-    captured_error = None
-    try:
-        GovBrAuth(
-            demo_page=True,
-            on_success=lambda context, request: ("", 204),
-            clock=lambda: FIXED_NOW,
-        )
-    except TypeError as error:
-        captured_error = error
-
-    assert (environment_reads, runtime_allocations) == ([], [])
-    assert str(captured_error) == "demo_page must be configured in settings"
-
-
-def test_flask_demo_page_rejects_callback_collision_only_when_enabled() -> None:
-    from govbr_auth.flask import GovBrAuth
-
-    runtime = _runtime(
-        ContractClient({"sub": "subject"}),
-        redirect_uri="https://consumer.example.test/govbr-auth-demo",
-    )
-    auth = GovBrAuth(
-        runtime=runtime,
-        demo_page=False,
-        on_success=lambda context, request: ("", 204),
-        clock=lambda: FIXED_NOW,
-    )
-    application = Flask(__name__)
-    auth.register(application)
-
-    assert application.test_client().get("/govbr-auth-demo").status_code == 400
-    with pytest.raises(
-        ValueError,
-        match="redirect URI callback path must differ from the demo page path",
-    ):
-        GovBrAuth(
-            runtime=runtime,
-            demo_page=True,
-            on_success=lambda context, request: ("", 204),
-            clock=lambda: FIXED_NOW,
-        )
-
-
 def test_flask_rejects_owned_fake_prefix_collision() -> None:
     from govbr_auth.flask import GovBrAuth
 
-    settings = GovBrApplicationSettings(
-        runtime=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_provider_prefix="/auth/govbr",
-        )
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_provider_prefix="/auth/govbr",
     )
     auth = None
 
@@ -444,3 +276,4 @@ def test_flask_rejects_borrowed_fake_prefix_collision() -> None:
             )
     finally:
         run_sync(runtime.aclose)
+

@@ -8,7 +8,6 @@ from flask import Flask, jsonify
 
 from govbr_auth.flask import GovBrAuth
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntimeSettings,
 )
@@ -44,11 +43,7 @@ def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -
 
     try:
         auth = GovBrAuth(
-            settings=GovBrApplicationSettings(
-                runtime=GovBrRuntimeSettings(
-                    provider=GovBrProvider.FAKE,
-                )
-            ),
+            settings=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
             on_success=authenticated,
             clock=lambda: FIXED_NOW,
         )
@@ -79,3 +74,4 @@ def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -
     finally:
         if auth is not None:
             auth.close()
+

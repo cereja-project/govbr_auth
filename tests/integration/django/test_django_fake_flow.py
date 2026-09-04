@@ -24,7 +24,6 @@ from django.urls import clear_url_caches
 
 from govbr_auth.django import GovBrAuth
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntimeSettings,
 )
@@ -59,11 +58,7 @@ def test_django_fake_runtime_completes_browser_authentication_flow(monkeypatch) 
 
     try:
         auth = GovBrAuth(
-            settings=GovBrApplicationSettings(
-                runtime=GovBrRuntimeSettings(
-                    provider=GovBrProvider.FAKE,
-                )
-            ),
+            settings=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
             on_success=authenticated,
             clock=lambda: datetime(2026, 8, 25, 12, tzinfo=UTC),
         )
@@ -99,3 +94,4 @@ def test_django_fake_runtime_completes_browser_authentication_flow(monkeypatch) 
             auth.close()
         urlpatterns = []
         clear_url_caches()
+

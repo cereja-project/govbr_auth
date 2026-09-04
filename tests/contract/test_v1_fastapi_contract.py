@@ -14,7 +14,6 @@ from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
@@ -105,9 +104,7 @@ def test_application_settings_reject_missing_official_oauth_before_route_allocat
 
     monkeypatch.setattr(fastapi_adapter, "APIRouter", record_router)
     monkeypatch.setattr(runtime_module.httpx, "AsyncClient", record_http_client)
-    settings = GovBrApplicationSettings(
-        runtime=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
-    )
+    settings = GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
 
     with pytest.raises(ValueError, match="official runtime requires OAuth settings"):
         GovBrAuth(
@@ -181,3 +178,4 @@ def test_router_facade_exposes_consumer_routes_without_installation_method() -> 
     assert route_paths(app) == expected_paths
     assert not hasattr(auth, "install")
     assert not any(path.startswith("/fake-govbr") for path in route_paths(app))
+

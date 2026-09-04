@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
 
 from govbr_auth.adapters._runtime import prepare_adapter_runtime_settings
-from govbr_auth.application_settings import GovBrApplicationSettings
 from govbr_auth.fake.http.routes import build_fake_govbr_routes
 from govbr_auth.fake.http.application import (
     FakeGovHttpApplication,
@@ -114,28 +113,15 @@ def create_fake_govbr_app(
 
 
 def create_fake_app(
-    settings: GovBrApplicationSettings | None = None,
+    settings: GovBrRuntimeSettings | None = None,
     *,
     clock: Callable[[], datetime] = utc_now,
     user_repository: FakeUserRepository | None = None,
 ) -> FastAPI:
-    """Create the provider-only or complete local fake application profile."""
+    """Create the complete local fake application profile."""
     resolved = settings or _launcher_settings()
     if resolved.runtime.provider is not GovBrProvider.FAKE:
         raise ValueError("fake launcher requires the fake provider")
-    if not resolved.demo_page:
-        runtime = create_fake_gov_simulator(
-            resolved.runtime,
-            prefix="",
-            clock=clock,
-            user_repository=user_repository,
-        )
-        return create_fake_govbr_app(
-            runtime,
-            application=runtime.http_application,
-            clock=clock,
-        )
-
     runtime_settings = prepare_adapter_runtime_settings(
         resolved,
         prefix="/auth/govbr",
@@ -172,11 +158,11 @@ def _fake_asgi_transport(
     return FakeGovHttpTransport(runtime, clock=clock)
 
 
-def _launcher_settings() -> GovBrApplicationSettings:
+def _launcher_settings() -> GovBrRuntimeSettings:
     """Default this explicit fake entry point without changing library defaults."""
     environ = dict(os.environ)
     environ.setdefault("GOVBR_PROVIDER", GovBrProvider.FAKE.value)
-    return GovBrApplicationSettings.from_environment(environ)
+    return GovBrRuntimeSettings.from_environment(environ)
 
 
 def _as_http_runtime(

@@ -8,7 +8,6 @@ import httpx
 
 from pydantic import SecretStr
 
-from govbr_auth.application_settings import GovBrApplicationSettings
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
 from govbr_auth.runtime_settings import (

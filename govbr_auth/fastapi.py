@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from govbr_auth.adapters._errors import describe_auth_error
 from govbr_auth.adapters._runtime import adapter_callback_path, create_adapter_runtime
@@ -14,8 +14,7 @@ from govbr_auth.authentication import AuthenticationContext, AuthenticationServi
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
-from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
-from govbr_auth.runtime import GovBrApplicationSettings, GovBrRuntime
+from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
 if TYPE_CHECKING:
@@ -107,9 +106,8 @@ class GovBrAuth:
         self,
         *,
         on_success: AuthSuccessHandler,
-        settings: GovBrApplicationSettings | None = None,
+        settings: GovBrRuntimeSettings | None = None,
         runtime: GovBrRuntime | None = None,
-        demo_page: bool = False,
         on_error: AuthErrorHandler | None = None,
         expose_tokens: bool = False,
         prefix: str = "/auth/govbr",
@@ -119,10 +117,9 @@ class GovBrAuth:
         if settings is not None and runtime is not None:
             raise TypeError("settings and runtime are mutually exclusive")
         prefix = _validate_router_prefix(prefix)
-        owner, demo_page_enabled = create_adapter_runtime(
+        owner = create_adapter_runtime(
             settings=settings,
             runtime=runtime,
-            demo_page=demo_page,
             prefix=prefix,
             clock=clock,
             user_repository=user_repository,
@@ -154,18 +151,6 @@ class GovBrAuth:
                 clock=clock,
             )
         )
-        if demo_page_enabled:
-
-            @router.get(DEMO_PAGE_PATH, include_in_schema=False)
-            async def demo() -> HTMLResponse:
-                return HTMLResponse(
-                    render_demo_page(
-                        provider=self._runtime.provider,
-                        login_path=login_path,
-                    ),
-                    headers={"Cache-Control": "no-store"},
-                )
-
         if self._runtime.fake is not None:
             from govbr_auth.fake.fastapi import create_fake_govbr_router
 

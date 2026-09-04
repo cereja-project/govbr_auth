@@ -9,9 +9,7 @@ from urllib.parse import unquote
 import httpx
 
 from govbr_auth.adapters._lifecycle import RuntimeOwner
-from govbr_auth.presentation import DEMO_PAGE_PATH
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
@@ -28,9 +26,8 @@ if TYPE_CHECKING:
 
 def create_adapter_runtime(
     *,
-    settings: GovBrApplicationSettings | None,
+    settings: GovBrRuntimeSettings | None,
     runtime: GovBrRuntime | None,
-    demo_page: bool,
     prefix: str,
     clock: Callable[[], datetime],
     user_repository: "FakeUserRepository | None",
@@ -39,13 +36,10 @@ def create_adapter_runtime(
     """Create or borrow one canonical runtime for a framework adapter."""
     if settings is not None and runtime is not None:
         raise TypeError("settings and runtime are mutually exclusive")
-    if runtime is None and demo_page:
-        raise TypeError("demo_page must be configured in settings")
-
     if runtime is None:
-        application_settings = settings or GovBrApplicationSettings.from_environment()
+        resolved_settings = settings or GovBrRuntimeSettings.from_environment()
         resolved_settings = prepare_adapter_runtime_settings(
-            application_settings,
+            resolved_settings,
             prefix=prefix,
         )
         owner = _create_owned_adapter_runtime(
@@ -54,7 +48,7 @@ def create_adapter_runtime(
             user_repository=user_repository,
             fake_transport_factory=fake_transport_factory,
         )
-        return owner, application_settings.demo_page
+        return owner
 
     _validate_adapter_prefix(prefix)
     _validate_fake_provider_prefix_collision(
@@ -63,8 +57,7 @@ def create_adapter_runtime(
         runtime=runtime,
     )
     _validate_runtime_callback(runtime, prefix)
-    _validate_demo_page_callback(runtime.settings, prefix, demo_page)
-    return RuntimeOwner(runtime=runtime, owns_runtime=False), demo_page
+    return RuntimeOwner(runtime=runtime, owns_runtime=False)
 
 
 def _create_owned_adapter_runtime(
@@ -91,19 +84,13 @@ def _create_owned_adapter_runtime(
 
 
 def prepare_adapter_runtime_settings(
-    application_settings: GovBrApplicationSettings,
+    settings: GovBrRuntimeSettings,
     *,
     prefix: str,
 ) -> GovBrRuntimeSettings:
     """Validate callback topology before allocating adapter runtime resources."""
     _validate_adapter_prefix(prefix)
-    settings = application_settings.runtime
     _validate_fake_provider_prefix_collision(settings, prefix)
-    _validate_demo_page_callback(
-        settings,
-        prefix,
-        application_settings.demo_page,
-    )
     if settings.provider is GovBrProvider.FAKE:
         settings = _settings_for_fake_callback(settings, prefix)
     adapter_settings_callback_path(settings, prefix)
@@ -151,23 +138,6 @@ def adapter_settings_callback_path(
     if callback_path == login_path:
         raise ValueError("redirect URI callback path must differ from the login path")
     return callback_path
-
-
-def _validate_demo_page_callback(
-    settings: GovBrRuntimeSettings,
-    prefix: str,
-    demo_page: bool,
-) -> None:
-    callback_path = adapter_settings_callback_path(settings, prefix)
-    if (
-        settings.provider is GovBrProvider.FAKE
-        and settings.fake_redirect_uri is not None
-    ):
-        callback_path = _route_path(settings.fake_redirect_uri.path or "/")
-    if demo_page and callback_path == DEMO_PAGE_PATH:
-        raise ValueError(
-            "redirect URI callback path must differ from the demo page path"
-        )
 
 
 def _route_path(encoded_path: str) -> str:

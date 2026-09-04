@@ -14,7 +14,6 @@ from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
 from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntime,
     GovBrRuntimeSettings,
@@ -106,13 +105,8 @@ async def request(app: FastAPI, path: str):
         return await http.get(path, follow_redirects=False)
 
 
-def fake_application_settings(*, demo_page: bool = False) -> GovBrApplicationSettings:
-    return GovBrApplicationSettings(
-        runtime=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-        ),
-        demo_page=demo_page,
-    )
+def fake_runtime_settings() -> GovBrRuntimeSettings:
+    return GovBrRuntimeSettings(provider=GovBrProvider.FAKE)
 
 
 def colliding_fake_runtime() -> GovBrRuntime:
@@ -229,7 +223,7 @@ async def test_official_callback_path_is_validated_before_runtime_allocation(
     try:
         with pytest.raises(ValueError, match="redirect URI path is not route-safe"):
             GovBrAuth(
-                settings=GovBrApplicationSettings(runtime=settings),
+                settings=settings,
                 on_success=success_handler,
             )
         assert allocated_http == []
@@ -291,9 +285,7 @@ def test_fastapi_facade_rejects_settings_and_runtime_together() -> None:
     async def success_handler(context) -> Response:
         return Response(status_code=204)
 
-    settings = GovBrApplicationSettings(
-        runtime=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
-    )
+    settings = GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
 
     with pytest.raises(TypeError, match="settings and runtime are mutually exclusive"):
         GovBrAuth(
@@ -323,7 +315,7 @@ async def test_fake_facade_uses_the_fake_adapter_transport_factory(
         return Response(status_code=204)
 
     auth = GovBrAuth(
-        settings=fake_application_settings(),
+        settings=fake_runtime_settings(),
         on_success=success_handler,
     )
 
@@ -355,7 +347,7 @@ async def test_fake_facade_mounts_routes_with_simulator_http_application(
 
     clock = lambda: FIXED_NOW
     auth = GovBrAuth(
-        settings=fake_application_settings(),
+        settings=fake_runtime_settings(),
         on_success=success_handler,
         clock=clock,
     )
@@ -425,9 +417,7 @@ async def test_invalid_prefix_is_rejected_before_runtime_allocation(
     raised: Exception | None = None
     try:
         GovBrAuth(
-            settings=GovBrApplicationSettings(
-                runtime=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
-            ),
+            settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
             on_success=success_handler,
             prefix=prefix,
         )
@@ -452,7 +442,7 @@ async def test_fake_facade_aligns_default_redirect_with_custom_router_prefix() -
         return Response(status_code=204)
 
     auth = GovBrAuth(
-        settings=fake_application_settings(),
+        settings=fake_runtime_settings(),
         on_success=success_handler,
         prefix="/custom-auth",
     )
@@ -475,7 +465,7 @@ async def test_fake_facade_rejects_supplied_runtime_with_mismatched_callback() -
         return Response(status_code=204)
 
     owner = GovBrAuth(
-        settings=fake_application_settings(),
+        settings=fake_runtime_settings(),
         on_success=success_handler,
     )
 
@@ -750,180 +740,6 @@ async def test_callback_propagates_handler_exceptions_unchanged() -> None:
     assert raised.value is expected_error
 
 
-@pytest.mark.asyncio
-async def test_fastapi_demo_page_is_absent_by_default_for_borrowed_runtime() -> None:
-    from govbr_auth.fastapi import GovBrAuth
-
-    auth = GovBrAuth(
-        runtime=client_runtime(RecordingClient()),
-        on_success=lambda context: Response(status_code=204),
-        clock=lambda: FIXED_NOW,
-    )
-    app = FastAPI()
-    app.include_router(auth.router)
-
-    response = await request(app, "/govbr-auth-demo")
-
-    assert response.status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_fastapi_demo_page_is_opt_in_and_excluded_from_openapi() -> None:
-    from govbr_auth.fastapi import GovBrAuth
-
-    auth = GovBrAuth(
-        runtime=client_runtime(RecordingClient()),
-        demo_page=True,
-        prefix="/oauth/govbr",
-        on_success=lambda context: Response(status_code=204),
-        clock=lambda: FIXED_NOW,
-    )
-    app = FastAPI()
-    app.include_router(auth.router)
-
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app),
-        base_url="https://consumer.example.test",
-    ) as client:
-        response = await client.get("/govbr-auth-demo")
-
-    assert response.status_code == 200
-    assert response.headers["cache-control"] == "no-store"
-    assert response.headers["content-type"].startswith("text/html")
-    assert "Provedor oficial Gov.br" in response.text
-    assert 'href="/oauth/govbr/login"' in response.text
-    assert "/govbr-auth-demo" not in app.openapi()["paths"]
-
-
-@pytest.mark.asyncio
-async def test_fastapi_fake_settings_without_demo_page_keep_provider_routes() -> None:
-    from govbr_auth.fastapi import GovBrAuth
-
-    auth = GovBrAuth(
-        settings=fake_application_settings(),
-        on_success=lambda context: Response(status_code=204),
-        clock=lambda: FIXED_NOW,
-    )
-    app = FastAPI()
-    app.include_router(auth.router)
-
-    try:
-        response = await request(app, "/govbr-auth-demo")
-        assert response.status_code == 404
-        assert "/fake-govbr/login" in app.openapi()["paths"]
-    finally:
-        await auth.runtime.aclose()
-
-
-@pytest.mark.asyncio
-async def test_fastapi_fake_settings_can_publish_credential_free_demo_page() -> None:
-    from govbr_auth.fastapi import GovBrAuth
-
-    auth = GovBrAuth(
-        settings=fake_application_settings(demo_page=True),
-        on_success=lambda context: Response(status_code=204),
-        clock=lambda: FIXED_NOW,
-    )
-    app = FastAPI()
-    app.include_router(auth.router)
-
-    try:
-        response = await request(app, "/govbr-auth-demo")
-        assert response.status_code == 200
-        assert response.headers["cache-control"] == "no-store"
-        assert response.headers["content-type"].startswith("text/html")
-        assert "FakeGov" in response.text
-        assert "Não use credenciais reais." in response.text
-        assert "11122233344" not in response.text
-        assert "senha-ficticia" not in response.text
-    finally:
-        await auth.runtime.aclose()
-
-
-def test_fastapi_demo_page_argument_conflicts_with_application_settings() -> None:
-    from govbr_auth.fastapi import GovBrAuth
-
-    with pytest.raises(TypeError, match="demo_page must be configured in settings"):
-        GovBrAuth(
-            settings=fake_application_settings(),
-            demo_page=True,
-            on_success=lambda context: Response(status_code=204),
-            clock=lambda: FIXED_NOW,
-        )
-
-
-def test_fastapi_direct_demo_page_rejects_before_environment_or_allocation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import govbr_auth.adapters._runtime as adapter_runtime
-    from govbr_auth.fastapi import GovBrAuth
-
-    environment_reads: list[object] = []
-    runtime_allocations: list[object] = []
-
-    def load_environment() -> GovBrApplicationSettings:
-        environment_reads.append(object())
-        return GovBrApplicationSettings(
-            runtime=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL)
-        )
-
-    def allocate_runtime(*args, **kwargs) -> GovBrRuntime:
-        runtime_allocations.append((args, kwargs))
-        return client_runtime(RecordingClient())
-
-    monkeypatch.setattr(
-        adapter_runtime.GovBrApplicationSettings,
-        "from_environment",
-        load_environment,
-    )
-    monkeypatch.setattr(adapter_runtime, "create_govbr_runtime", allocate_runtime)
-
-    captured_error = None
-    try:
-        GovBrAuth(
-            demo_page=True,
-            on_success=lambda context: Response(status_code=204),
-            clock=lambda: FIXED_NOW,
-        )
-    except TypeError as error:
-        captured_error = error
-
-    assert (environment_reads, runtime_allocations) == ([], [])
-    assert str(captured_error) == "demo_page must be configured in settings"
-
-
-@pytest.mark.asyncio
-async def test_fastapi_demo_page_rejects_callback_collision_only_when_enabled() -> None:
-    from govbr_auth.fastapi import GovBrAuth
-
-    runtime = client_runtime(
-        RecordingClient(),
-        redirect_uri="https://consumer.example.test/govbr-auth-demo",
-    )
-    auth = GovBrAuth(
-        runtime=runtime,
-        demo_page=False,
-        on_success=lambda context: Response(status_code=204),
-        clock=lambda: FIXED_NOW,
-    )
-    app = FastAPI()
-    app.include_router(auth.router)
-
-    callback = await request(app, "/govbr-auth-demo")
-
-    assert callback.status_code == 422
-    with pytest.raises(
-        ValueError,
-        match="redirect URI callback path must differ from the demo page path",
-    ):
-        GovBrAuth(
-            runtime=runtime,
-            demo_page=True,
-            on_success=lambda context: Response(status_code=204),
-            clock=lambda: FIXED_NOW,
-        )
-
-
 def test_fastapi_rejects_owned_fake_prefix_collision_before_runtime_allocation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -937,11 +753,9 @@ def test_fastapi_rejects_owned_fake_prefix_collision_before_runtime_allocation(
         raise AssertionError("runtime must not be allocated")
 
     monkeypatch.setattr(adapter_runtime, "create_govbr_runtime", allocate_runtime)
-    settings = GovBrApplicationSettings(
-        runtime=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_provider_prefix="/auth/govbr",
-        )
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_provider_prefix="/auth/govbr",
     )
 
     with pytest.raises(
@@ -975,3 +789,4 @@ async def test_fastapi_rejects_borrowed_fake_prefix_collision() -> None:
             )
     finally:
         await runtime.aclose()
+

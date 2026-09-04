@@ -16,7 +16,6 @@ from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import EncryptedTransactionCodec
 from govbr_auth.fastapi import create_govbr_router
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrClient,
     GovBrProvider,
     GovBrRuntimeSettings,
@@ -106,22 +105,6 @@ def test_runtime_settings_select_fake_explicitly(
     settings = GovBrRuntimeSettings.from_environment()
 
     assert settings.provider is GovBrProvider.FAKE
-
-
-def test_removed_end_to_end_variable_fails_in_portuguese() -> None:
-    """The removed launcher switch must fail closed without exposing its value."""
-    with pytest.raises(ValueError) as captured:
-        GovBrApplicationSettings.from_environment(
-            {
-                "GOVBR_PROVIDER": "fake",
-                "GOVBR_FAKE_END_TO_END": "true",
-            }
-        )
-
-    assert str(captured.value) == (
-        "Configuração Gov.br inválida: variável não suportada: "
-        "GOVBR_FAKE_END_TO_END."
-    )
 
 
 def test_runtime_settings_build_official_oauth_from_environment() -> None:
@@ -688,3 +671,4 @@ def _route_authentication_services(router: object) -> list[AuthenticationService
                 seen.add(id(value))
                 services.append(value)
     return services
+

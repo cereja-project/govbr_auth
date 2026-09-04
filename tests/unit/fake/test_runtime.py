@@ -14,7 +14,6 @@ from govbr_auth.fake.credentials import FakeLoginCredential
 from govbr_auth.fastapi import GovBrAuth
 from govbr_auth.fake.runtime import create_fake_gov_simulator
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntimeSettings,
 )
@@ -322,7 +321,7 @@ async def test_fake_facade_routes_and_transport_share_one_http_application(
         return Response(status_code=204)
 
     auth = GovBrAuth(
-        settings=GovBrApplicationSettings(runtime=fake_settings),
+        settings=fake_settings,
         on_success=success_handler,
     )
 
@@ -333,3 +332,4 @@ async def test_fake_facade_routes_and_transport_share_one_http_application(
         assert auth.runtime.fake.http_application is sentinel_application
     finally:
         await auth.runtime.aclose()
+
