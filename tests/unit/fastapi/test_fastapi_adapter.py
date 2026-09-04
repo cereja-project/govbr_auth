@@ -793,4 +793,3 @@ async def test_fastapi_rejects_borrowed_fake_prefix_collision() -> None:
             )
     finally:
         await runtime.aclose()
-

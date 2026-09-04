@@ -178,4 +178,3 @@ def test_router_facade_exposes_consumer_routes_without_installation_method() -> 
     assert route_paths(app) == expected_paths
     assert not hasattr(auth, "install")
     assert not any(path.startswith("/fake-govbr") for path in route_paths(app))
-

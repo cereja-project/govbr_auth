@@ -94,4 +94,3 @@ def test_django_fake_runtime_completes_browser_authentication_flow(monkeypatch) 
             auth.close()
         urlpatterns = []
         clear_url_caches()
-

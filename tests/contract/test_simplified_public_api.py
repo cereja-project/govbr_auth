@@ -41,4 +41,3 @@ def test_fastapi_does_not_accept_demo_page_argument() -> None:
 def test_application_settings_module_and_runtime_export_are_removed() -> None:
     assert not (PROJECT_ROOT / "govbr_auth" / "application_settings.py").exists()
     assert not hasattr(runtime_module, "GovBrApplicationSettings")
-

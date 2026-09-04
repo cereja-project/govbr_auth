@@ -8,7 +8,6 @@ from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
-
 FIXED_NOW = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
 
 

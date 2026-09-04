@@ -74,4 +74,3 @@ def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -
     finally:
         if auth is not None:
             auth.close()
-

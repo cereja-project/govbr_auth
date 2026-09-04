@@ -671,4 +671,3 @@ def _route_authentication_services(router: object) -> list[AuthenticationService
                 seen.add(id(value))
                 services.append(value)
     return services
-

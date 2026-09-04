@@ -130,4 +130,3 @@ def test_distribution_requires_the_launcher_contract_in_each_packaged_guide(
                 complete_source.replace(missing_symbol, ""),
                 document_name,
             )
-

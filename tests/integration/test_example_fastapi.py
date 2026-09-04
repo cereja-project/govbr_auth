@@ -229,4 +229,3 @@ def test_django_example_loads_provider_from_working_directory_env(
         )
     finally:
         example.auth.close()
-

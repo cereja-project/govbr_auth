@@ -51,9 +51,7 @@ def create_adapter_application(
     expose_tokens: bool,
     clock: Callable[[], datetime],
     user_repository: "FakeUserRepository | None",
-    fake_transport_factory: Callable[
-        ["FakeGovSimulator"], "httpx.AsyncBaseTransport"
-    ],
+    fake_transport_factory: Callable[["FakeGovSimulator"], "httpx.AsyncBaseTransport"],
 ) -> AdapterApplication:
     """Compose the common runtime and authentication service once."""
     owner = create_adapter_runtime(

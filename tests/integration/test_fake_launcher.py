@@ -207,9 +207,7 @@ def test_end_to_end_rejects_official_provider_before_runtime_allocation(
 
 @pytest.mark.parametrize(
     ("callback_path", "message"),
-    (
-        ("/unexpected/callback", "fake redirect URI does not match"),
-    ),
+    (("/unexpected/callback", "fake redirect URI does not match"),),
     ids=("incompatible",),
 )
 def test_demo_launcher_validates_callback_before_runtime_allocation(
@@ -691,4 +689,3 @@ def test_fake_module_executes_run(mocker) -> None:
     runpy.run_module("govbr_auth.fake.__main__", run_name="__main__")
 
     run.assert_called_once_with()
-

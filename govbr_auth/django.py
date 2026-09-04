@@ -65,7 +65,6 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
-        self._prefix = prefix.lstrip("/")
         self._clock = self._application.clock
         self._urlpatterns = self._build_urlpatterns()
 
@@ -104,9 +103,7 @@ class GovBrAuth:
         return patterns
 
     def _login(self, request: HttpRequest) -> HttpResponseRedirect:
-        authorization = self._application.service.authorization_url(
-            now=self._clock()
-        )
+        authorization = self._application.service.authorization_url(now=self._clock())
         return HttpResponseRedirect(authorization.url)
 
     @csrf_exempt

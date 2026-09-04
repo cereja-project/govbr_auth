@@ -37,8 +37,7 @@ def test_readme_fastapi_quickstart_opens_the_fake_login(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     (tmp_path / ".env").write_text(
-        "GOVBR_PROVIDER=fake\n"
-        "GOVBR_FAKE_USERS_FILE=./fake-users.local.json\n",
+        "GOVBR_PROVIDER=fake\n" "GOVBR_FAKE_USERS_FILE=./fake-users.local.json\n",
         encoding="utf-8",
     )
 

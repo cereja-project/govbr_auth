@@ -332,4 +332,3 @@ async def test_fake_facade_routes_and_transport_share_one_http_application(
         assert auth.runtime.fake.http_application is sentinel_application
     finally:
         await auth.runtime.aclose()
-

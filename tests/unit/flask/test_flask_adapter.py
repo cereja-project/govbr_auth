@@ -276,4 +276,3 @@ def test_flask_rejects_borrowed_fake_prefix_collision() -> None:
             )
     finally:
         run_sync(runtime.aclose)
-
