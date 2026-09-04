@@ -57,6 +57,10 @@ O provedor oficial usa os endpoints oficiais configurados.
 Customizar usuários
 -------------------
 
+Sem ``GOVBR_FAKE_USERS_FILE``, o perfil padrão aceita
+``11122233344`` com a senha ``senha-ficticia``. Quando a variável é definida,
+o arquivo substitui os usuários padrão.
+
 Defina ``GOVBR_FAKE_USERS_FILE`` com um JSON no formato::
 
     {"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}

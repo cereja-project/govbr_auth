@@ -71,12 +71,12 @@ class FakeGovSimulator:
 _DEFAULT_USERS = (
     (
         FakeUser(
-            sub="12345678901",
-            name="Ana Demo",
-            email="ana@example.test",
+            sub="11122233344",
+            name="Usuário Fake",
+            email="fake@example.test",
             email_verified=True,
         ),
-        SecretStr("ana-demo"),
+        SecretStr("senha-ficticia"),
     ),
     (
         FakeUser(

@@ -85,8 +85,8 @@ def test_fake_runtime_contains_one_consistent_provider_graph(
     assert str(runtime.settings.issuer) == runtime.endpoints.issuer
     assert (
         runtime.credential_authenticator.authenticate(
-            cpf="12345678901",
-            password=SecretStr("ana-demo"),
+            cpf="11122233344",
+            password=SecretStr("senha-ficticia"),
         )
         == runtime.users[0]
     )
@@ -112,7 +112,7 @@ def test_default_credentials_are_derived_from_the_default_user_source(
 ) -> None:
     """Adding one default identity must also add its presented login credential."""
     extra_user = FakeUser(
-        sub="11122233344",
+        sub="44455566677",
         name="Carla Demo",
         email="carla@example.test",
     )
@@ -129,7 +129,7 @@ def test_default_credentials_are_derived_from_the_default_user_source(
     )
 
     assert runtime.credentials[-1] == FakeLoginCredential(
-        cpf="11122233344",
+        cpf="44455566677",
         password="carla-demo",
         name="Carla Demo",
     )
@@ -161,9 +161,9 @@ def test_fake_runtime_repr_hides_users_and_credentials(
 
     rendered = repr(runtime)
 
-    assert "12345678901" not in rendered
-    assert "ana-demo" not in rendered
-    assert "ana@example.test" not in rendered
+    assert "11122233344" not in rendered
+    assert "senha-ficticia" not in rendered
+    assert "fake@example.test" not in rendered
 
 
 def test_fake_runtime_repr_hides_credential_authenticator(

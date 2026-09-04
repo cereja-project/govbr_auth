@@ -452,7 +452,8 @@ def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
     sections = [line for line in source.splitlines() if line.startswith("## ")]
     assert sections[0] == "## Índice"
     assert sections[1] == "## Instalação"
-    assert sections[2] == "## Teste a integração sem depender do gov.br"
+    assert sections[2] == "## Como a comunicação funciona"
+    assert sections[3] == "## Teste a integração sem depender do gov.br"
     assert "docs/media/fakegov-flow.svg" in source
     assert "**FakeGov**" in source
     assert "Instalar" in source
@@ -1095,7 +1096,7 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "from govbr_auth import AuthContext, GovBrAuth" not in source
 
 
-def test_entry_docs_use_explicit_local_credentials_not_built_in_defaults() -> None:
+def test_entry_docs_use_canonical_local_credentials() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),

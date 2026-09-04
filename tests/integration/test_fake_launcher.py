@@ -318,7 +318,13 @@ async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form
 @pytest.mark.parametrize(
     "cpf,password,name,email,masked_cpf",
     (
-        ("12345678901", "ana-demo", "Ana Demo", "ana@example.test", "***.***.***-01"),
+        (
+            "11122233344",
+            "senha-ficticia",
+            "Usuário Fake",
+            "fake@example.test",
+            "***.***.***-44",
+        ),
         (
             "98765432100",
             "bruno-demo",
@@ -584,8 +590,8 @@ async def test_end_to_end_internal_error_never_exposes_exception_text(mocker) ->
         ) as client:
             response = await complete_fake_flow(
                 client,
-                cpf="12345678901",
-                password="ana-demo",
+                cpf="11122233344",
+                password="senha-ficticia",
             )
 
     assert response.status_code == 500

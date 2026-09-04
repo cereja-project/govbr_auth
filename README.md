@@ -14,9 +14,9 @@
 
 # Autenticamente pythônica
 
-Uma biblioteca moderna e robusta para integração com o Login Único gov.br. Seu *core* assíncrono OAuth 2.0/OpenID Connect é independente de framework e cuida das partes mais sensíveis do fluxo - PKCE, nonce, state criptografado, troca de tokens, validação de assinatura, claims do ID Token e consulta ao userinfo -, entregando para a aplicação uma API enxuta, segura e previsível. Adapters opcionais conectam esse mesmo *core* ao FastAPI, Django e Flask.
+Uma biblioteca para integração com o Login Único gov.br. Conta com *core* assíncrono OAuth 2.0/OpenID Connect que é independente de framework e cuida das partes mais sensíveis do fluxo - PKCE, nonce, state criptografado, troca de tokens, validação de assinatura, claims do ID Token e consulta ao userinfo -, entregando para a aplicação uma API enxuta, segura e previsível. Adapters opcionais conectam esse mesmo *core* ao FastAPI, Django e Flask.
 
-E como a cereja do bolo, o projeto inclui o **FakeGov**, um simulador para ambientes de desenvolvimento e teste que permite depurar o fluxo completo de autenticação antes da homologação oficial. Isso reduz dependências externas, acelera o setup e encurta o ciclo de desenvolvimento da equipe.
+Assim como a cereja do bolo, `govbr-auth` inclui o **FakeGov**, um simulador para ambientes de desenvolvimento e teste que permite depurar o fluxo completo de autenticação antes da homologação oficial. Isso reduz dependências externas, acelera o setup e encurta o ciclo de desenvolvimento da equipe.
 
 O fluxo OAuth é 100% *stateless* no backend: funciona com múltiplos *workers* e sem armazenamento compartilhado, bastando que todos utilizem a mesma secret `GOVBR_TRANSACTION_SECRET`.
 O envelope usa Fernet, TTL, PKCE e nonce; o state não é um registro de uso
@@ -32,6 +32,7 @@ O envelope usa Fernet, TTL, PKCE e nonce; o state não é um registro de uso
 **Começar**
 
 - [Instalação](#instalação)
+- [Como a comunicação funciona](#como-a-comunicação-funciona)
 - [Teste a integração sem depender do gov.br](#teste-a-integração-sem-depender-do-govbr)
 
 **Referência**
@@ -41,7 +42,6 @@ O envelope usa Fernet, TTL, PKCE e nonce; o state não é um registro de uso
 
 **Aprofundar**
 
-- [Como a comunicação funciona](#como-a-comunicação-funciona)
 - [Customizar usuários](#customizar-usuários)
 - [Provedor oficial](#provedor-oficial)
 - [Desenvolvimento](#desenvolvimento)
@@ -58,6 +58,30 @@ Instale somente o core ou o extra correspondente à aplicação:
 | `pip install "govbr-auth[flask]"` | Adapter Flask |
 | `pip install "govbr-auth[fastapi,fake]"` | FastAPI + FakeGov + uvicorn |
 
+## Como a comunicação funciona
+
+![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação e provedor](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence-animated.svg)
+
+
+A aplicação expõe `/auth/govbr/login`. O navegador é redirecionado para o
+provedor selecionado e retorna pelo callback configurado. Depois do login, o
+backend troca o código, busca as chaves, valida o ID Token e consulta
+`userinfo` antes de chamar `on_success`.
+
+Com `GOVBR_PROVIDER=official`, as chamadas vão para o gov.br. Com
+`GOVBR_PROVIDER=fake`, o FakeGov troca apenas os endpoints do provedor e o
+transporte HTTP interno; o mesmo runtime consumidor e a fachada `GovBrAuth`
+permanecem os mesmos. O diagrama completo está no
+[`guia de fluxo de comunicação`](https://govbr-auth.readthedocs.io/en/latest/guide/communication-flow.html).
+Internamente, o adapter usa `FakeGovHttpTransport` para manter essa troca sem
+abrir uma conexão de rede.
+
+Para composições avançadas, o simulador canônico é
+`govbr_auth.fake.FakeGovSimulator`, criado por
+`govbr_auth.fake.create_fake_gov_simulator`. Para iniciar uma demonstração
+visual local, o launcher exibe o botão **Entrar com gov.br** na raiz `/`; o
+caminho `/govbr-auth-demo` permanece disponível como alias.
+
 ## Teste a integração sem depender do gov.br
 
 **FakeGov** é um provedor OAuth/OIDC local incluído na biblioteca. Ele permite
@@ -72,7 +96,7 @@ no [guia completo](https://govbr-auth.readthedocs.io/en/latest/guide/quick-start
 executável em um diretório vazio e exercita o mesmo core usado com o provedor
 oficial.
 
-### 1. Crie a aplicação e o usuário fictício
+### 1. Crie a aplicação e, opcionalmente, um usuário fictício
 
 ```bash
 pip install "govbr-auth[fastapi,fake]"
@@ -242,18 +266,16 @@ Os exemplos completos de FastAPI, Django e Flask no
 criam os arquivos da aplicação no diretório do usuário e funcionam após a
 instalação do extra correspondente; não dependem de um checkout deste repositório.
 
-Com `GOVBR_PROVIDER=fake`, a aplicação mantém o mesmo runtime consumidor e a
-mesma fachada `GovBrAuth`: o modo fake troca apenas os endpoints do provedor e
-o transporte HTTP interno (`FakeGovHttpTransport`). Para composições avançadas,
-o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado por
-`govbr_auth.fake.create_fake_gov_simulator`.
-
 ## Credenciais de teste
 
 | Campo | Valor |
 | --- | --- |
 | CPF | `11122233344` |
 | Senha | `senha-ficticia` |
+
+Essas credenciais funcionam no perfil padrão, sem
+`GOVBR_FAKE_USERS_FILE`. Quando essa variável é definida, o arquivo substitui
+os usuários padrão.
 
 > [!WARNING]
 > Credenciais fictícias, válidas apenas no FakeGov local. Para trocá-las, veja
@@ -271,48 +293,6 @@ o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado por
 | `GOVBR_REDIRECT_URI` | Callback da aplicação | Compartilhado entre o provedor oficial e o FakeGov |
 | `GOVBR_SCOPE` | Escopo OAuth | Compartilhado entre o provedor oficial e o FakeGov |
 | `GOVBR_TRANSACTION_SECRET` | Segredo gerado uma única vez | Compartilhado entre o provedor oficial e o FakeGov; o mesmo valor em todas as instâncias |
-
-## Como a comunicação funciona
-
-![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação e provedor](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence-animated.svg)
-
-[Ver versão estática do fluxo](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence.svg)
-
-A aplicação expõe `/auth/govbr/login`. Com o provedor oficial, a rota de
-callback usa exatamente o caminho de `GOVBR_REDIRECT_URI`; por exemplo,
-`https://api.example.com/oauth/govbr/retorno` registra
-`/oauth/govbr/retorno`. No FakeGov, o callback permanece
-`/auth/govbr/callback` por padrão. Depois do login, o backend troca o código no
-endpoint `token`, busca as chaves em `jwk`, valida o ID Token e consulta
-`userinfo` antes de chamar `on_success`.
-
-Com `GOVBR_PROVIDER=official`, essas chamadas vão para o gov.br. Com
-`GOVBR_PROVIDER=fake`, as rotas FakeGov são montadas no mesmo router e o
-backend usa `FakeGovHttpTransport`. Em outras palavras: é o mesmo runtime
-consumidor, e a configuração fake troca apenas os endpoints do provedor e o
-transporte HTTP interno. O diagrama completo está no
-[`guia de fluxo de comunicação`](https://govbr-auth.readthedocs.io/en/latest/guide/communication-flow.html).
-
-`GOVBR_ENVIRONMENT` descreve o provedor acessado, não onde a aplicação roda.
-Ao usar os hosts oficiais, `authorize`, `token`, `userinfo`, `issuer` e `jwk`
-devem ser todos de produção ou todos de staging. O `GOVBR_REDIRECT_URI` é
-independente dessa comparação e pode apontar para a aplicação local, desde que
-use HTTPS quando não for loopback. Para usar um DNS de desenvolvimento,
-termine o TLS em um proxy reverso e encaminhe para a aplicação HTTP no
-loopback; a biblioteca não gerencia certificados nem inicia esse proxy.
-
-Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
-fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente
-a composição selecionada pela configuração muda.
-
-O provedor oficial usa as mesmas rotas de autenticação, sem uma página de
-apresentação embutida no adapter.
-
-O backend é stateless e pode rodar com múltiplos workers sem armazenamento
-compartilhado. Use a mesma secret ``GOVBR_TRANSACTION_SECRET`` em todas as
-instâncias, gerada uma vez e mantida em segredo. Para iniciar uma demonstração
-visual local, o launcher exibe o botão **Entrar com gov.br** na raiz ``/``.
-O caminho ``/govbr-auth-demo`` permanece disponível como alias.
 
 ## Customizar usuários
 
