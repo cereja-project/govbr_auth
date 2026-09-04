@@ -102,6 +102,18 @@ def test_docs_job_installs_every_documented_adapter_before_sphinx() -> None:
     assert len(sphinx_indexes) == 2
 
 
+def test_docs_ci_smoke_test_targets_the_mounted_fakegov_jwks() -> None:
+    workflow = _load_docs_workflow()
+    smoke_commands = "\n".join(
+        step.get("run", "")
+        for step in workflow["jobs"]["build"]["steps"]
+        if step.get("name") == "Smoke-test installed fake provider"
+    )
+
+    assert "http://127.0.0.1:8000/fake-govbr/jwk" in smoke_commands
+    assert "http://127.0.0.1:8000/jwk" not in smoke_commands
+
+
 def test_ci_covers_supported_pythons_and_major_operating_systems() -> None:
     workflow = _load_workflow("pythonpackage.yml")
     matrix = workflow["jobs"]["test"]["strategy"]["matrix"]
