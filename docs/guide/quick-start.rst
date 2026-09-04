@@ -133,8 +133,9 @@ de demonstração e iniciar o fluxo completo em um launcher dedicado, execute::
     pip install "govbr-auth[fastapi,fake]"
     python -m govbr_auth.fake
 
-O launcher publica ``/govbr-auth-demo`` em loopback e não deve ser exposto na
-rede. Abra a página e clique em **Entrar com gov.br**. O FakeGov aceita somente
+O launcher publica a demo na raiz ``/`` em loopback e não deve ser exposto na
+rede. ``/govbr-auth-demo`` permanece como alias. Abra a página e clique em
+**Entrar com gov.br**. O FakeGov aceita somente
 credenciais fictícias; não use credenciais reais. A página demo não é injetada nos adapters.
 
 O backend é stateless, pode usar múltiplos workers sem armazenamento

@@ -4,8 +4,8 @@ FakeGov avançado
 O FakeGov é um provedor local opcional, habilitado explicitamente com
 ``GOVBR_PROVIDER=fake``. O caminho comum usa ``GovBrAuth``. O comando
 ``python -m govbr_auth.fake`` inicia o launcher end-to-end em loopback e
-publica a página ``/govbr-auth-demo``. Essa apresentação não pertence aos
-adapters nem ao provedor oficial.
+publica a página demo na raiz ``/``; ``/govbr-auth-demo`` permanece como alias.
+Essa apresentação não pertence aos adapters nem ao provedor oficial.
 
 .. autoclass:: govbr_auth.fake.FakeGovSimulator
 

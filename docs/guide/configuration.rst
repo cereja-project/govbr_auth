@@ -59,7 +59,7 @@ FakeGov
 ``GOVBR_FAKE_HOST``, ``GOVBR_FAKE_PORT``, ``GOVBR_FAKE_PROVIDER_PREFIX`` e
 ``GOVBR_FAKE_USERS_FILE`` controlam o simulador local. O host é restrito a
 ``localhost``, ``127.0.0.1`` e ``::1``. O launcher ``python -m govbr_auth.fake``
-monta o fluxo end-to-end e a página demo em loopback.
+monta o fluxo end-to-end e a página demo na raiz em loopback.
 
 Configuração explícita
 ----------------------

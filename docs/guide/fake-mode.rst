@@ -47,7 +47,8 @@ Para executar o fluxo completo com a página de demonstração, use::
 
     python -m govbr_auth.fake
 
-O launcher monta consumidor, FakeGov e ``/govbr-auth-demo`` em loopback. Ele
+O launcher monta consumidor, FakeGov e a página demo na raiz ``/`` em loopback.
+O caminho ``/govbr-auth-demo`` permanece disponível como alias. O launcher
 não deve ser exposto na rede. A seleção fake é explícita no launcher, mas o
 provedor nunca é fallback automático para uma aplicação oficial. O provedor
 oficial permanece disponível na mesma aplicação com ``GOVBR_PROVIDER=official``.

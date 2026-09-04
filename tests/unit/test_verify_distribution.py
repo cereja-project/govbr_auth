@@ -89,6 +89,7 @@ def test_fastapi_distribution_probe_targets_fakegov_jwks(
     assert "GovBrProvider," in probe
     assert "GovBrRuntimeSettings," in probe
     assert "create_fake_app(GovBrRuntimeSettings(provider=GovBrProvider.FAKE))" in probe
+    assert 'client.get("/")' in probe
     assert 'client.get("/fake-govbr/jwk")' in probe
 
 

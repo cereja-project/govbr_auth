@@ -151,7 +151,7 @@ def test_launcher_defaults_to_complete_end_to_end_profile() -> None:
 
 
 def test_launcher_demo_profile_uses_fixed_demo_route() -> None:
-    """The demo launcher must expose the adapter route without taking application root."""
+    """The demo launcher must expose the demo at the application root."""
     app = create_fake_app(
         settings=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
         clock=fixed_clock,
@@ -159,7 +159,7 @@ def test_launcher_demo_profile_uses_fixed_demo_route() -> None:
 
     paths = route_paths(app)
     assert "/govbr-auth-demo" in paths
-    assert "/" not in paths
+    assert "/" in paths
     assert "/auth/govbr/login" in paths
     assert "/fake-govbr/authorize" in paths
 
@@ -249,12 +249,15 @@ async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form
             base_url="http://127.0.0.1:8000",
             follow_redirects=False,
         ) as client:
-            home = await client.get("/govbr-auth-demo")
+            home = await client.get("/")
+            demo_alias = await client.get("/govbr-auth-demo")
             login = await client.get("/auth/govbr/login")
             authorize = await client.get(login.headers["location"])
             form = parse_fake_login_form(authorize.text)
 
     assert home.status_code == 200
+    assert demo_alias.status_code == 200
+    assert demo_alias.text == home.text
     assert home.headers["cache-control"] == "no-store"
     assert "SIMULAÇÃO LOCAL" in home.text
     assert "FakeGov" in home.text

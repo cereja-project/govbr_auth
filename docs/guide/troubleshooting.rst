@@ -26,8 +26,8 @@ versão instalada. Nunca são exibidos valores de configuração ou segredos.
 Página de demonstração
 ----------------------
 
-A página ``/govbr-auth-demo`` é criada somente por ``python -m govbr_auth.fake``
-ou ``create_fake_app``. Ela não é adicionada pelos adapters. Se o launcher não
+A página ``/`` é criada somente por ``python -m govbr_auth.fake`` ou
+``create_fake_app``; ``/govbr-auth-demo`` é um alias. Ela não é adicionada pelos adapters. Se o launcher não
 mostrar a página, confirme que o extra ``fake`` está instalado, que o provedor
 fake foi selecionado e que o app usado é o launcher.
 

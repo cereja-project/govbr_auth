@@ -72,6 +72,7 @@ def create_end_to_end_app(
         lifespan=lifespan,
     )
 
+    @application.get("/", include_in_schema=False)
     @application.get(DEMO_PAGE_PATH, include_in_schema=False)
     async def demo_page() -> HTMLResponse:
         return HTMLResponse(

@@ -47,6 +47,7 @@ async def verify_http_boundaries():
         transport=httpx.ASGITransport(app=fake_app),
         base_url="http://127.0.0.1:8000",
     ) as client:
+        assert (await client.get("/")).status_code == 200
         response = await client.get("/fake-govbr/jwk")
         assert response.status_code == 200
         assert response.json()["keys"]

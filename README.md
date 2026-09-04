@@ -306,8 +306,8 @@ apresentação embutida no adapter.
 O backend é stateless e pode rodar com múltiplos workers sem armazenamento
 compartilhado. Use a mesma secret ``GOVBR_TRANSACTION_SECRET`` em todas as
 instâncias, gerada uma vez e mantida em segredo. Para iniciar uma demonstração
-visual local, o launcher exibe o botão **Entrar com gov.br** em
-``/govbr-auth-demo``.
+visual local, o launcher exibe o botão **Entrar com gov.br** na raiz ``/``.
+O caminho ``/govbr-auth-demo`` permanece disponível como alias.
 
 ## Customizar usuários
 
