@@ -68,6 +68,8 @@ def test_django_fake_runtime_completes_browser_authentication_flow(monkeypatch) 
 
         with override_settings(ROOT_URLCONF=__name__):
             client = Client()
+            home = client.get("/")
+            demo_alias = client.get("/govbr-auth-demo")
             login = client.get("/auth/govbr/login")
             authorize = client.get(_path(login["Location"]))
             request_value = re.search(
@@ -83,6 +85,9 @@ def test_django_fake_runtime_completes_browser_authentication_flow(monkeypatch) 
             )
             callback = client.get(_path(fake_login["Location"]))
 
+        assert home.status_code == 200
+        assert demo_alias.status_code == 200
+        assert demo_alias.content == home.content
         assert login.status_code == 302
         assert authorize.status_code == 200
         assert fake_login.status_code == 302

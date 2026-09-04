@@ -16,6 +16,7 @@ from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.flask import create_fake_govbr_blueprint
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
@@ -93,6 +94,21 @@ class GovBrAuth:
 
     def _build_blueprint(self) -> Blueprint:
         blueprint = Blueprint("govbr_auth", __name__)
+
+        if self._application.runtime.fake is not None:
+
+            @blueprint.get("/")
+            @blueprint.get(DEMO_PAGE_PATH)
+            def demo_page() -> Response:
+                response = Response(
+                    render_demo_page(
+                        provider=self._application.runtime.provider,
+                        login_path=self._application.login_path,
+                    ),
+                    mimetype="text/html",
+                )
+                response.headers["Cache-Control"] = "no-store"
+                return response
 
         @blueprint.get(self._application.login_path)
         def login():

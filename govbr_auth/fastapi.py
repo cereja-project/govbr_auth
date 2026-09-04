@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from govbr_auth.adapters._errors import describe_auth_error
 from govbr_auth.adapters._application import create_adapter_application
@@ -14,6 +14,7 @@ from govbr_auth.authentication import AuthenticationContext, AuthenticationServi
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
@@ -151,6 +152,17 @@ class GovBrAuth:
         )
         if self._runtime.fake is not None:
             from govbr_auth.fake.fastapi import create_fake_govbr_router
+
+            @router.get("/", include_in_schema=False)
+            @router.get(DEMO_PAGE_PATH, include_in_schema=False)
+            async def demo_page() -> HTMLResponse:
+                return HTMLResponse(
+                    render_demo_page(
+                        provider=self._runtime.provider,
+                        login_path=f"{prefix}/login" if prefix else "/login",
+                    ),
+                    headers={"Cache-Control": "no-store"},
+                )
 
             router.include_router(
                 create_fake_govbr_router(

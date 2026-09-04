@@ -12,6 +12,7 @@ from html.parser import HTMLParser
 import httpx
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import Response
 from pydantic import SecretStr
 
 from govbr_auth.fake import FakeUser, InMemoryFakeUserRepository, create_fake_app
@@ -148,6 +149,35 @@ def test_launcher_defaults_to_complete_end_to_end_profile() -> None:
 
     assert "/govbr-auth-demo" in route_paths(app)
     assert "/auth/govbr/login" in route_paths(app)
+
+
+@pytest.mark.asyncio
+async def test_fake_provider_adapter_exposes_demo_at_application_root() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    async def authenticated(context) -> Response:
+        del context
+        return Response(status_code=204)
+
+    auth = GovBrAuth(
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
+        on_success=authenticated,
+        clock=fixed_clock,
+    )
+    application = FastAPI()
+    application.include_router(auth.router)
+
+    async with application.router.lifespan_context(application):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=application),
+            base_url="http://127.0.0.1:8000",
+        ) as client:
+            home = await client.get("/")
+            alias = await client.get("/govbr-auth-demo")
+
+    assert home.status_code == 200
+    assert alias.status_code == 200
+    assert alias.text == home.text
 
 
 def test_launcher_demo_profile_uses_fixed_demo_route() -> None:

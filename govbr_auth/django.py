@@ -18,6 +18,7 @@ from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.django import create_fake_govbr_urlpatterns
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
@@ -94,6 +95,16 @@ class GovBrAuth:
         fake_runtime = self._application.runtime.fake
         if fake_runtime is not None:
             patterns.extend(
+                [
+                    path("", self._demo_page, name="govbr-auth-demo"),
+                    path(
+                        DEMO_PAGE_PATH.lstrip("/"),
+                        self._demo_page,
+                        name="govbr-auth-demo-alias",
+                    ),
+                ]
+            )
+            patterns.extend(
                 create_fake_govbr_urlpatterns(
                     fake_runtime,
                     application=fake_runtime.http_application,
@@ -101,6 +112,16 @@ class GovBrAuth:
                 )
             )
         return patterns
+
+    def _demo_page(self, request: HttpRequest) -> HttpResponse:
+        del request
+        return HttpResponse(
+            render_demo_page(
+                provider=self._application.runtime.provider,
+                login_path=f"{self._application.login_path}",
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
 
     def _login(self, request: HttpRequest) -> HttpResponseRedirect:
         authorization = self._application.service.authorization_url(now=self._clock())

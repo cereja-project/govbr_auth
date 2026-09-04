@@ -206,9 +206,10 @@ python myapp.py
 Abra `http://localhost:8000/auth/govbr/login`. Entre com as
 [credenciais de teste](#credenciais-de-teste) e conclua o callback.
 
-O adapter registra apenas as rotas de autenticação. A página visual de
-demonstração pertence ao launcher FakeGov (`python -m govbr_auth.fake`) e não é
-injetada na aplicação consumidora.
+O adapter registra as rotas de autenticação. Quando o provedor é FakeGov, ele
+também registra a página visual de demonstração na raiz `/`; com o provedor
+oficial, essa página não é criada. O launcher (`python -m govbr_auth.fake`) é
+apenas um atalho para iniciar uma aplicação FakeGov completa.
 
 O callback `authenticated` recebe um `AuthContext` já validado:
 

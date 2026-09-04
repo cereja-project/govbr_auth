@@ -42,7 +42,8 @@ FakeGov na API
 Com ``GOVBR_PROVIDER=fake``, as rotas FakeGov são montadas na mesma API e as
 chamadas internas usam ``FakeGovHttpTransport``. O código consumidor permanece
 igual. Para uma página visual de demonstração, use o launcher
-``python -m govbr_auth.fake``; os adapters não a injetam.
+``python -m govbr_auth.fake``; em modo fake, os adapters também a montam na
+raiz ``/``.
 
 FakeGov compartilhado
 ---------------------

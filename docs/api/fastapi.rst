@@ -13,7 +13,8 @@ Uso comum:
 ``GovBrAuth`` aceita ``GovBrRuntimeSettings`` ou um ``GovBrRuntime`` já
 composto. Quando ambos são omitidos, carrega ``GovBrRuntimeSettings`` do
 ambiente. ``settings`` e ``runtime`` são mutuamente exclusivos. O adapter
-registra apenas login e callback; a página demo pertence ao launcher FakeGov.
+registra login e callback. Com ``GOVBR_PROVIDER=fake``, também registra a demo
+na raiz ``/``; com o provedor oficial, a página demo não é criada.
 
 .. py:class:: GovBrAuth(*, on_success, settings=None, runtime=None, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now, user_repository=None)
 

@@ -496,7 +496,7 @@ def test_public_docs_publish_only_the_application_demo_page_contract() -> None:
     assert "demo_page" not in normalized
     assert "/govbr-auth-demo" in combined
     assert "python -m govbr_auth.fake" in normalized
-    assert "responsabilidade exclusiva do launcher" in normalized
+    assert "em modo fake" in normalized
 
 
 def test_removed_fake_switch_occurs_only_in_the_closed_tracked_file_allowlist() -> None:
@@ -572,13 +572,14 @@ def test_launcher_docs_publish_the_end_to_end_profile() -> None:
         assert "govbr-auth-demo" in normalized
 
 
-def test_launcher_docs_keep_the_demo_page_out_of_adapters() -> None:
+def test_launcher_docs_describe_the_demo_page_in_fake_adapters() -> None:
     sources = (
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8"),
     )
     assert all("python -m govbr_auth.fake" in source for source in sources)
-    assert all("não é injetada nos adapters" in source for source in sources)
+    assert all("raiz" in source for source in sources)
+    assert all("não é injetada nos adapters" not in source for source in sources)
 
 
 def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
@@ -987,7 +988,8 @@ def test_fastapi_api_doc_describes_the_fakegov_provider_facade_surface() -> None
     assert "GovBrRuntime" in source
     assert "GovBrApplicationSettings" not in source
     assert "demo_page" not in source
-    assert "launcher FakeGov" in source
+    assert "GOVBR_PROVIDER=fake" in source
+    assert "raiz" in source
 
 
 def test_fake_mode_guide_documents_the_supported_installation_matrix() -> None:

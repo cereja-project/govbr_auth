@@ -34,8 +34,8 @@ Salve ``myapp.py``:
     app.include_router(auth.router)
 
 O adapter registra ``/auth/govbr/login`` e o callback. No modo fake, as rotas
-do provedor são montadas no mesmo app; a página demo fica exclusivamente no
-launcher ``python -m govbr_auth.fake``.
+do provedor e a página demo na raiz ``/`` são montadas no mesmo app. O launcher
+``python -m govbr_auth.fake`` é um atalho para iniciar esse perfil completo.
 
 Aplicação Django
 ----------------
@@ -136,7 +136,8 @@ de demonstração e iniciar o fluxo completo em um launcher dedicado, execute::
 O launcher publica a demo na raiz ``/`` em loopback e não deve ser exposto na
 rede. ``/govbr-auth-demo`` permanece como alias. Abra a página e clique em
 **Entrar com gov.br**. O FakeGov aceita somente
-credenciais fictícias; não use credenciais reais. A página demo não é injetada nos adapters.
+credenciais fictícias; não use credenciais reais. Com o provedor oficial, a
+página demo não é criada.
 
 O backend é stateless, pode usar múltiplos workers sem armazenamento
 compartilhado e exige a mesma secret ``GOVBR_TRANSACTION_SECRET`` em todas as

@@ -37,8 +37,8 @@ Monte o adapter normalmente:
 
 Configure ``GOVBR_PROVIDER=fake`` e, opcionalmente,
 ``GOVBR_FAKE_USERS_FILE``. O adapter monta as rotas FakeGov na própria API e
-usa ``FakeGovHttpTransport`` para as chamadas internas. A página visual demo
-não é injetada nos adapters.
+usa ``FakeGovHttpTransport`` para as chamadas internas. No modo fake, o adapter
+também monta a página visual demo na raiz ``/``.
 
 Launcher end-to-end
 -------------------

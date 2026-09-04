@@ -50,6 +50,8 @@ def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -
         auth.register(application)
 
         client = application.test_client()
+        home = client.get("/")
+        demo_alias = client.get("/govbr-auth-demo")
         login = client.get("/auth/govbr/login")
         authorize = client.get(_path(login.headers["Location"]))
         request_value = re.search(
@@ -65,6 +67,9 @@ def test_flask_fake_runtime_completes_browser_authentication_flow(monkeypatch) -
         )
         callback = client.get(_path(fake_login.headers["Location"]))
 
+        assert home.status_code == 200
+        assert demo_alias.status_code == 200
+        assert demo_alias.data == home.data
         assert login.status_code == 302
         assert authorize.status_code == 200
         assert fake_login.status_code == 302

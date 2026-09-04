@@ -16,8 +16,8 @@ Uso:
 
 ``register(app)`` registra as rotas do consumidor e, em modo fake, as rotas
 do FakeGov. Aceita ``GovBrRuntimeSettings`` ou ``GovBrRuntime``; quando
-omitidos, carrega as configurações do ambiente. A página demo é responsabilidade
-exclusiva do launcher FakeGov.
+omitidos, carrega as configurações do ambiente. Em modo fake, também registra a
+página demo na raiz ``/``; o launcher FakeGov é apenas um atalho.
 
 .. py:class:: GovBrAuth(*, on_success, settings=None, runtime=None, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now, user_repository=None)
    :no-index:
