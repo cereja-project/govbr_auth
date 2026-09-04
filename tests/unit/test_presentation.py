@@ -47,7 +47,7 @@ def test_fake_demo_page_identifies_simulation_without_credentials() -> None:
     for forbidden in (
         "12345678901",
         "ana-demo",
-        "fake_client_secret",
+        "GOVBR_FAKE_CLIENT_SECRET",
         "access_token",
         "id_token",
     ):

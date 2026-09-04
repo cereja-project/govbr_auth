@@ -461,8 +461,8 @@ async def test_fake_facade_aligns_default_redirect_with_custom_router_prefix() -
 
 
 @pytest.mark.asyncio
-async def test_fake_facade_rejects_supplied_runtime_with_mismatched_callback() -> None:
-    """A caller-owned fake runtime must not mount under an inconsistent callback path."""
+async def test_fake_facade_reuses_supplied_runtime_callback_across_prefixes() -> None:
+    """A caller-owned runtime keeps its configured consumer callback."""
     from govbr_auth.fastapi import GovBrAuth
 
     async def success_handler(context) -> Response:
@@ -473,21 +473,13 @@ async def test_fake_facade_rejects_supplied_runtime_with_mismatched_callback() -
         on_success=success_handler,
     )
 
-    raised: Exception | None = None
     try:
-        try:
-            GovBrAuth(
-                runtime=owner.runtime,
-                on_success=success_handler,
-                prefix="/custom-auth",
-            )
-        except Exception as error:
-            raised = error
-
-        assert isinstance(raised, ValueError)
-        assert str(raised) == (
-            "fake runtime redirect URI does not match the adapter callback"
+        borrowed = GovBrAuth(
+            runtime=owner.runtime,
+            on_success=success_handler,
+            prefix="/custom-auth",
         )
+        assert borrowed.runtime is owner.runtime
     finally:
         await owner.runtime.aclose()
 

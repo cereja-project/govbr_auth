@@ -5,10 +5,22 @@ from datetime import UTC, datetime
 import pytest
 
 from govbr_auth.adapters._application import create_adapter_application
+from govbr_auth.adapters._runtime import adapter_settings_callback_path
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
 
 FIXED_NOW = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
+
+
+def test_fake_adapter_reuses_the_configured_consumer_callback() -> None:
+    settings = GovBrRuntimeSettings.from_environment(
+        {
+            "GOVBR_PROVIDER": "fake",
+            "GOVBR_REDIRECT_URI": "http://127.0.0.1:8000/app/callback",
+        }
+    )
+
+    assert adapter_settings_callback_path(settings, "/auth/govbr") == "/app/callback"
 
 
 @pytest.mark.asyncio

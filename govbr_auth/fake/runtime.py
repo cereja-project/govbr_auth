@@ -103,10 +103,13 @@ def create_fake_gov_simulator(
     if not _is_canonical_path_prefix(prefix, allow_empty=True):
         raise ValueError("prefix must be an empty string or a canonical path")
 
-    settings = GovBrRuntimeSettings.model_validate(settings.model_dump())
+    settings = GovBrRuntimeSettings.model_validate(settings.model_dump(mode="python"))
     repository, credentials = _resolve_repository(settings, user_repository)
     endpoints = _fake_endpoints(settings, prefix=prefix)
-    redirect_uri = settings.fake_redirect_uri or _default_redirect_uri(settings)
+    if settings.oauth is None:
+        raise ValueError("fake runtime requires OAuth settings")
+    oauth = settings.oauth
+    redirect_uri = oauth.redirect_uri
     provider_settings = FakeGovBrSettings(
         base_url=endpoints.issuer,
         issuer=endpoints.issuer,
@@ -117,8 +120,8 @@ def create_fake_gov_simulator(
         id_token_ttl_seconds=settings.fake_id_token_ttl_seconds,
         clients=(
             FakeClient(
-                client_id=settings.fake_client_id,
-                client_secret=settings.fake_client_secret,
+                client_id=oauth.client_id,
+                client_secret=oauth.client_secret,
                 registered_redirect_uris=(redirect_uri,),
             ),
         ),
@@ -180,7 +183,3 @@ def _fake_origin(settings: GovBrRuntimeSettings) -> str:
     host = settings.fake_host
     rendered_host = f"[{host}]" if host == "::1" else host
     return f"http://{rendered_host}:{settings.fake_port}"
-
-
-def _default_redirect_uri(settings: GovBrRuntimeSettings) -> str:
-    return f"{_fake_origin(settings)}/auth/govbr/callback"

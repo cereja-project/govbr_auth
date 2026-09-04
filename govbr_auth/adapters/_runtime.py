@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 import httpx
+from pydantic import AnyHttpUrl
 
 from govbr_auth.adapters._lifecycle import RuntimeOwner
 from govbr_auth.runtime import (
@@ -129,7 +130,7 @@ def adapter_settings_callback_path(
     prefix: str,
 ) -> str:
     """Resolve and validate the callback before allocating runtime resources."""
-    if settings.provider is GovBrProvider.OFFICIAL and settings.oauth is not None:
+    if settings.oauth is not None:
         callback_path = _route_path(settings.oauth.redirect_uri.path or "/")
     else:
         callback_path = f"{prefix}/callback" if prefix else "/callback"
@@ -168,30 +169,32 @@ def _settings_for_fake_callback(
     settings: GovBrRuntimeSettings,
     prefix: str,
 ) -> GovBrRuntimeSettings:
+    if settings.oauth is None:
+        raise ValueError("fake runtime requires OAuth settings")
     expected = _fake_callback_url(settings.fake_host, settings.fake_port, prefix)
-    configured = (
-        None if settings.fake_redirect_uri is None else str(settings.fake_redirect_uri)
-    )
+    configured = str(settings.oauth.redirect_uri)
     default = _fake_callback_url(
         settings.fake_host,
         settings.fake_port,
         "/auth/govbr",
     )
-    if configured is not None and configured not in {default, expected}:
-        raise ValueError("fake redirect URI does not match the adapter callback")
-    values = settings.model_dump()
-    values["fake_redirect_uri"] = expected
-    return GovBrRuntimeSettings.model_validate(values)
+    if configured not in {default, expected}:
+        return settings
+    return settings.model_copy(
+        update={
+            "oauth": settings.oauth.model_copy(
+                update={"redirect_uri": AnyHttpUrl(expected)}
+            )
+        }
+    )
 
 
 def _validate_runtime_callback(runtime: GovBrRuntime, prefix: str) -> None:
     if runtime.fake is None:
         return
-    expected = _fake_callback_url(
-        runtime.settings.fake_host,
-        runtime.settings.fake_port,
-        prefix,
-    )
+    if runtime.settings.oauth is None:
+        raise ValueError("fake runtime requires OAuth settings")
+    expected = str(runtime.settings.oauth.redirect_uri)
     configured = str(runtime.fake.settings.clients[0].registered_redirect_uris[0])
     if configured != expected:
         raise ValueError(

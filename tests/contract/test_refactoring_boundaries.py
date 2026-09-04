@@ -22,7 +22,6 @@ def test_official_and_fake_runtime_share_the_same_consumer_stack() -> None:
     fake = create_govbr_runtime(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
         ),
         fake_transport_factory=lambda _: httpx.MockTransport(
             lambda request: httpx.Response(500, request=request)

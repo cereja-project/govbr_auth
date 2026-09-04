@@ -48,9 +48,6 @@ def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
-        "GOVBR_FAKE_CLIENT_ID",
-        "GOVBR_FAKE_CLIENT_SECRET",
-        "GOVBR_FAKE_REDIRECT_URI",
         "GOVBR_FAKE_REQUEST_TTL_SECONDS",
         "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS",
         "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS",
@@ -83,7 +80,6 @@ def fake_settings() -> GovBrRuntimeSettings:
     """Provide complete settings for an embedded fake provider."""
     return GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
     )
 
 
@@ -105,6 +101,48 @@ def test_runtime_settings_select_fake_explicitly(
     settings = GovBrRuntimeSettings.from_environment()
 
     assert settings.provider is GovBrProvider.FAKE
+
+
+def test_fake_environment_reuses_shared_oauth_configuration() -> None:
+    """FakeGov must replace only provider endpoints, not client settings."""
+    transaction_secret = Fernet.generate_key().decode("ascii")
+
+    settings = GovBrRuntimeSettings.from_environment(
+        {
+            "GOVBR_PROVIDER": "fake",
+            "GOVBR_ENVIRONMENT": "local",
+            "GOVBR_CLIENT_ID": "shared-client",
+            "GOVBR_CLIENT_SECRET": "shared-client-secret",
+            "GOVBR_REDIRECT_URI": "http://127.0.0.1:8000/auth/govbr/callback",
+            "GOVBR_SCOPE": "openid profile",
+            "GOVBR_TRANSACTION_SECRET": transaction_secret,
+        }
+    )
+
+    assert settings.oauth is not None
+    assert settings.oauth.client_id == "shared-client"
+    assert settings.oauth.client_secret.get_secret_value() == "shared-client-secret"
+    assert str(settings.oauth.redirect_uri) == (
+        "http://127.0.0.1:8000/auth/govbr/callback"
+    )
+    assert settings.oauth.scope == "openid profile"
+    assert settings.oauth.transaction_secret.get_secret_value() == transaction_secret
+
+
+@pytest.mark.parametrize(
+    "variable",
+    (
+        "GOVBR_FAKE_CLIENT_ID",
+        "GOVBR_FAKE_CLIENT_SECRET",
+        "GOVBR_FAKE_REDIRECT_URI",
+    ),
+)
+def test_fake_environment_rejects_duplicated_client_variables(variable: str) -> None:
+    """FakeGov client variables must not create a second client configuration."""
+    with pytest.raises(ValueError, match=f"variável não suportada: {variable}"):
+        GovBrRuntimeSettings.from_environment(
+            {"GOVBR_PROVIDER": "fake", variable: "obsolete"}
+        )
 
 
 def test_runtime_settings_build_official_oauth_from_environment() -> None:
@@ -244,18 +282,8 @@ def test_runtime_settings_reject_unknown_govbr_variable() -> None:
             {"GOVBR_PROVIDER": "official", "GOVBR_FAKE_PORT": "8123"},
             "GOVBR_FAKE_PORT",
         ),
-        (
-            {
-                "GOVBR_PROVIDER": "fake",
-                "GOVBR_CONNECT_TIMEOUT_SECONDS": "7",
-            },
-            "GOVBR_CONNECT_TIMEOUT_SECONDS",
-        ),
     ),
-    ids=(
-        "fake-variable-with-official-provider",
-        "official-variable-with-fake-provider",
-    ),
+    ids=("fake-variable-with-official-provider",),
 )
 def test_runtime_settings_warn_about_provider_inactive_variables(
     environment: dict[str, str],
@@ -274,11 +302,10 @@ def test_runtime_settings_warn_about_provider_inactive_variables(
         "GOVBR_AUTHORIZATION_URL",
         "GOVBR_TOKEN_URL",
         "GOVBR_USERINFO_URL",
-        "GOVBR_REDIRECT_URI",
         "GOVBR_ISSUER",
         "GOVBR_JWKS_URL",
     ),
-    ids=("authorize", "token", "userinfo", "redirect", "issuer", "jwks"),
+    ids=("authorize", "token", "userinfo", "issuer", "jwks"),
 )
 def test_fake_environment_rejects_official_endpoint_variables(variable: str) -> None:
     """Fake selection must not silently ignore an official provider endpoint."""

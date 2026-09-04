@@ -13,7 +13,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import Response
-from pydantic import SecretStr
+from pydantic import AnyHttpUrl, SecretStr
 
 from govbr_auth.fake import FakeUser, InMemoryFakeUserRepository, create_fake_app
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
@@ -237,7 +237,7 @@ def test_end_to_end_rejects_official_provider_before_runtime_allocation(
 
 @pytest.mark.parametrize(
     ("callback_path", "message"),
-    (("/unexpected/callback", "fake redirect URI does not match"),),
+    (("/auth/govbr/login", "redirect URI callback path must differ"),),
     ids=("incompatible",),
 )
 def test_demo_launcher_validates_callback_before_runtime_allocation(
@@ -250,7 +250,16 @@ def test_demo_launcher_validates_callback_before_runtime_allocation(
 
     settings = GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_redirect_uri=f"http://127.0.0.1:8000{callback_path}",
+    )
+    assert settings.oauth is not None
+    settings = settings.model_copy(
+        update={
+            "oauth": settings.oauth.model_copy(
+                update={
+                    "redirect_uri": AnyHttpUrl(f"http://127.0.0.1:8000{callback_path}")
+                }
+            )
+        }
     )
     runtime_calls: list[object] = []
 
@@ -294,7 +303,7 @@ async def test_end_to_end_home_hides_credentials_and_exposes_provider_login_form
     assert "Ana Demo" not in home.text
     assert "ana-demo" not in home.text
     assert "12345678901" not in home.text
-    assert "fake_client_secret" not in home.text
+    assert "GOVBR_FAKE_CLIENT_SECRET" not in home.text
     assert "govbr-auth-local-key" not in home.text
     assert login.status_code == 302
     assert authorize.status_code == 200
@@ -352,7 +361,7 @@ async def test_end_to_end_completes_credential_flow_without_exposing_secrets(
             "id_token",
             "code_verifier",
             "local-fake-only",
-            "fake_client_secret",
+            "GOVBR_FAKE_CLIENT_SECRET",
             "govbr-auth-local-key",
         )
     )
@@ -613,12 +622,12 @@ def test_launcher_reads_complete_fake_configuration_from_dotenv(
         "\n".join(
             (
                 "GOVBR_PROVIDER=fake",
+                "GOVBR_CLIENT_ID=dotenv-client",
+                "GOVBR_CLIENT_SECRET=dotenv-secret",
+                "GOVBR_REDIRECT_URI=http://localhost:8123/callback",
                 "GOVBR_FAKE_HOST=localhost",
                 "GOVBR_FAKE_PORT=8123",
                 "GOVBR_FAKE_PROVIDER_PREFIX=/provider",
-                "GOVBR_FAKE_CLIENT_ID=dotenv-client",
-                "GOVBR_FAKE_CLIENT_SECRET=dotenv-secret",
-                "GOVBR_FAKE_REDIRECT_URI=http://localhost:8123/callback",
                 "GOVBR_FAKE_REQUEST_TTL_SECONDS=11",
                 "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS=12",
                 "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS=13",
@@ -632,9 +641,6 @@ def test_launcher_reads_complete_fake_configuration_from_dotenv(
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
-        "GOVBR_FAKE_CLIENT_ID",
-        "GOVBR_FAKE_CLIENT_SECRET",
-        "GOVBR_FAKE_REDIRECT_URI",
         "GOVBR_FAKE_REQUEST_TTL_SECONDS",
         "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS",
         "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS",
@@ -655,9 +661,10 @@ def test_launcher_reads_complete_fake_configuration_from_dotenv(
     assert settings.fake_host == "localhost"
     assert settings.fake_port == 8123
     assert settings.fake_provider_prefix == "/provider"
-    assert settings.fake_client_id == "dotenv-client"
-    assert settings.fake_client_secret.get_secret_value() == "dotenv-secret"
-    assert str(settings.fake_redirect_uri) == "http://localhost:8123/callback"
+    assert settings.oauth is not None
+    assert settings.oauth.client_id == "dotenv-client"
+    assert settings.oauth.client_secret.get_secret_value() == "dotenv-secret"
+    assert str(settings.oauth.redirect_uri) == "http://localhost:8123/callback"
     assert settings.fake_request_ttl_seconds == 11
     assert settings.fake_authorization_code_ttl_seconds == 12
     assert settings.fake_access_token_ttl_seconds == 13

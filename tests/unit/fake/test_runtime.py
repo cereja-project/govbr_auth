@@ -52,7 +52,6 @@ def fake_settings() -> GovBrRuntimeSettings:
     """Provide a complete embedded fake-provider configuration."""
     return GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
     )
 
 

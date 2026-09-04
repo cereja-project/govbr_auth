@@ -226,7 +226,7 @@ backend; CPF, senha, tokens e segredos não são exibidos. O arquivo de usuário
 aceita apenas dados fictícios: não use credenciais reais.
 
 Para trocar o FakeGov pelo provedor oficial, mantenha `myapp.py` e altere apenas
-`GOVBR_PROVIDER` e as variáveis oficiais descritas em
+`GOVBR_PROVIDER` e os endpoints oficiais descritos em
 [Provedor oficial](#provedor-oficial). O FakeGov nunca funciona como fallback
 automático.
 
@@ -266,7 +266,11 @@ o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado por
 | `GOVBR_PROVIDER` | `official` (default), `fake` | Escolhe os endpoints do provedor e o transporte HTTP interno |
 | `GOVBR_ENVIRONMENT` | `production`, `staging`, `local` | Identifica o ambiente do provedor; endpoints oficiais incompatíveis impedem a inicialização |
 | `GOVBR_FAKE_USERS_FILE` | Caminho para um JSON fora do Git | Substitui os usuários defaults do FakeGov |
-| `GOVBR_TRANSACTION_SECRET` | Segredo gerado uma única vez | Obrigatório no provedor oficial; o mesmo valor em todas as instâncias |
+| `GOVBR_CLIENT_ID` | Identificador do cliente | Compartilhado entre o provedor oficial e o FakeGov |
+| `GOVBR_CLIENT_SECRET` | Segredo do cliente | Compartilhado entre o provedor oficial e o FakeGov |
+| `GOVBR_REDIRECT_URI` | Callback da aplicação | Compartilhado entre o provedor oficial e o FakeGov |
+| `GOVBR_SCOPE` | Escopo OAuth | Compartilhado entre o provedor oficial e o FakeGov |
+| `GOVBR_TRANSACTION_SECRET` | Segredo gerado uma única vez | Compartilhado entre o provedor oficial e o FakeGov; o mesmo valor em todas as instâncias |
 
 ## Como a comunicação funciona
 

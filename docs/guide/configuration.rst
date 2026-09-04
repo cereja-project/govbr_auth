@@ -15,6 +15,9 @@ warning sem incluir valores ou segredos.
 Provedor oficial
 ----------------
 
+As configurações do cliente são compartilhadas entre o provedor oficial e o
+FakeGov. Os endpoints abaixo são exclusivos do provedor oficial.
+
 .. code-block:: text
 
     GOVBR_PROVIDER=official
@@ -22,12 +25,15 @@ Provedor oficial
     GOVBR_AUTHORIZATION_URL=https://sso.acesso.gov.br/authorize
     GOVBR_TOKEN_URL=https://sso.acesso.gov.br/token
     GOVBR_USERINFO_URL=https://sso.acesso.gov.br/userinfo/
+    GOVBR_ISSUER=https://sso.acesso.gov.br/
+    GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
+
+Configure sempre as variáveis comuns do cliente uma única vez::
+
     GOVBR_CLIENT_ID=seu-client-id
     GOVBR_CLIENT_SECRET=seu-client-secret
     GOVBR_REDIRECT_URI=https://app.example/auth/govbr/callback
     GOVBR_TRANSACTION_SECRET=substitua-pelo-valor-gerado
-    GOVBR_ISSUER=https://sso.acesso.gov.br/
-    GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
 
 Os endpoints oficiais devem pertencer ao mesmo ambiente. Fora de loopback,
 ``GOVBR_REDIRECT_URI`` exige HTTPS e deve coincidir exatamente com a URI
@@ -55,6 +61,11 @@ compartilhado e mantém a mesma secret em todas as instâncias.
 
 FakeGov
 -------
+
+Defina ``GOVBR_PROVIDER=fake`` e ``GOVBR_ENVIRONMENT=local``. O FakeGov
+reutiliza ``GOVBR_CLIENT_ID``, ``GOVBR_CLIENT_SECRET``,
+``GOVBR_REDIRECT_URI``, ``GOVBR_SCOPE`` e ``GOVBR_TRANSACTION_SECRET``; não
+existe uma segunda configuração de cliente para o simulador.
 
 ``GOVBR_FAKE_HOST``, ``GOVBR_FAKE_PORT``, ``GOVBR_FAKE_PROVIDER_PREFIX`` e
 ``GOVBR_FAKE_USERS_FILE`` controlam o simulador local. O host é restrito a

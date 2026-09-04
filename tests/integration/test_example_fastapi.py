@@ -47,9 +47,6 @@ def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
-        "GOVBR_FAKE_CLIENT_ID",
-        "GOVBR_FAKE_CLIENT_SECRET",
-        "GOVBR_FAKE_REDIRECT_URI",
         "GOVBR_FAKE_REQUEST_TTL_SECONDS",
         "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS",
         "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS",
@@ -66,12 +63,12 @@ def test_example_settings_preserve_complete_fake_environment(
     users_file = tmp_path / "fake-users.json"
     configured = {
         "GOVBR_PROVIDER": "fake",
+        "GOVBR_CLIENT_ID": "example-client",
+        "GOVBR_CLIENT_SECRET": "example-secret",
+        "GOVBR_REDIRECT_URI": "http://localhost:8123/auth/govbr/callback",
         "GOVBR_FAKE_HOST": "localhost",
         "GOVBR_FAKE_PORT": "8123",
         "GOVBR_FAKE_PROVIDER_PREFIX": "/provider",
-        "GOVBR_FAKE_CLIENT_ID": "example-client",
-        "GOVBR_FAKE_CLIENT_SECRET": "example-secret",
-        "GOVBR_FAKE_REDIRECT_URI": "http://localhost:8123/auth/govbr/callback",
         "GOVBR_FAKE_REQUEST_TTL_SECONDS": "11",
         "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS": "12",
         "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS": "13",
@@ -90,9 +87,10 @@ def test_example_settings_preserve_complete_fake_environment(
     assert settings.fake_host == "localhost"
     assert settings.fake_port == 8123
     assert settings.fake_provider_prefix == "/provider"
-    assert settings.fake_client_id == "example-client"
-    assert settings.fake_client_secret.get_secret_value() == "example-secret"
-    assert str(settings.fake_redirect_uri) == (
+    assert settings.oauth is not None
+    assert settings.oauth.client_id == "example-client"
+    assert settings.oauth.client_secret.get_secret_value() == "example-secret"
+    assert str(settings.oauth.redirect_uri) == (
         "http://localhost:8123/auth/govbr/callback"
     )
     assert settings.fake_request_ttl_seconds == 11
