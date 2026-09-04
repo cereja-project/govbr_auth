@@ -9,7 +9,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 
 from govbr_auth.fastapi import AuthContext, GovBrAuth
-from govbr_auth.presentation import render_error, render_success
+from govbr_auth.presentation import (
+    DEMO_PAGE_PATH,
+    render_demo_page,
+    render_error,
+    render_success,
+)
 from govbr_auth.core import (
     ExpiredTransactionError,
     GovBrAuthError,
@@ -46,7 +51,6 @@ def create_end_to_end_app(
 
     auth = GovBrAuth(
         runtime=runtime,
-        demo_page=True,
         on_success=authenticated,
         on_error=authentication_failed,
         clock=clock,
@@ -67,6 +71,16 @@ def create_end_to_end_app(
         openapi_url=None,
         lifespan=lifespan,
     )
+
+    @application.get(DEMO_PAGE_PATH, include_in_schema=False)
+    async def demo_page() -> HTMLResponse:
+        return HTMLResponse(
+            render_demo_page(
+                provider=runtime.provider,
+                login_path="/auth/govbr/login",
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
 
     @application.exception_handler(RequestValidationError)
     async def invalid_callback(

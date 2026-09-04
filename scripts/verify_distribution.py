@@ -24,7 +24,6 @@ import httpx
 import govbr_auth
 from govbr_auth.fake.fastapi import create_fake_app
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntimeSettings,
 )
@@ -43,20 +42,12 @@ async def verify_http_boundaries():
             follow_redirects=False,
         ) as client:
             assert (await client.get("/auth/govbr/login")).status_code == 302
-            demo = await client.get("/govbr-auth-demo")
-            assert demo.status_code == 200
-            assert "Entrar com gov.br" in demo.text
-
-    provider_only_settings = GovBrApplicationSettings(
-        runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE),
-        demo_page=False,
-    )
-    fake_app = create_fake_app(provider_only_settings)
+    fake_app = create_fake_app(GovBrRuntimeSettings(provider=GovBrProvider.FAKE))
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fake_app),
         base_url="http://127.0.0.1:8000",
     ) as client:
-        response = await client.get("/jwk")
+        response = await client.get("/fake-govbr/jwk")
         assert response.status_code == 200
         assert response.json()["keys"]
 
@@ -66,10 +57,9 @@ print(f"verified govbr-auth {govbr_auth.__version__} from {govbr_auth.__file__}"
 """
 
 _DEMO_DOCUMENTATION_SYMBOLS = (
-    "GOVBR_DEMO_PAGE",
+    "GovBrRuntimeSettings",
     "/govbr-auth-demo",
-    "GovBrApplicationSettings.from_environment()",
-    "Entrar com gov.br",
+    "python -m govbr_auth.fake",
 )
 
 
@@ -178,7 +168,6 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
         )
         child_environment = {
             **os.environ,
-            "GOVBR_DEMO_PAGE": "true",
             "GOVBR_FAKE_USERS_FILE": str(users_file),
             "GOVBR_PROVIDER": "fake",
             "PYTHONNOUSERSITE": "1",
@@ -214,7 +203,7 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
                     "from django.core.management import call_command; "
                     "call_command('check'); "
                     "from django_app import urlpatterns; "
-                    "assert any(str(pattern.pattern) == 'govbr-auth-demo' "
+                    "assert any(str(pattern.pattern) == 'auth/govbr/login' "
                     "for pattern in urlpatterns)",
                 )
             else:
@@ -222,7 +211,7 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
                     str(python),
                     "-c",
                     "from flask_app import app; "
-                    "assert any(rule.rule == '/govbr-auth-demo' "
+                    "assert any(rule.rule == '/auth/govbr/login' "
                     "for rule in app.url_map.iter_rules())",
                 )
             subprocess.run(

@@ -30,7 +30,6 @@ def route_paths(application) -> set[str]:
 def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for variable in (
         "GOVBR_PROVIDER",
-        "GOVBR_DEMO_PAGE",
         "GOVBR_ENVIRONMENT",
         "GOVBR_AUTHORIZATION_URL",
         "GOVBR_TOKEN_URL",
@@ -67,7 +66,6 @@ def test_example_settings_preserve_complete_fake_environment(
     users_file = tmp_path / "fake-users.json"
     configured = {
         "GOVBR_PROVIDER": "fake",
-        "GOVBR_DEMO_PAGE": "true",
         "GOVBR_FAKE_HOST": "localhost",
         "GOVBR_FAKE_PORT": "8123",
         "GOVBR_FAKE_PROVIDER_PREFIX": "/provider",
@@ -88,21 +86,20 @@ def test_example_settings_preserve_complete_fake_environment(
 
     settings = settings_factory()
 
-    assert settings.demo_page is True
-    assert settings.runtime.provider.value == "fake"
-    assert settings.runtime.fake_host == "localhost"
-    assert settings.runtime.fake_port == 8123
-    assert settings.runtime.fake_provider_prefix == "/provider"
-    assert settings.runtime.fake_client_id == "example-client"
-    assert settings.runtime.fake_client_secret.get_secret_value() == "example-secret"
-    assert str(settings.runtime.fake_redirect_uri) == (
+    assert settings.provider.value == "fake"
+    assert settings.fake_host == "localhost"
+    assert settings.fake_port == 8123
+    assert settings.fake_provider_prefix == "/provider"
+    assert settings.fake_client_id == "example-client"
+    assert settings.fake_client_secret.get_secret_value() == "example-secret"
+    assert str(settings.fake_redirect_uri) == (
         "http://localhost:8123/auth/govbr/callback"
     )
-    assert settings.runtime.fake_request_ttl_seconds == 11
-    assert settings.runtime.fake_authorization_code_ttl_seconds == 12
-    assert settings.runtime.fake_access_token_ttl_seconds == 13
-    assert settings.runtime.fake_id_token_ttl_seconds == 14
-    assert settings.runtime.fake_users_file == users_file
+    assert settings.fake_request_ttl_seconds == 11
+    assert settings.fake_authorization_code_ttl_seconds == 12
+    assert settings.fake_access_token_ttl_seconds == 13
+    assert settings.fake_id_token_ttl_seconds == 14
+    assert settings.fake_users_file == users_file
 
 
 def test_example_loads_only_the_working_directory_env(
@@ -135,7 +132,7 @@ def test_example_uses_only_the_canonical_fastapi_facade() -> None:
 
     assert "from govbr_auth.fastapi import AuthContext, GovBrAuth" in source
     assert "GovBrAuth(" in source
-    assert "GovBrApplicationSettings.from_environment()" in settings_source
+    assert "GovBrRuntimeSettings.from_environment()" in settings_source
     assert "application.include_router(auth.router)" in source
     assert "FakeGovBrProvider" not in source
     assert "create_fake_govbr_router" not in source
@@ -150,7 +147,6 @@ async def test_example_selects_complete_fake_graph_from_environment(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GOVBR_PROVIDER", "fake")
-    monkeypatch.setenv("GOVBR_DEMO_PAGE", "true")
     for variable in (
         "GOVBR_AUTHORIZATION_URL",
         "GOVBR_TOKEN_URL",
@@ -183,7 +179,6 @@ async def test_example_selects_complete_fake_graph_from_environment(
         "/fake-govbr/login",
         "/fake-govbr/token",
         "/fake-govbr/userinfo",
-        "/govbr-auth-demo",
     }.issubset(route_paths(application))
 
 
@@ -201,13 +196,12 @@ def test_flask_example_loads_provider_from_working_directory_env(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(example, "load_dotenv", record_load_dotenv, raising=False)
     monkeypatch.setenv("GOVBR_PROVIDER", "fake")
-    monkeypatch.setenv("GOVBR_DEMO_PAGE", "true")
 
     application = example.create_app()
 
     assert loaded == {"dotenv_path": tmp_path / ".env", "override": False}
     assert any(
-        rule.rule == "/govbr-auth-demo" for rule in application.url_map.iter_rules()
+        rule.rule == "/auth/govbr/login" for rule in application.url_map.iter_rules()
     )
 
 
@@ -224,14 +218,15 @@ def test_django_example_loads_provider_from_working_directory_env(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(dotenv, "load_dotenv", record_load_dotenv)
     monkeypatch.setenv("GOVBR_PROVIDER", "fake")
-    monkeypatch.setenv("GOVBR_DEMO_PAGE", "true")
     example = importlib.reload(importlib.import_module("examples.example_django"))
 
     try:
-        assert example.auth._owner.runtime.settings.provider.value == "fake"
+        assert example.auth._application.runtime.settings.provider.value == "fake"
         assert loaded == {"dotenv_path": tmp_path / ".env", "override": False}
         assert any(
-            str(pattern.pattern) == "govbr-auth-demo" for pattern in example.urlpatterns
+            str(pattern.pattern) == "auth/govbr/login"
+            for pattern in example.urlpatterns
         )
     finally:
         example.auth.close()
+

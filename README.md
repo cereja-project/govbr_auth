@@ -19,6 +19,8 @@ Uma biblioteca moderna e robusta para integração com o Login Único gov.br. Se
 E como a cereja do bolo, o projeto inclui o **FakeGov**, um simulador para ambientes de desenvolvimento e teste que permite depurar o fluxo completo de autenticação antes da homologação oficial. Isso reduz dependências externas, acelera o setup e encurta o ciclo de desenvolvimento da equipe.
 
 O fluxo OAuth é 100% *stateless* no backend: funciona com múltiplos *workers* e sem armazenamento compartilhado, bastando que todos utilizem a mesma secret `GOVBR_TRANSACTION_SECRET`.
+O envelope usa Fernet, TTL, PKCE e nonce; o state não é um registro de uso
+único e o authorization code de uso único limita replay.
 
 > [!IMPORTANT]
 > 1. Este é um projeto open source independente, sem manutenção, homologação ou endosso do Governo Federal.
@@ -103,7 +105,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from govbr_auth.fastapi import AuthContext, GovBrAuth
-from govbr_auth.runtime import GovBrApplicationSettings
+from govbr_auth.runtime import GovBrRuntimeSettings
 
 
 async def authenticated(context: AuthContext) -> JSONResponse:
@@ -111,7 +113,7 @@ async def authenticated(context: AuthContext) -> JSONResponse:
     return JSONResponse({"authenticated": True})
 
 
-def create_app(settings: GovBrApplicationSettings) -> FastAPI:
+def create_app(settings: GovBrRuntimeSettings) -> FastAPI:
     app = FastAPI()
     auth = GovBrAuth(settings=settings, on_success=authenticated)
     app.include_router(auth.router)
@@ -119,7 +121,7 @@ def create_app(settings: GovBrApplicationSettings) -> FastAPI:
 
 
 load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
-settings = GovBrApplicationSettings.from_environment()
+settings = GovBrRuntimeSettings.from_environment()
 app = create_app(settings)
 
 
@@ -133,11 +135,10 @@ if __name__ == "__main__":
 Para carregar por variáveis de ambiente, crie `.env`. O `myapp.py` carrega
 somente `Path.cwd() / ".env"`, sem procurar arquivos em diretórios ancestrais,
 e preserva variáveis que já existem no processo com `override=False`. Em
-seguida, `GovBrApplicationSettings.from_environment()` aplica a configuração:
+seguida, `GovBrRuntimeSettings.from_environment()` aplica a configuração:
 
 ```dotenv
 GOVBR_PROVIDER=fake
-GOVBR_DEMO_PAGE=true
 GOVBR_FAKE_USERS_FILE=./fake-users.local.json
 ```
 
@@ -150,17 +151,13 @@ pela composição explícita abaixo. O restante da aplicação permanece igual:
 from pathlib import Path
 
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntimeSettings,
 )
 
-settings = GovBrApplicationSettings(
-    runtime=GovBrRuntimeSettings(
-        provider=GovBrProvider.FAKE,
-        fake_users_file=Path("fake-users.local.json"),
-    ),
-    demo_page=True,
+settings = GovBrRuntimeSettings(
+    provider=GovBrProvider.FAKE,
+    fake_users_file=Path("fake-users.local.json"),
 )
 app = create_app(settings)
 ```
@@ -177,15 +174,13 @@ from os import environ
 from pydantic import SecretStr
 from govbr_auth.core import GovBrSettings, ProviderEnvironment
 from govbr_auth.runtime import (
-    GovBrApplicationSettings,
     GovBrProvider,
     GovBrRuntimeSettings,
 )
 
-settings = GovBrApplicationSettings(
-    runtime=GovBrRuntimeSettings(
-        provider=GovBrProvider.OFFICIAL,
-        oauth=GovBrSettings(
+settings = GovBrRuntimeSettings(
+    provider=GovBrProvider.OFFICIAL,
+    oauth=GovBrSettings(
             environment=ProviderEnvironment.STAGING,
             authorization_url="https://sso.staging.acesso.gov.br/authorize",
             token_url="https://sso.staging.acesso.gov.br/token",
@@ -197,8 +192,6 @@ settings = GovBrApplicationSettings(
             issuer="https://sso.staging.acesso.gov.br/",
             jwks_url="https://sso.staging.acesso.gov.br/jwk",
         ),
-    ),
-    demo_page=True,
 )
 app = create_app(settings)
 ```
@@ -210,15 +203,12 @@ app = create_app(settings)
 python myapp.py
 ```
 
-Abra `http://localhost:8000/govbr-auth-demo` e clique em
-**Entrar com gov.br**. Entre com as
+Abra `http://localhost:8000/auth/govbr/login`. Entre com as
 [credenciais de teste](#credenciais-de-teste) e conclua o callback.
 
-`GOVBR_DEMO_PAGE=true` injeta essa rota fixa nos adapters FastAPI, Django e
-Flask. Com `demo_page=false` (o default), nenhuma página é injetada. Habilitar
-`/govbr-auth-demo` em uma aplicação que já usa esse caminho pode causar
-colisão; verificar e evitar a colisão da rota fixa é responsabilidade do
-integrador.
+O adapter registra apenas as rotas de autenticação. A página visual de
+demonstração pertence ao launcher FakeGov (`python -m govbr_auth.fake`) e não é
+injetada na aplicação consumidora.
 
 O callback `authenticated` recebe um `AuthContext` já validado:
 
@@ -273,7 +263,6 @@ o simulador canônico é `govbr_auth.fake.FakeGovSimulator`, criado por
 | Variável | Valores | Efeito |
 | --- | --- | --- |
 | `GOVBR_PROVIDER` | `official` (default), `fake` | Escolhe os endpoints do provedor e o transporte HTTP interno |
-| `GOVBR_DEMO_PAGE` | `true`, `false` (default) | Injeta a rota fixa `/govbr-auth-demo` nos adapters quando habilitada |
 | `GOVBR_ENVIRONMENT` | `production`, `staging`, `local` | Identifica o ambiente do provedor; endpoints oficiais incompatíveis impedem a inicialização |
 | `GOVBR_FAKE_USERS_FILE` | Caminho para um JSON fora do Git | Substitui os usuários defaults do FakeGov |
 | `GOVBR_TRANSACTION_SECRET` | Segredo gerado uma única vez | Obrigatório no provedor oficial; o mesmo valor em todas as instâncias |
@@ -311,10 +300,14 @@ Para desenvolvimento, execute a aplicação com `GOVBR_PROVIDER=fake`. A mesma
 fachada e as mesmas rotas do backend são usadas com o provedor oficial; somente
 a composição selecionada pela configuração muda.
 
-O provedor oficial usa a mesma página `/govbr-auth-demo`: o botão inicia o
-redirect real, sem simulação. Em código avançado que já constrói o runtime,
-habilite a apresentação separadamente com
-`GovBrAuth(runtime=runtime, demo_page=True, on_success=authenticated)`.
+O provedor oficial usa as mesmas rotas de autenticação, sem uma página de
+apresentação embutida no adapter.
+
+O backend é stateless e pode rodar com múltiplos workers sem armazenamento
+compartilhado. Use a mesma secret ``GOVBR_TRANSACTION_SECRET`` em todas as
+instâncias, gerada uma vez e mantida em segredo. Para iniciar uma demonstração
+visual local, o launcher exibe o botão **Entrar com gov.br** em
+``/govbr-auth-demo``.
 
 ## Customizar usuários
 

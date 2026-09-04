@@ -123,7 +123,7 @@ def test_documented_quickstart_does_not_load_dotenv_from_parent_directory(
                 (
                     "-c",
                     "from django_app import urlpatterns; "
-                    "assert any(str(pattern.pattern) == 'govbr-auth-demo' "
+                    "assert any(str(pattern.pattern) == 'auth/govbr/login' "
                     "for pattern in urlpatterns)",
                 ),
             ),
@@ -134,7 +134,7 @@ def test_documented_quickstart_does_not_load_dotenv_from_parent_directory(
                 (
                     "-c",
                     "from flask_app import app; "
-                    "assert any(rule.rule == '/govbr-auth-demo' "
+                    "assert any(rule.rule == '/auth/govbr/login' "
                     "for rule in app.url_map.iter_rules())",
                 ),
             ),
@@ -155,7 +155,6 @@ def test_documented_framework_quickstart_is_executable(
         **os.environ,
         "GOVBR_FAKE_USERS_FILE": str(users),
         "GOVBR_PROVIDER": "fake",
-        "GOVBR_DEMO_PAGE": "true",
         "PYTHONPATH": str(PROJECT_ROOT),
         "PYTHONUTF8": "1",
     }

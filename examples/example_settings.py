@@ -1,8 +1,8 @@
 """Application configuration used by the runnable framework examples."""
 
-from govbr_auth.runtime import GovBrApplicationSettings
+from govbr_auth.runtime import GovBrRuntimeSettings
 
 
-def application_settings() -> GovBrApplicationSettings:
-    """Load the validated runtime and opt-in presentation settings."""
-    return GovBrApplicationSettings.from_environment()
+def application_settings() -> GovBrRuntimeSettings:
+    """Load the validated framework-neutral runtime settings."""
+    return GovBrRuntimeSettings.from_environment()

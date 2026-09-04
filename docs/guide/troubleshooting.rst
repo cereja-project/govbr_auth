@@ -4,7 +4,7 @@ Solução de problemas
 Instalação ou launcher ausente
 ------------------------------
 
-Instale o extra que contém dependências do servidor local::
+Instale o extra necessário::
 
     pip install "govbr-auth[fake]"
     python -m govbr_auth.fake
@@ -12,70 +12,42 @@ Instale o extra que contém dependências do servidor local::
 Porta ocupada
 -------------
 
-O launcher usa a porta 8000. Encerre o processo local que já a utiliza ou
-defina ``GOVBR_FAKE_PORT`` com outra porta válida. Não exponha o FakeGov em uma
-interface de rede.
+O launcher usa a porta configurada em ``GOVBR_FAKE_PORT`` e mantém o host em
+loopback. Escolha outra porta válida se necessário; não publique o FakeGov na
+rede.
 
-Provider ou booleano inválido
------------------------------
+Provider ou variável desconhecida
+---------------------------------
 
-``GOVBR_PROVIDER`` aceita apenas ``official`` e ``fake``.
-``GOVBR_DEMO_PAGE`` aceita exatamente ``true`` ou ``false`` em
-minúsculas. Corrija a variável e reinicie o processo.
+``GOVBR_PROVIDER`` aceita apenas ``official`` e ``fake``. Nomes desconhecidos
+com prefixo ``GOVBR_`` interrompem a inicialização. Confira a grafia e a
+versão instalada. Nunca são exibidos valores de configuração ou segredos.
 
-Página de demonstração ausente ou em conflito
----------------------------------------------
+Página de demonstração
+----------------------
 
-Carregue ``GovBrApplicationSettings.from_environment()`` e configure
-``GOVBR_DEMO_PAGE=true`` para injetar ``/govbr-auth-demo``. Com
-``demo_page=false``, nenhuma rota é adicionada. O provedor oficial usa a mesma
-página sem simulação.
-
-A rota é fixa. Se a aplicação já registrou esse caminho, remova a duplicidade
-antes de habilitar o opt-in; evitar a colisão é responsabilidade do integrador.
-O comando ``python -m govbr_auth.fake`` é ``provider-only`` por padrão, sem
-``GOVBR_DEMO_PAGE=true``. ``GOVBR_DEMO_PAGE=true`` seleciona a composição
-completa e cria a página na aplicação consumidora.
-
-Variável desconhecida ou inativa
---------------------------------
-
-Uma variável com prefixo ``GOVBR_`` que não pertence à versão instalada
-interrompe a inicialização e informa o nome desconhecido. Confira a grafia e a
-versão do pacote. Uma variável reconhecida, mas pertencente ao provider inativo,
-gera warning e é ignorada; remova-a ou selecione o provider correspondente.
-Mensagens de configuração nunca incluem o valor da variável.
+A página ``/govbr-auth-demo`` é criada somente por ``python -m govbr_auth.fake``
+ou ``create_fake_app``. Ela não é adicionada pelos adapters. Se o launcher não
+mostrar a página, confirme que o extra ``fake`` está instalado, que o provedor
+fake foi selecionado e que o app usado é o launcher.
 
 Host recusado
 -------------
 
 ``GOVBR_FAKE_HOST`` aceita somente ``localhost``, ``127.0.0.1`` ou ``::1``.
-Essa restrição evita publicar acidentalmente o simulador na rede.
 
 Arquivo de usuários ausente ou inválido
 ---------------------------------------
 
-Se ``GOVBR_FAKE_USERS_FILE`` não existir ou não puder ser lido, a inicialização
-falha. O JSON deve conter ``{"users": [...]}``; cada item exige ``"cpf"``,
-``"password"``, ``"name"`` e ``"email"``. Não use credenciais reais.
+``GOVBR_FAKE_USERS_FILE`` deve apontar para um JSON com ``{"users": [...]}``.
+Cada item exige CPF, senha, nome e email fictícios. Não use credenciais reais.
 
 Transação expirada ou estado inválido
 -------------------------------------
 
 Volte ao início e crie um novo fluxo. Não desative validação de ``state``,
-nonce ou PKCE.
-
-O ``state`` é um envelope Fernet com TTL, PKCE e nonce; ele não depende do
-processo que iniciou o login. Em múltiplos workers sem armazenamento
-compartilhado, confirme que todos receberam a mesma secret
-``GOVBR_TRANSACTION_SECRET`` e que ela não foi rotacionada durante o fluxo.
-
-O ``state`` não é um registro de uso único. Se o mesmo callback for repetido
-dentro do TTL, a rejeição segura deve vir do authorization code de uso único
-que o provedor invalida na primeira troca.
-
-Configuração oficial conflitante com FakeGov
----------------------------------------------
-
-Ao usar ``GOVBR_PROVIDER=fake``, remova variáveis de endpoints oficiais. A
-biblioteca rejeita a mistura para evitar um grafo ambíguo.
+nonce ou PKCE. O envelope Fernet tem TTL. Em múltiplos workers, use a mesma
+``GOVBR_TRANSACTION_SECRET``. O ``state`` não é um registro de uso único; o
+authorization code descartável é o limite de replay do provedor.
+O state não é um registro de uso único; o authorization code de uso único
+limita replay.

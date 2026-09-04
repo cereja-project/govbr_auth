@@ -1,20 +1,19 @@
 FakeGov avançado
 ================
 
-O provedor local é opcional e nunca é ativado pelo cliente oficial. Instale o
-extra ``govbr-auth[fake]``. No caminho comum, selecione ``GOVBR_PROVIDER=fake``
-e use ``GovBrAuth``; as factories abaixo atendem topologias avançadas.
-
-``python -m govbr_auth.fake`` executa a topologia isolada ``provider-only`` sem
-flag adicional. A página da aplicação é um opt-in dos adapters por
-``GOVBR_DEMO_PAGE=true`` e fica em ``/govbr-auth-demo``. Carregue-a com
-``GovBrApplicationSettings.from_environment()``. Com ``demo_page=false``, a
-rota não é injetada; o provedor oficial usa a mesma página sem simulação. A
-rota é fixa, portanto verificar colisões é responsabilidade do integrador.
+O FakeGov é um provedor local opcional, habilitado explicitamente com
+``GOVBR_PROVIDER=fake``. O caminho comum usa ``GovBrAuth``. O comando
+``python -m govbr_auth.fake`` inicia o launcher end-to-end em loopback e
+publica a página ``/govbr-auth-demo``. Essa apresentação não pertence aos
+adapters nem ao provedor oficial.
 
 .. autoclass:: govbr_auth.fake.FakeGovSimulator
 
 .. autofunction:: govbr_auth.fake.create_fake_gov_simulator
+
+``FakeGovHttpApplication`` é a fachada HTTP neutra do simulador. Com um
+``FakeGovSimulator``, reutilize ``runtime.http_application`` quando precisar
+fornecer uma aplicação HTTP já composta.
 
 .. autoclass:: govbr_auth.fake.FakeGovBrSettings
 
@@ -28,17 +27,14 @@ rota é fixa, portanto verificar colisões é responsabilidade do integrador.
 
 .. autoclass:: govbr_auth.fake.InMemoryFakeUserStore
 
+.. py:function:: create_fake_app(settings=None, *, clock=utc_now, user_repository=None)
+
+   Cria a aplicação local completa com consumidor, FakeGov e página demo.
+
 .. py:function:: create_fake_govbr_router(runtime, *, prefix=None, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)
 
-   Cria as rotas ASGI de um ``FakeGovSimulator`` ou ``FakeGovBrProvider``.
-   ``application`` aceita uma ``FakeGovHttpApplication`` já composta. Com
-   ``FakeGovSimulator``, omita esse argumento ou passe
-   ``runtime.http_application`` para reutilizar a fachada canônica do simulador.
+   Cria apenas as rotas do provedor FakeGov para topologias avançadas.
 
 .. py:function:: create_fake_govbr_app(runtime, *, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)
 
-   Cria uma aplicação ASGI de provedor separado para uso avançado. Com
-   ``FakeGovBrProvider`` cru, passe ``credential_authenticator`` para login
-   interativo ou ``automatic_subject`` para automação. A composição falha sem
-   uma estratégia explícita. ``application`` permite fornecer uma fachada HTTP
-   própria sem recriar o provider.
+   Cria uma aplicação ASGI somente do provedor FakeGov.

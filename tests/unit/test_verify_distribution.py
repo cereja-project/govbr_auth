@@ -20,10 +20,9 @@ def fastapi_distribution_execution(
     wheel.write_text("fixture", encoding="utf-8")
     documented_surface = "\n".join(
         (
-            "GOVBR_DEMO_PAGE",
+            "GovBrRuntimeSettings",
             "/govbr-auth-demo",
-            "GovBrApplicationSettings.from_environment()",
-            "Entrar com gov.br",
+            "python -m govbr_auth.fake",
         )
     )
     for path in (readme, guide):
@@ -80,32 +79,25 @@ def test_distribution_profiles_install_each_documented_extra_in_isolation() -> N
     )
 
 
-def test_fastapi_distribution_probe_targets_provider_only_jwks(
+def test_fastapi_distribution_probe_targets_fakegov_jwks(
     fastapi_distribution_execution: tuple[str, dict[str, str]],
 ) -> None:
-    """The standalone FakeGov probe must ignore the demo-enabled environment."""
+    """The installed FakeGov launcher must expose its provider routes."""
     probe, _ = fastapi_distribution_execution
 
     assert "from govbr_auth.runtime import (" in probe
-    assert "GovBrApplicationSettings," in probe
     assert "GovBrProvider," in probe
     assert "GovBrRuntimeSettings," in probe
-    assert "provider_only_settings = GovBrApplicationSettings(" in probe
-    assert "runtime=GovBrRuntimeSettings(provider=GovBrProvider.FAKE)," in probe
-    assert "demo_page=False," in probe
-    assert "fake_app = create_fake_app(provider_only_settings)" in probe
-    assert "fake_app = create_fake_app()" not in probe
-    assert 'client.get("/jwk")' in probe
-    assert "/fake-govbr/jwk" not in probe
+    assert "create_fake_app(GovBrRuntimeSettings(provider=GovBrProvider.FAKE))" in probe
+    assert 'client.get("/fake-govbr/jwk")' in probe
 
 
-def test_fastapi_distribution_probe_opens_the_documented_demo_page(
+def test_fastapi_distribution_probe_uses_the_consumer_login(
     fastapi_distribution_execution: tuple[str, dict[str, str]],
 ) -> None:
     probe, _ = fastapi_distribution_execution
 
-    assert 'client.get("/govbr-auth-demo")' in probe
-    assert "Entrar com gov.br" in probe
+    assert 'client.get("/auth/govbr/login")' in probe
 
 
 def test_distribution_child_environment_removes_obsolete_fake_switch(
@@ -115,18 +107,17 @@ def test_distribution_child_environment_removes_obsolete_fake_switch(
     _, environment = fastapi_distribution_execution
 
     assert "GOVBR_FAKE_END_TO_END" not in environment
-    assert environment.get("GOVBR_DEMO_PAGE") == "true"
+    assert "GOVBR_DEMO_PAGE" not in environment
 
 
 @pytest.mark.parametrize("document_name", ("README.md", "quick-start.rst"))
-def test_distribution_requires_the_demo_contract_in_each_packaged_guide(
+def test_distribution_requires_the_launcher_contract_in_each_packaged_guide(
     document_name: str,
 ) -> None:
     required_symbols = (
-        "GOVBR_DEMO_PAGE",
+        "GovBrRuntimeSettings",
         "/govbr-auth-demo",
-        "GovBrApplicationSettings.from_environment()",
-        "Entrar com gov.br",
+        "python -m govbr_auth.fake",
     )
     complete_source = "\n".join(required_symbols)
 
@@ -139,3 +130,4 @@ def test_distribution_requires_the_demo_contract_in_each_packaged_guide(
                 complete_source.replace(missing_symbol, ""),
                 document_name,
             )
+

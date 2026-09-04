@@ -120,7 +120,7 @@ def create_fake_app(
 ) -> FastAPI:
     """Create the complete local fake application profile."""
     resolved = settings or _launcher_settings()
-    if resolved.runtime.provider is not GovBrProvider.FAKE:
+    if resolved.provider is not GovBrProvider.FAKE:
         raise ValueError("fake launcher requires the fake provider")
     runtime_settings = prepare_adapter_runtime_settings(
         resolved,
@@ -144,8 +144,8 @@ def run() -> None:
     uvicorn.run(
         "govbr_auth.fake:create_fake_app",
         factory=True,
-        host=settings.runtime.fake_host,
-        port=settings.runtime.fake_port,
+        host=settings.fake_host,
+        port=settings.fake_port,
     )
 
 
