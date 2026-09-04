@@ -257,7 +257,7 @@ def test_django_fake_runtime_passes_simulator_http_application_to_provider_patte
     )
 
     try:
-        runtime = auth._owner.runtime.fake
+        runtime = auth._application.runtime.fake
         assert runtime is not None
         assert mounted == [(runtime, runtime.http_application, auth._clock)]
     finally:

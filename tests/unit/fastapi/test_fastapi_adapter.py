@@ -409,7 +409,11 @@ async def test_invalid_prefix_is_rejected_before_runtime_allocation(
         allocated_http.append(owned_http)
         return client_runtime(RecordingClient(), owned_http=owned_http)
 
-    monkeypatch.setattr(fastapi_adapter, "create_adapter_runtime", allocate_runtime)
+    monkeypatch.setattr(
+        fastapi_adapter,
+        "create_adapter_application",
+        allocate_runtime,
+    )
 
     async def success_handler(context) -> Response:
         return Response(status_code=204)

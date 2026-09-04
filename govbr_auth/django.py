@@ -12,9 +12,9 @@ from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
     describe_auth_error,
 )
-from govbr_auth.adapters._runtime import adapter_callback_path, create_adapter_runtime
+from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.adapters._sync import run_sync
-from govbr_auth.authentication import AuthenticationContext, AuthenticationService
+from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.django import create_fake_govbr_urlpatterns
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
@@ -51,15 +51,13 @@ class GovBrAuth:
     ) -> None:
         if not _is_canonical_path_prefix(prefix, allow_empty=True):
             raise ValueError("prefix must be an empty string or a canonical path")
-        self._prefix = prefix.lstrip("/")
-        self._login_path = f"{prefix}/login" if prefix else "/login"
-        self._clock = clock
         self._on_success = on_success
         self._on_error = on_error
-        self._owner = create_adapter_runtime(
+        self._application = create_adapter_application(
             settings=settings,
             runtime=runtime,
             prefix=prefix,
+            expose_tokens=expose_tokens,
             clock=clock,
             user_repository=user_repository,
             fake_transport_factory=lambda fake: FakeGovHttpTransport(
@@ -67,10 +65,8 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
-        self._service = AuthenticationService(
-            self._owner.runtime.client,
-            expose_tokens=expose_tokens,
-        )
+        self._prefix = prefix.lstrip("/")
+        self._clock = self._application.clock
         self._urlpatterns = self._build_urlpatterns()
 
     @property
@@ -80,23 +76,23 @@ class GovBrAuth:
 
     def close(self) -> None:
         """Close an adapter-owned runtime without closing a borrowed runtime."""
-        self._owner.close()
+        self._application.close()
 
     def _build_urlpatterns(self) -> list[URLPattern]:
-        prefix = f"{self._prefix}/" if self._prefix else ""
-        callback_path = adapter_callback_path(
-            self._owner.runtime,
-            f"/{self._prefix}" if self._prefix else "",
-        ).lstrip("/")
+        callback_path = self._application.callback_path.lstrip("/")
         patterns = [
-            path(f"{prefix}login", self._login, name="govbr-auth-login"),
+            path(
+                self._application.login_path.lstrip("/"),
+                self._login,
+                name="govbr-auth-login",
+            ),
             path(
                 callback_path,
                 self._callback,
                 name="govbr-auth-callback",
             ),
         ]
-        fake_runtime = self._owner.runtime.fake
+        fake_runtime = self._application.runtime.fake
         if fake_runtime is not None:
             patterns.extend(
                 create_fake_govbr_urlpatterns(
@@ -108,7 +104,9 @@ class GovBrAuth:
         return patterns
 
     def _login(self, request: HttpRequest) -> HttpResponseRedirect:
-        authorization = self._service.authorization_url(now=self._clock())
+        authorization = self._application.service.authorization_url(
+            now=self._clock()
+        )
         return HttpResponseRedirect(authorization.url)
 
     @csrf_exempt
@@ -128,7 +126,7 @@ class GovBrAuth:
         try:
 
             async def authenticate():
-                return await self._service.authenticate(
+                return await self._application.service.authenticate(
                     code=code,
                     state=state,
                     now=self._clock(),

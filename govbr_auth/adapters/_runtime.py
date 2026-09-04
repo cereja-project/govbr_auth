@@ -32,7 +32,7 @@ def create_adapter_runtime(
     clock: Callable[[], datetime],
     user_repository: "FakeUserRepository | None",
     fake_transport_factory: Callable[["FakeGovSimulator"], httpx.AsyncBaseTransport],
-) -> tuple[RuntimeOwner, bool]:
+) -> RuntimeOwner:
     """Create or borrow one canonical runtime for a framework adapter."""
     if settings is not None and runtime is not None:
         raise TypeError("settings and runtime are mutually exclusive")

@@ -10,9 +10,9 @@ from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
     describe_auth_error,
 )
-from govbr_auth.adapters._runtime import adapter_callback_path, create_adapter_runtime
+from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.adapters._sync import run_sync
-from govbr_auth.authentication import AuthenticationContext, AuthenticationService
+from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.flask import create_fake_govbr_blueprint
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
@@ -49,13 +49,13 @@ class GovBrAuth:
     ) -> None:
         if not _is_canonical_path_prefix(prefix, allow_empty=True):
             raise ValueError("prefix must be an empty string or a canonical path")
-        self._clock = clock
         self._on_success = on_success
         self._on_error = on_error
-        self._owner = create_adapter_runtime(
+        self._application = create_adapter_application(
             settings=settings,
             runtime=runtime,
             prefix=prefix,
+            expose_tokens=expose_tokens,
             clock=clock,
             user_repository=user_repository,
             fake_transport_factory=lambda fake: FakeGovHttpTransport(
@@ -63,12 +63,9 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
-        self._service = AuthenticationService(
-            self._owner.runtime.client,
-            expose_tokens=expose_tokens,
-        )
-        self._blueprint = self._build_blueprint(prefix)
-        fake_runtime = self._owner.runtime.fake
+        self._clock = self._application.clock
+        self._blueprint = self._build_blueprint()
+        fake_runtime = self._application.runtime.fake
         self._fake_blueprint = (
             create_fake_govbr_blueprint(
                 fake_runtime,
@@ -86,7 +83,7 @@ class GovBrAuth:
 
     def close(self) -> None:
         """Close an adapter-owned runtime without closing a borrowed runtime."""
-        self._owner.close()
+        self._application.close()
 
     def register(self, application: Flask) -> None:
         """Register consumer and conditional FakeGov routes on a Flask app."""
@@ -94,17 +91,20 @@ class GovBrAuth:
         if self._fake_blueprint is not None:
             application.register_blueprint(self._fake_blueprint)
 
-    def _build_blueprint(self, prefix: str) -> Blueprint:
+    def _build_blueprint(self) -> Blueprint:
         blueprint = Blueprint("govbr_auth", __name__)
-        login_path = f"{prefix}/login" if prefix else "/login"
-        callback_path = adapter_callback_path(self._owner.runtime, prefix)
 
-        @blueprint.get(login_path)
+        @blueprint.get(self._application.login_path)
         def login():
-            authorization = self._service.authorization_url(now=self._clock())
+            authorization = self._application.service.authorization_url(
+                now=self._clock()
+            )
             return redirect(authorization.url)
 
-        @blueprint.route(callback_path, methods=["GET", "POST"])
+        @blueprint.route(
+            self._application.callback_path,
+            methods=["GET", "POST"],
+        )
         def callback():
             code = request.values.get("code")
             state = request.values.get("state")
@@ -126,7 +126,7 @@ class GovBrAuth:
             try:
 
                 async def authenticate():
-                    return await self._service.authenticate(
+                    return await self._application.service.authenticate(
                         code=code,
                         state=state,
                         now=self._clock(),

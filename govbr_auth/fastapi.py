@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from govbr_auth.adapters._errors import describe_auth_error
-from govbr_auth.adapters._runtime import adapter_callback_path, create_adapter_runtime
+from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import GovBrAuthError
@@ -50,11 +50,11 @@ def create_govbr_router(
 ) -> APIRouter:
     """Create consumer authentication routes backed by a strict core client."""
     prefix = _validate_router_prefix(prefix)
+    service = AuthenticationService(client, expose_tokens=expose_tokens)
     return _create_govbr_router(
-        client=client,
+        service=service,
         on_success=on_success,
         on_error=on_error,
-        expose_tokens=expose_tokens,
         router_prefix=prefix,
         login_path="/login",
         callback_path="/callback",
@@ -64,17 +64,15 @@ def create_govbr_router(
 
 def _create_govbr_router(
     *,
-    client: GovBrClient,
+    service: AuthenticationService,
     on_success: AuthSuccessHandler,
     on_error: AuthErrorHandler | None,
-    expose_tokens: bool,
     router_prefix: str,
     login_path: str,
     callback_path: str,
     clock: Callable[[], datetime],
 ) -> APIRouter:
     router = APIRouter(prefix=router_prefix)
-    service = AuthenticationService(client, expose_tokens=expose_tokens)
 
     @router.get(login_path)
     async def login() -> RedirectResponse:
@@ -117,10 +115,11 @@ class GovBrAuth:
         if settings is not None and runtime is not None:
             raise TypeError("settings and runtime are mutually exclusive")
         prefix = _validate_router_prefix(prefix)
-        owner = create_adapter_runtime(
+        application = create_adapter_application(
             settings=settings,
             runtime=runtime,
             prefix=prefix,
+            expose_tokens=expose_tokens,
             clock=clock,
             user_repository=user_repository,
             fake_transport_factory=lambda fake: FakeGovHttpTransport(
@@ -128,26 +127,25 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
-        self._runtime = owner.runtime
+        self._application = application
+        self._runtime = application.runtime
 
         @asynccontextmanager
         async def lifespan(_: object):
             try:
                 yield
             finally:
-                await owner.aclose()
+                await application.aclose()
 
         router = APIRouter(lifespan=lifespan)
-        login_path = f"{prefix}/login" if prefix else "/login"
         router.include_router(
             _create_govbr_router(
-                client=self._runtime.client,
+                service=application.service,
                 on_success=on_success,
                 on_error=on_error,
-                expose_tokens=expose_tokens,
                 router_prefix="",
-                login_path=login_path,
-                callback_path=adapter_callback_path(self._runtime, prefix),
+                login_path=application.login_path,
+                callback_path=application.callback_path,
                 clock=clock,
             )
         )
