@@ -70,6 +70,14 @@ class GovBrClient:
         """Create an authorization request bound to a protected transaction."""
         return self._authorization.build(now=now)
 
+    def validate_state(self, state: str, *, now: datetime) -> None:
+        """Validate a callback state without exchanging an authorization code."""
+        self._transactions.decode(state, now=now)
+
+    def logout_url(self) -> str:
+        """Build the configured provider logout URL."""
+        return self._authorization.build_logout()
+
     async def exchange_code(
         self,
         *,

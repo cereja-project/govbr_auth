@@ -127,6 +127,8 @@ def test_fake_environment_reuses_shared_oauth_configuration() -> None:
     )
     assert settings.oauth.scope == "openid profile"
     assert settings.oauth.transaction_secret.get_secret_value() == transaction_secret
+    assert str(settings.oauth.logout_url) == "http://127.0.0.1:8000/fake-govbr/logout"
+    assert str(settings.oauth.post_logout_redirect_uri) == "http://127.0.0.1:8000/"
 
 
 @pytest.mark.parametrize(

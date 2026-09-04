@@ -25,7 +25,7 @@ class RecordingTransactionCodec:
     def issue(self, *, now: datetime) -> tuple[str, AuthTransaction]:
         transaction = AuthTransaction(
             transaction_id="transaction-123",
-            code_verifier=SecretStr("pkce-verifier-for-authorization-test"),
+            code_verifier=SecretStr("v" * 43),
             nonce=SecretStr("nonce-bound-to-transaction"),
             issued_at=now,
             expires_at=now + timedelta(minutes=5),
@@ -86,3 +86,26 @@ def test_build_binds_state_nonce_and_pkce_to_created_transaction(
     )
     assert query["code_challenge"] == [expected_challenge]
     assert query["code_challenge_method"] == ["S256"]
+
+
+def test_build_logout_uses_only_the_configured_post_logout_redirect_uri(
+    settings: GovBrSettings,
+) -> None:
+    settings = settings.model_copy(
+        update={
+            "logout_url": "https://sso.example.test/logout",
+            "post_logout_redirect_uri": (
+                "https://consumer.example.test/signed-out?source=govbr"
+            ),
+        }
+    )
+    from govbr_auth.core.authorization import AuthorizationBuilder
+
+    builder = AuthorizationBuilder(settings, RecordingTransactionCodec())
+
+    request = builder.build_logout()
+
+    assert request == (
+        "https://sso.example.test/logout?"
+        "post_logout_redirect_uri=https%3A%2F%2Fconsumer.example.test%2Fsigned-out%3Fsource%3Dgovbr"
+    )

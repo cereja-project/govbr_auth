@@ -92,12 +92,22 @@ def create_fake_govbr_urlpatterns(
             return _oauth_error(error)
         return JsonResponse(user.model_dump(exclude_none=True, mode="json"))
 
+    def logout(request: HttpRequest) -> HttpResponse:
+        try:
+            redirect_uri = application.logout(
+                request.GET.get("post_logout_redirect_uri")
+            )
+        except FakeOAuthError as error:
+            return _oauth_error(error)
+        return HttpResponseRedirect(redirect_uri)
+
     return [
         path(f"{prefix}/authorize" if prefix else "authorize", authorize),
         path(f"{prefix}/login" if prefix else "login", login),
         path(f"{prefix}/token" if prefix else "token", token),
         path(f"{prefix}/jwk" if prefix else "jwk", jwk),
         path(f"{prefix}/userinfo" if prefix else "userinfo", userinfo),
+        path(f"{prefix}/logout" if prefix else "logout", logout),
     ]
 
 

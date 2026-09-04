@@ -43,6 +43,8 @@ class GovBrSettings(BaseModel):
     transaction_secret: SecretStr
     issuer: AnyHttpUrl
     jwks_url: AnyHttpUrl
+    logout_url: AnyHttpUrl | None = None
+    post_logout_redirect_uri: AnyHttpUrl | None = None
     connect_timeout_seconds: PositiveFloat = 5.0
     read_timeout_seconds: PositiveFloat = 10.0
     clock_skew_seconds: NonNegativeInt = 60
@@ -67,6 +69,8 @@ class GovBrSettings(BaseModel):
     def validate_url_schemes(self) -> "GovBrSettings":
         """Require HTTPS except for loopback-only configuration."""
         for environment_name, url in self._configured_urls():
+            if url is None:
+                continue
             if url.scheme == "https":
                 continue
             host = (url.host or "").strip("[]")
@@ -84,12 +88,22 @@ class GovBrSettings(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_logout_configuration(self) -> "GovBrSettings":
+        """Require a complete, paired logout configuration."""
+        if (self.logout_url is None) != (self.post_logout_redirect_uri is None):
+            raise ValueError(
+                "logout_url and post_logout_redirect_uri must be configured together"
+            )
+        return self
+
+    @model_validator(mode="after")
     def validate_official_provider_environment(self) -> "GovBrSettings":
         """Reject official Gov.br endpoints from another deployment."""
         mismatched_variables = [
             environment_name
             for environment_name, url in self._provider_urls()
-            if _OFFICIAL_GOVBR_HOST_ENVIRONMENTS.get(url.host.rstrip(".")) is not None
+            if url is not None
+            and _OFFICIAL_GOVBR_HOST_ENVIRONMENTS.get(url.host.rstrip(".")) is not None
             and _OFFICIAL_GOVBR_HOST_ENVIRONMENTS[url.host.rstrip(".")]
             is not self.environment
         ]
@@ -102,7 +116,7 @@ class GovBrSettings(BaseModel):
             )
         return self
 
-    def _configured_urls(self) -> tuple[tuple[str, AnyHttpUrl], ...]:
+    def _configured_urls(self) -> tuple[tuple[str, AnyHttpUrl | None], ...]:
         """Return every OAuth URL with its public environment name."""
         return (
             ("GOVBR_AUTHORIZATION_URL", self.authorization_url),
@@ -111,9 +125,11 @@ class GovBrSettings(BaseModel):
             ("GOVBR_REDIRECT_URI", self.redirect_uri),
             ("GOVBR_ISSUER", self.issuer),
             ("GOVBR_JWKS_URL", self.jwks_url),
+            ("GOVBR_LOGOUT_URL", self.logout_url),
+            ("GOVBR_POST_LOGOUT_REDIRECT_URI", self.post_logout_redirect_uri),
         )
 
-    def _provider_urls(self) -> tuple[tuple[str, AnyHttpUrl], ...]:
+    def _provider_urls(self) -> tuple[tuple[str, AnyHttpUrl | None], ...]:
         """Return provider endpoints with their public environment names."""
         return (
             ("GOVBR_AUTHORIZATION_URL", self.authorization_url),
@@ -121,6 +137,7 @@ class GovBrSettings(BaseModel):
             ("GOVBR_USERINFO_URL", self.userinfo_url),
             ("GOVBR_ISSUER", self.issuer),
             ("GOVBR_JWKS_URL", self.jwks_url),
+            ("GOVBR_LOGOUT_URL", self.logout_url),
         )
 
 

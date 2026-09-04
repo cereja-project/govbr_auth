@@ -27,6 +27,7 @@ class AdapterApplication:
     service: AuthenticationService
     login_path: str
     callback_path: str
+    logout_path: str | None
     clock: Callable[[], datetime]
 
     @property
@@ -63,6 +64,7 @@ def create_adapter_application(
         fake_transport_factory=fake_transport_factory,
     )
     concrete_runtime = cast(GovBrRuntime, owner.runtime)
+    oauth = concrete_runtime.settings.oauth
     return AdapterApplication(
         owner=owner,
         service=AuthenticationService(
@@ -71,5 +73,12 @@ def create_adapter_application(
         ),
         login_path=f"{prefix}/login" if prefix else "/login",
         callback_path=adapter_callback_path(concrete_runtime, prefix),
+        logout_path=(
+            (f"{prefix}/logout" if prefix else "/logout")
+            if oauth is not None
+            and oauth.logout_url is not None
+            and oauth.post_logout_redirect_uri is not None
+            else None
+        ),
         clock=clock,
     )

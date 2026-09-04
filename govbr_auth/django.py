@@ -92,6 +92,14 @@ class GovBrAuth:
                 name="govbr-auth-callback",
             ),
         ]
+        if self._application.logout_path is not None:
+            patterns.append(
+                path(
+                    self._application.logout_path.lstrip("/"),
+                    self._logout,
+                    name="govbr-auth-logout",
+                )
+            )
         fake_runtime = self._application.runtime.fake
         if fake_runtime is not None:
             patterns.extend(
@@ -127,10 +135,36 @@ class GovBrAuth:
         authorization = self._application.service.authorization_url(now=self._clock())
         return HttpResponseRedirect(authorization.url)
 
+    def _logout(self, request: HttpRequest) -> HttpResponseRedirect:
+        del request
+        return HttpResponseRedirect(self._application.service.logout_url())
+
     @csrf_exempt
     def _callback(self, request: HttpRequest) -> HttpResponse:
         code = request.POST.get("code") or request.GET.get("code")
         state = request.POST.get("state") or request.GET.get("state")
+        error = request.POST.get("error") or request.GET.get("error")
+        error_description = request.POST.get("error_description") or request.GET.get(
+            "error_description"
+        )
+        if error is not None:
+            if not error.strip() or not isinstance(state, str) or not state.strip():
+                return JsonResponse(
+                    {"error": "invalid_callback", "message": INVALID_CALLBACK_MESSAGE},
+                    status=400,
+                )
+            try:
+                self._application.service.provider_error(
+                    error=error,
+                    state=state,
+                    error_description=error_description,
+                    now=self._clock(),
+                )
+            except GovBrAuthError as auth_error:
+                if self._on_error is not None:
+                    return self._on_error(auth_error, request)
+                return _auth_error_response(auth_error)
+            raise AssertionError("provider_error must raise")
         if (
             not isinstance(code, str)
             or not code.strip()

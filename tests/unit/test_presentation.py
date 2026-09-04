@@ -28,7 +28,7 @@ def test_official_demo_page_has_neutral_copy_and_configured_login() -> None:
 
     assert DEMO_PAGE_PATH == "/govbr-auth-demo"
     assert 'href="/oauth/govbr/login"' in page
-    assert ">Entrar com gov.br<" in page
+    assert ">Entrar com GOV.BR<" in page
     assert "Provedor oficial Gov.br" in page
     assert "SIMULAÇÃO" not in page
     assert "credenciais fictícias" not in page
@@ -279,7 +279,7 @@ def test_home_does_not_render_credentials_in_the_launcher_response() -> None:
     assert "bruno-demo" not in page
     assert "nunca são exibidos" in page
     assert 'href="/auth/govbr/login"' in page
-    assert ">Entrar com gov.br</a>" in page
+    assert ">Entrar com GOV.BR</a>" in page
     assert ":focus-visible" in page
     assert "@media" in page
 

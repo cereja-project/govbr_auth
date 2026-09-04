@@ -49,6 +49,6 @@ Transação expirada ou estado inválido
 Volte ao início e crie um novo fluxo. Não desative validação de ``state``,
 nonce ou PKCE. O envelope Fernet tem TTL. Em múltiplos workers, use a mesma
 ``GOVBR_TRANSACTION_SECRET``. O ``state`` não é um registro de uso único; o
-authorization code descartável é o limite de replay do provedor.
-O state não é um registro de uso único; o authorization code de uso único
-limita replay.
+authorization code de uso único é o limite de replay do provedor.
+Se o callback retornar erro do provedor, reinicie o fluxo pelo botão de login;
+descrições técnicas do provedor não são reproduzidas na resposta pública.

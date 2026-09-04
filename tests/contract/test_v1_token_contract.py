@@ -28,7 +28,7 @@ class ContractTransactionCodec:
     def _transaction(now: datetime) -> AuthTransaction:
         return AuthTransaction(
             transaction_id="contract-transaction",
-            code_verifier=SecretStr("contract-pkce-verifier"),
+            code_verifier=SecretStr("v" * 43),
             nonce=SecretStr("contract-nonce"),
             issued_at=now,
             expires_at=now + timedelta(minutes=5),
@@ -109,7 +109,7 @@ async def test_exchange_code_preserves_token_wire_contract() -> None:
         "grant_type": ["authorization_code"],
         "code": ["contract-authorization-code"],
         "redirect_uri": ["https://consumer.example.test/oauth/callback"],
-        "code_verifier": ["contract-pkce-verifier"],
+        "code_verifier": ["v" * 43],
     }
     assert result.tokens.access_token.get_secret_value() == "contract-access-token"
     assert result.id_token_claims["sub"] == "12345678900"

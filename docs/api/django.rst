@@ -20,6 +20,8 @@ configurações do ambiente. Registre ``auth.urlpatterns`` na raiz do URLconf.
 As rotas do FakeGov e a página demo na raiz ``/`` só aparecem quando
 ``GOVBR_PROVIDER=fake``. O launcher FakeGov é apenas um atalho para essa
 composição.
+Com a configuração completa de logout, ``auth.urlpatterns`` também contém a
+rota ``auth/govbr/logout``.
 
 .. py:class:: GovBrAuth(*, on_success, settings=None, runtime=None, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now, user_repository=None)
    :no-index:

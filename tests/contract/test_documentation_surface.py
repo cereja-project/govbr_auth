@@ -222,6 +222,8 @@ def test_environment_example_documents_every_supported_variable() -> None:
         "GOVBR_TRANSACTION_SECRET",
         "GOVBR_ISSUER",
         "GOVBR_JWKS_URL",
+        "GOVBR_LOGOUT_URL",
+        "GOVBR_POST_LOGOUT_REDIRECT_URI",
         "GOVBR_CONNECT_TIMEOUT_SECONDS",
         "GOVBR_READ_TIMEOUT_SECONDS",
         "GOVBR_CLOCK_SKEW_SECONDS",
@@ -467,7 +469,7 @@ def test_entry_docs_quote_the_launcher_button_label_verbatim() -> None:
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
     )
-    assert tuple("**Entrar com gov.br**" in source for source in sources) == (
+    assert tuple("**Entrar com GOV.BR**" in source for source in sources) == (
         True,
         True,
     )

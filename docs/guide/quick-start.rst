@@ -135,7 +135,7 @@ de demonstração e iniciar o fluxo completo em um launcher dedicado, execute::
 
 O launcher publica a demo na raiz ``/`` em loopback e não deve ser exposto na
 rede. ``/govbr-auth-demo`` permanece como alias. Abra a página e clique em
-**Entrar com gov.br**. O FakeGov aceita somente
+**Entrar com GOV.BR**. O FakeGov aceita somente
 credenciais fictícias; não use credenciais reais. Com o provedor oficial, a
 página demo não é criada.
 

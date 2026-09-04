@@ -10,6 +10,7 @@ from pydantic import SecretStr
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.errors import InvalidIdTokenError
+from govbr_auth.core.errors import ProviderRejectedError
 from govbr_auth.core.models import GovBrUser, TokenSet
 
 FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
@@ -26,6 +27,7 @@ class StubClient:
             scope="openid profile email",
         )
         self.user = GovBrUser(sub="subject", name="Test user")
+        self.validated_states: list[tuple[str, datetime]] = []
 
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         return AuthorizationRequest("https://sso.example.test/authorize", "state")
@@ -45,6 +47,12 @@ class StubClient:
         expected_subject: str,
     ) -> GovBrUser:
         return self.user
+
+    def validate_state(self, state: str, *, now: datetime) -> None:
+        self.validated_states.append((state, now))
+
+    def logout_url(self) -> str:
+        return "https://sso.example.test/logout?post_logout_redirect_uri=encoded"
 
 
 def test_authorization_url_delegates_to_the_core_client() -> None:
@@ -100,3 +108,31 @@ async def test_authenticate_rejects_an_id_token_without_a_subject() -> None:
 
     with pytest.raises(InvalidIdTokenError, match="usable subject"):
         await service.authenticate(code="code", state="state", now=FIXED_NOW)
+
+
+def test_provider_error_validates_state_and_discards_provider_description() -> None:
+    from govbr_auth.authentication import AuthenticationService
+
+    client = StubClient({"sub": "subject"})
+    service = AuthenticationService(client)
+
+    with pytest.raises(ProviderRejectedError) as exc_info:
+        service.provider_error(
+            error="access_denied",
+            state="state",
+            error_description="sensitive provider detail",
+            now=FIXED_NOW,
+        )
+
+    assert client.validated_states == [("state", FIXED_NOW)]
+    assert str(exc_info.value) == "Gov.br rejected the authorization request"
+    assert "sensitive provider detail" not in str(exc_info.value)
+
+
+def test_logout_url_delegates_to_the_core_client() -> None:
+    from govbr_auth.authentication import AuthenticationService
+
+    assert (
+        AuthenticationService(StubClient({"sub": "subject"})).logout_url()
+        == "https://sso.example.test/logout?post_logout_redirect_uri=encoded"
+    )

@@ -233,6 +233,22 @@ class FakeGovBrProvider:
             raise _oauth_error("invalid_token", _TOKEN_INVALID)
         return user
 
+    def logout(self, post_logout_redirect_uri: str | None) -> str:
+        """Validate a registered post-logout redirect URI for the local provider."""
+        registered_uris = self._settings.post_logout_redirect_uris
+        if not registered_uris:
+            origin = urlsplit(str(self._settings.base_url))
+            registered_uris = (urlunsplit((origin.scheme, origin.netloc, "/", "", "")),)
+        if post_logout_redirect_uri is None or not any(
+            secrets.compare_digest(
+                str(registered).encode("utf-8"),
+                post_logout_redirect_uri.encode("utf-8"),
+            )
+            for registered in registered_uris
+        ):
+            raise _oauth_error("invalid_request", _AUTHORIZATION_REQUEST_INVALID)
+        return post_logout_redirect_uri
+
     def _issue_access_token(
         self,
         *,

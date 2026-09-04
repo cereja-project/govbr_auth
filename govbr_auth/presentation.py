@@ -287,7 +287,7 @@ def render_demo_page(*, provider: GovBrProvider, login_path: str) -> str:
     """Render a provider-neutral authentication demonstration page."""
     action = render_primary_action(
         href=login_path,
-        label="Entrar com gov.br",
+        label="Entrar com GOV.BR",
     )
     if provider is GovBrProvider.FAKE:
         badge = render_simulation_badge()
@@ -329,7 +329,7 @@ def _render_demo_shell(
 <main class="container">
 <section class="hero" aria-labelledby="page-title">
 <p class="eyebrow">Demonstração de autenticação</p>
-<h1 id="page-title">Entrar com gov.br</h1>
+<h1 id="page-title">Entrar com GOV.BR</h1>
 <p class="lead">{provider_copy}</p>
 {action}
 </section>
@@ -409,7 +409,7 @@ def render_home(credentials: tuple[PresentedCredential, ...] = ()) -> str:
             '<h1 id="page-title">Teste a autenticação completa em ambiente local</h1>'
             '<p class="lead">Percorra uma simulação segura, isolada e sem acesso '
             "a serviços externos.</p>"
-            f'{render_primary_action(href="/auth/govbr/login", label="Entrar com gov.br")}'
+            f'{render_primary_action(href="/auth/govbr/login", label="Entrar com GOV.BR")}'
             "</section>"
             '<section class="workflow" aria-labelledby="workflow-title">'
             '<p class="section-kicker">Como funciona</p>'

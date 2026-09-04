@@ -48,3 +48,15 @@ class AuthorizationBuilder:
             url=f"{self._settings.authorization_url}?{query}",
             state=state,
         )
+
+    def build_logout(self) -> str:
+        """Build the provider logout URL from the configured fixed return URI."""
+        logout_url = self._settings.logout_url
+        post_logout_redirect_uri = self._settings.post_logout_redirect_uri
+        if logout_url is None or post_logout_redirect_uri is None:
+            raise ValueError(
+                "logout_url and post_logout_redirect_uri must be configured together"
+            )
+        query = urlencode({"post_logout_redirect_uri": str(post_logout_redirect_uri)})
+        separator = "&" if "?" in str(logout_url) else "?"
+        return f"{logout_url}{separator}{query}"

@@ -33,7 +33,7 @@ class RecordingTransactionCodec:
     def issue(self, *, now: datetime) -> tuple[str, AuthTransaction]:
         transaction = AuthTransaction(
             transaction_id="contract-transaction-123",
-            code_verifier=SecretStr("pkce-verifier-for-contract-test"),
+            code_verifier=SecretStr("v" * 43),
             nonce=SecretStr("contract-nonce-bound-to-transaction"),
             issued_at=now,
             expires_at=now + timedelta(minutes=5),

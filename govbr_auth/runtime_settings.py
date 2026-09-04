@@ -219,6 +219,8 @@ def _fake_oauth_values(
     shared.setdefault("userinfo_url", f"{base_url}/userinfo")
     shared.setdefault("issuer", f"{base_url}/")
     shared.setdefault("jwks_url", f"{base_url}/jwk")
+    shared.setdefault("logout_url", f"{base_url}/logout")
+    shared.setdefault("post_logout_redirect_uri", _fake_origin(host, port) + "/")
     shared.setdefault("client_id", "govbr-auth-local")
     shared.setdefault("client_secret", "local-fake-only")
     shared.setdefault(
@@ -269,6 +271,8 @@ _OFFICIAL_OAUTH_FIELDS = {
     "GOVBR_USERINFO_URL": "userinfo_url",
     "GOVBR_ISSUER": "issuer",
     "GOVBR_JWKS_URL": "jwks_url",
+    "GOVBR_LOGOUT_URL": "logout_url",
+    "GOVBR_POST_LOGOUT_REDIRECT_URI": "post_logout_redirect_uri",
 }
 
 _COMMON_OAUTH_FIELDS = {
@@ -281,6 +285,8 @@ _COMMON_OAUTH_FIELDS = {
         "GOVBR_USERINFO_URL",
         "GOVBR_ISSUER",
         "GOVBR_JWKS_URL",
+        "GOVBR_LOGOUT_URL",
+        "GOVBR_POST_LOGOUT_REDIRECT_URI",
     }
 }
 
@@ -291,6 +297,8 @@ _OFFICIAL_PROVIDER_ENDPOINT_FIELDS = frozenset(
         "GOVBR_USERINFO_URL",
         "GOVBR_ISSUER",
         "GOVBR_JWKS_URL",
+        "GOVBR_LOGOUT_URL",
+        "GOVBR_POST_LOGOUT_REDIRECT_URI",
     }
 )
 

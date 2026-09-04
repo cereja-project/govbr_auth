@@ -8,38 +8,30 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Added
-- `GovBrApplicationSettings` agrega a configuração neutra do runtime e o
-  opt-in de apresentação `GOVBR_DEMO_PAGE=true` para a rota fixa
-  `/govbr-auth-demo` nos adapters FastAPI, Django e Flask.
+- Configuração opcional de logout com `GOVBR_LOGOUT_URL` e
+  `GOVBR_POST_LOGOUT_REDIRECT_URI`, com rotas nativas para FastAPI, Django e
+  Flask.
+- Validação do `code_verifier` conforme RFC 7636 no core e no FakeGov.
 
 ### Changed
-- O início rápido do README agora parte de um `myapp.py` FastAPI completo e
-  executável, mostra configuração por `.env` ou pelas classes públicas e
-  explica como consumir `AuthContext` sem expor tokens ou dados pessoais.
-- A mesma página de demonstração funciona com FakeGov ou com o provedor
-  oficial; na topologia isolada, `python -m govbr_auth.fake` permanece
-  explicitamente provider-only sem flag adicional.
+- O callback agora trata erros OAuth, valida o `state` e retorna mensagens
+  públicas sem reproduzir `error_description` do provedor.
+- A documentação e a demonstração usam o rótulo oficial `Entrar com GOV.BR`.
 
-### Removed
+### Fixed
+- O endpoint de logout do FakeGov agora valida destinos registrados e conclui
+  o fluxo local sem criar redirecionamento aberto.
+
+### Security
+- O destino pós-logout é derivado da configuração e não pode ser escolhido por
+  query string na rota do consumidor.
+- Respostas de callback inválidas mantêm `Cache-Control: no-store` e não
+  expõem parâmetros OAuth recebidos.
+
+### Histórico de compatibilidade
 - A configuração incompatível e ainda não publicada
   `GOVBR_FAKE_END_TO_END`/`fake_end_to_end` foi removida em favor do opt-in
   agregado `GOVBR_DEMO_PAGE`.
-
-### Fixed
-- Os adapters FastAPI, Django e Flask agora registram o callback oficial no
-  caminho configurado por `GOVBR_REDIRECT_URI`, mantendo o prefixo do adapter
-  para a rota de login e o comportamento existente do FakeGov.
-- A configuração agora rejeita, antes da inicialização do runtime, endpoints
-  oficiais de produção e staging misturados ou incompatíveis com
-  `GOVBR_ENVIRONMENT`.
-- Erros do Pydantic ao carregar variáveis de ambiente agora são convertidos em
-  mensagens diretas em português, sem incluir os valores configurados.
-- Erros de URL HTTP fora de loopback agora identificam a variável responsável
-  e orientam o uso de HTTPS por DNS ou de uma URI local de loopback.
-
-### Security
-- URLs HTTP no ambiente local voltam a ser aceitas somente para hosts de
-  loopback; DNS de desenvolvimento não pode desativar a exigência de HTTPS.
 
 ## [1.0.0] - 2026-09-01
 

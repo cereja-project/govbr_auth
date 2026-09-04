@@ -50,6 +50,17 @@ class ContractClient:
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         return AuthorizationRequest("https://sso.example.test/authorize", "state")
 
+    def validate_state(self, state: str, *, now: datetime) -> None:
+        del now
+        if state != "state":
+            raise AssertionError("unexpected state")
+
+    def logout_url(self) -> str:
+        return (
+            "https://sso.example.test/logout?"
+            "post_logout_redirect_uri=https%3A%2F%2Fconsumer.example.test%2Fsigned-out"
+        )
+
     async def exchange_code(
         self, *, code: str, state: str, now: datetime
     ) -> AuthenticationResult:
@@ -65,19 +76,24 @@ def _runtime(
     client: ContractClient,
     *,
     redirect_uri: str | None = None,
+    with_logout: bool = False,
 ) -> GovBrRuntime:
     oauth = None
-    if redirect_uri is not None:
+    if redirect_uri is not None or with_logout:
         oauth = GovBrSettings(
             authorization_url="https://sso.example.test/authorize",
             token_url="https://sso.example.test/token",
             userinfo_url="https://sso.example.test/userinfo",
             client_id="client-id",
             client_secret=SecretStr("client-secret"),
-            redirect_uri=redirect_uri,
+            redirect_uri=redirect_uri or "https://consumer.example.test/callback",
             transaction_secret=SecretStr("transaction-secret"),
             issuer="https://sso.example.test/",
             jwks_url="https://sso.example.test/jwks",
+            logout_url=("https://sso.example.test/logout" if with_logout else None),
+            post_logout_redirect_uri=(
+                "https://consumer.example.test/signed-out" if with_logout else None
+            ),
         )
     return GovBrRuntime(
         settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL, oauth=oauth),
@@ -126,6 +142,21 @@ def test_django_facade_exposes_native_login_and_callback_patterns() -> None:
         "auth/govbr/login",
         "auth/govbr/callback",
     ]
+
+
+def test_django_configured_logout_redirects_to_provider_endpoint() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(ContractClient({"sub": "subject"}), with_logout=True),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    response = _route(auth, "logout")(RequestFactory().get("/auth/govbr/logout"))
+
+    assert response.status_code == 302
+    assert response["Location"].startswith("https://sso.example.test/logout?")
 
 
 def test_django_facade_mounts_callback_at_configured_redirect_uri_path() -> None:
@@ -222,6 +253,7 @@ def test_django_fake_runtime_adds_provider_patterns_without_fastapi() -> None:
         assert {
             "auth/govbr/login",
             "auth/govbr/callback",
+            "auth/govbr/logout",
             "fake-govbr/authorize",
             "fake-govbr/login",
             "fake-govbr/token",

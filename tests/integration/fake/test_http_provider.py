@@ -302,6 +302,37 @@ def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> N
     }
 
 
+@pytest.mark.asyncio
+async def test_fake_provider_logout_redirects_only_to_registered_uri() -> None:
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://localhost",
+    ) as http:
+        response = await http.get(
+            "/logout",
+            params={"post_logout_redirect_uri": "http://localhost/"},
+            follow_redirects=False,
+        )
+        rejected = await http.get(
+            "/logout",
+            params={"post_logout_redirect_uri": "http://attacker.test/"},
+        )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "http://localhost/"
+    assert rejected.status_code == 400
+    assert rejected.json() == {
+        "error": "invalid_request",
+        "error_description": "The authorization request is invalid.",
+    }
+
+
 @pytest.mark.parametrize(
     "factory",
     (

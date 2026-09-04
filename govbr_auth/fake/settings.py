@@ -28,6 +28,7 @@ class FakeGovBrSettings(BaseModel):
     access_token_ttl_seconds: PositiveInt
     id_token_ttl_seconds: PositiveInt
     clients: tuple[FakeClient, ...]
+    post_logout_redirect_uris: tuple[AnyHttpUrl, ...] = ()
     allow_non_loopback: bool = False
 
     @field_validator("artifact_secret")

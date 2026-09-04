@@ -15,6 +15,9 @@ Cliente e autorização
 
 .. autoclass:: govbr_auth.core.AuthorizationBuilder
 
+``AuthorizationBuilder.build_logout()`` constrói o redirecionamento de logout
+usando exclusivamente ``post_logout_redirect_uri`` configurado.
+
 .. autoclass:: govbr_auth.core.AuthenticationResult
 
 Transações e validação

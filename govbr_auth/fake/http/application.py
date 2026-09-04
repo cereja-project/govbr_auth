@@ -168,6 +168,10 @@ class FakeGovHttpApplication:
             raise FakeOAuthError(error="invalid_token", description=_TOKEN_INVALID)
         return self._provider.userinfo(access_token, now=self._clock())
 
+    def logout(self, post_logout_redirect_uri: str | None) -> str:
+        """Validate and return a registered post-logout redirect URI."""
+        return self._provider.logout(post_logout_redirect_uri)
+
     @staticmethod
     def parse_client_credentials(value: str | None) -> FakeClientCredentials:
         credentials = parse_basic_authorization(value)

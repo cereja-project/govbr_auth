@@ -25,6 +25,14 @@ O frontend inicia ``/auth/govbr/login``. Depois da autorização, o navegador
 retorna ao callback; o backend mantém ``state``, nonce e PKCE, troca o código,
 valida o ID Token e consulta ``userinfo``.
 
+Use HTTPS em toda comunicação com o provedor oficial. Em mobile, o fluxo deve
+abrir no navegador nativo, sem WebView. A página que recebe o ``code`` deve
+redirecionar após o callback, e a aplicação deve criar sua própria sessão.
+Armazene tokens no backend; o access token é usado para APIs autorizadas e o
+ID token é usado para identificação, sem ser enviado a APIs. O logout deve ser
+iniciado pelo frontend pela rota configurada e retornar ao destino previamente
+autorizado.
+
 .. image:: ../media/authentication-sequence.svg
    :alt: Sequência entre navegador, API com govbr-auth e provedor OAuth OIDC.
    :align: center

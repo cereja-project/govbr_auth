@@ -62,11 +62,20 @@ Instale somente o core ou o extra correspondente à aplicação:
 
 ![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação e provedor](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence-animated.svg)
 
+[Ver versão estática do fluxo](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence.svg)
+
 
 A aplicação expõe `/auth/govbr/login`. O navegador é redirecionado para o
 provedor selecionado e retorna pelo callback configurado. Depois do login, o
 backend troca o código, busca as chaves, valida o ID Token e consulta
 `userinfo` antes de chamar `on_success`.
+
+Toda comunicação com o provedor oficial deve usar HTTPS. Em dispositivos
+móveis, abra o fluxo no navegador nativo; não incorpore a autenticação em
+WebView. A página que recebe o `code` deve redirecionar depois do callback, e
+a aplicação deve criar sua própria sessão. Mantenha tokens no backend: use o
+access token para APIs autorizadas e nunca envie o ID token a uma API. O
+logout é iniciado pelo frontend pela rota configurada da aplicação.
 
 Com `GOVBR_PROVIDER=official`, as chamadas vão para o gov.br. Com
 `GOVBR_PROVIDER=fake`, o FakeGov troca apenas os endpoints do provedor e o
@@ -79,7 +88,7 @@ abrir uma conexão de rede.
 Para composições avançadas, o simulador canônico é
 `govbr_auth.fake.FakeGovSimulator`, criado por
 `govbr_auth.fake.create_fake_gov_simulator`. Para iniciar uma demonstração
-visual local, o launcher exibe o botão **Entrar com gov.br** na raiz `/`; o
+visual local, o launcher exibe o botão **Entrar com GOV.BR** na raiz `/`; o
 caminho `/govbr-auth-demo` permanece disponível como alias.
 
 ## Teste a integração sem depender do gov.br
@@ -292,6 +301,8 @@ os usuários padrão.
 | `GOVBR_CLIENT_SECRET` | Segredo do cliente | Compartilhado entre o provedor oficial e o FakeGov |
 | `GOVBR_REDIRECT_URI` | Callback da aplicação | Compartilhado entre o provedor oficial e o FakeGov |
 | `GOVBR_SCOPE` | Escopo OAuth | Compartilhado entre o provedor oficial e o FakeGov |
+| `GOVBR_LOGOUT_URL` | Endpoint de logout do provedor | Deve ser configurado junto com `GOVBR_POST_LOGOUT_REDIRECT_URI` |
+| `GOVBR_POST_LOGOUT_REDIRECT_URI` | Retorno após logout | URI previamente autorizada no provedor |
 | `GOVBR_TRANSACTION_SECRET` | Segredo gerado uma única vez | Compartilhado entre o provedor oficial e o FakeGov; o mesmo valor em todas as instâncias |
 
 ## Customizar usuários
@@ -330,6 +341,9 @@ protocolo de repositório descrito no guia de FakeGov.
 
 Instale a biblioteca sem extras e configure `GOVBR_PROVIDER=official` (o
 default), endpoints, credenciais, redirect e `GOVBR_TRANSACTION_SECRET`.
+Para habilitar o logout, configure também `GOVBR_LOGOUT_URL` e
+`GOVBR_POST_LOGOUT_REDIRECT_URI`; o segundo valor deve estar previamente
+autorizado no Gov.br.
 Gere uma vez o segredo:
 
 ```python

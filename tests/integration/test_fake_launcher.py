@@ -180,6 +180,24 @@ async def test_fake_provider_adapter_exposes_demo_at_application_root() -> None:
     assert alias.text == home.text
 
 
+@pytest.mark.asyncio
+async def test_end_to_end_logout_returns_to_the_configured_consumer_origin() -> None:
+    app = create_fake_app(settings=end_to_end_settings(), clock=fixed_clock)
+
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://127.0.0.1:8000",
+            follow_redirects=False,
+        ) as client:
+            consumer_response = await client.get("/auth/govbr/logout")
+            provider_response = await client.get(consumer_response.headers["location"])
+
+    assert consumer_response.status_code == 302
+    assert provider_response.status_code == 302
+    assert provider_response.headers["location"] == "http://127.0.0.1:8000/"
+
+
 def test_launcher_demo_profile_uses_fixed_demo_route() -> None:
     """The demo launcher must expose the demo at the application root."""
     app = create_fake_app(

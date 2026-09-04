@@ -163,7 +163,7 @@ async def test_fastapi_facade_mounts_callback_at_configured_redirect_uri_path() 
     obsolete_callback = await request(app, "/auth/govbr/callback")
 
     assert login.status_code == 302
-    assert callback.status_code == 422
+    assert callback.status_code == 400
     assert obsolete_callback.status_code == 404
 
 
@@ -580,7 +580,7 @@ async def test_callback_requires_code_and_state() -> None:
 
     response = await request(app, "/auth/govbr/callback")
 
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert client.exchange_calls == []
 
 

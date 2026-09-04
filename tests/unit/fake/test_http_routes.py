@@ -29,4 +29,5 @@ def test_build_fake_govbr_routes_registers_provider_endpoints() -> None:
         "/fake-govbr/token",
         "/fake-govbr/jwk",
         "/fake-govbr/userinfo",
+        "/fake-govbr/logout",
     }

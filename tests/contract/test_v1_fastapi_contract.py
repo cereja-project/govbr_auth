@@ -13,6 +13,7 @@ from pydantic import SecretStr
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
+from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntime,
@@ -38,6 +39,15 @@ class ContractClient:
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         return AuthorizationRequest("https://sso.example.test/authorize", "state")
 
+    def validate_state(self, state: str, *, now: datetime) -> None:
+        assert state == "state"
+
+    def logout_url(self) -> str:
+        return (
+            "https://sso.example.test/logout?"
+            "post_logout_redirect_uri=https%3A%2F%2Fconsumer.example.test%2Fsigned-out"
+        )
+
     async def exchange_code(
         self,
         *,
@@ -56,10 +66,30 @@ class ContractClient:
         return GovBrUser(sub=expected_subject, name="Contract user")
 
 
-def contract_runtime(client: ContractClient) -> GovBrRuntime:
+def contract_runtime(
+    client: ContractClient, *, with_logout: bool = False
+) -> GovBrRuntime:
     """Wrap the deterministic client in the facade's neutral runtime contract."""
+    oauth = None
+    if with_logout:
+        oauth = GovBrSettings(
+            authorization_url="https://sso.example.test/authorize",
+            token_url="https://sso.example.test/token",
+            userinfo_url="https://sso.example.test/userinfo",
+            client_id="contract-client",
+            client_secret="contract-secret",
+            redirect_uri="https://consumer.example.test/callback",
+            transaction_secret="contract-transaction-secret",
+            issuer="https://sso.example.test",
+            jwks_url="https://sso.example.test/jwk",
+            logout_url="https://sso.example.test/logout",
+            post_logout_redirect_uri="https://consumer.example.test/signed-out",
+        )
     return GovBrRuntime(
-        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        settings=GovBrRuntimeSettings(
+            provider=GovBrProvider.OFFICIAL,
+            oauth=oauth,
+        ),
         client=client,
         provider=GovBrProvider.OFFICIAL,
         fake=None,
@@ -178,3 +208,60 @@ def test_router_facade_exposes_consumer_routes_without_installation_method() -> 
     assert route_paths(app) == expected_paths
     assert not hasattr(auth, "install")
     assert not any(path.startswith("/fake-govbr") for path in route_paths(app))
+
+
+@pytest.mark.asyncio
+async def test_callback_sanitizes_provider_error_after_validating_state() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    errors = []
+
+    async def on_error(error):
+        errors.append(error)
+        return Response(status_code=502, content="safe")
+
+    app = FastAPI()
+    auth = GovBrAuth(
+        runtime=contract_runtime(ContractClient({"sub": "subject"})),
+        on_success=lambda context: Response(status_code=204),
+        on_error=on_error,
+        clock=lambda: FIXED_NOW,
+    )
+    app.include_router(auth.router)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as http:
+        response = await http.get(
+            "/auth/govbr/callback?error=access_denied&state=state"
+            "&error_description=secret-provider-detail"
+        )
+
+    assert response.status_code == 502
+    assert response.text == "safe"
+    assert len(errors) == 1
+    assert "secret-provider-detail" not in str(errors[0])
+
+
+@pytest.mark.asyncio
+async def test_configured_logout_redirects_to_the_provider_logout_endpoint() -> None:
+    from govbr_auth.fastapi import GovBrAuth
+
+    app = FastAPI()
+    auth = GovBrAuth(
+        runtime=contract_runtime(ContractClient({"sub": "subject"}), with_logout=True),
+        on_success=lambda context: Response(status_code=204),
+        clock=lambda: FIXED_NOW,
+    )
+    app.include_router(auth.router)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as http:
+        response = await http.get("/auth/govbr/logout", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["location"] == (
+        "https://sso.example.test/logout?"
+        "post_logout_redirect_uri=https%3A%2F%2Fconsumer.example.test%2Fsigned-out"
+    )

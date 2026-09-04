@@ -117,6 +117,12 @@ class GovBrAuth:
             )
             return redirect(authorization.url)
 
+        if self._application.logout_path is not None:
+
+            @blueprint.get(self._application.logout_path)
+            def logout():
+                return redirect(self._application.service.logout_url())
+
         @blueprint.route(
             self._application.callback_path,
             methods=["GET", "POST"],
@@ -124,6 +130,31 @@ class GovBrAuth:
         def callback():
             code = request.values.get("code")
             state = request.values.get("state")
+            error = request.values.get("error")
+            error_description = request.values.get("error_description")
+            if error is not None:
+                if not error.strip() or not isinstance(state, str) or not state.strip():
+                    return (
+                        jsonify(
+                            {
+                                "error": "invalid_callback",
+                                "message": INVALID_CALLBACK_MESSAGE,
+                            }
+                        ),
+                        400,
+                    )
+                try:
+                    self._application.service.provider_error(
+                        error=error,
+                        state=state,
+                        error_description=error_description,
+                        now=self._clock(),
+                    )
+                except GovBrAuthError as auth_error:
+                    if self._on_error is not None:
+                        return self._on_error(auth_error, request)
+                    return _auth_error_response(auth_error)
+                raise AssertionError("provider_error must raise")
             if (
                 not isinstance(code, str)
                 or not code.strip()

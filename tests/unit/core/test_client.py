@@ -34,7 +34,7 @@ class RecordingTransactionStore:
     def __init__(self) -> None:
         self.transaction = AuthTransaction(
             transaction_id="transaction-123",
-            code_verifier=SecretStr("sensitive-code-verifier"),
+            code_verifier=SecretStr("v" * 43),
             nonce=SecretStr("sensitive-expected-nonce"),
             issued_at=FIXED_NOW,
             expires_at=FIXED_NOW + timedelta(minutes=5),

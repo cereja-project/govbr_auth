@@ -20,6 +20,10 @@ _GRANT_UNSUPPORTED = "The authorization grant type is not supported."
 _RESPONSE_TYPE_UNSUPPORTED = "The authorization response type is not supported."
 _SCOPE_INVALID = "The requested scope is invalid."
 _S256_CHALLENGE_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}", flags=re.ASCII)
+_PKCE_VERIFIER_PATTERN = re.compile(
+    r"[A-Za-z0-9\-._~]{43,128}",
+    flags=re.ASCII,
+)
 
 
 class FakeOAuthError(Exception):
@@ -175,7 +179,7 @@ class FakeOAuthProtocolRules:
         if not isinstance(request.code_verifier, SecretStr):
             raise _oauth_error("invalid_grant", _CODE_INVALID)
         verifier = request.code_verifier.get_secret_value()
-        if not verifier.strip():
+        if _PKCE_VERIFIER_PATTERN.fullmatch(verifier) is None:
             raise _oauth_error("invalid_grant", _CODE_INVALID)
         challenge = _pkce_challenge(verifier)
         if (

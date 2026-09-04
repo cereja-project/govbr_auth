@@ -94,6 +94,16 @@ def create_fake_govbr_blueprint(
             return _oauth_error(error)
         return jsonify(user.model_dump(exclude_none=True, mode="json"))
 
+    @blueprint.get("/logout")
+    def logout():
+        try:
+            redirect_uri = application.logout(
+                request.args.get("post_logout_redirect_uri")
+            )
+        except FakeOAuthError as error:
+            return _oauth_error(error)
+        return redirect(redirect_uri)
+
     return blueprint
 
 

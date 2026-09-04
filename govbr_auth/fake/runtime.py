@@ -125,6 +125,11 @@ def create_fake_gov_simulator(
                 registered_redirect_uris=(redirect_uri,),
             ),
         ),
+        post_logout_redirect_uris=(
+            (oauth.post_logout_redirect_uri,)
+            if oauth.post_logout_redirect_uri is not None
+            else ()
+        ),
     )
     provider = FakeGovBrProvider(
         settings=provider_settings,

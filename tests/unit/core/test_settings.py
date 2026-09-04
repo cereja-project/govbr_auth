@@ -215,3 +215,30 @@ def test_settings_rejects_unknown_configuration(
 ) -> None:
     with pytest.raises(ValidationError, match="unexpected"):
         GovBrSettings(**valid_settings_data, unexpected="value")
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ("logout_url", "post_logout_redirect_uri"),
+)
+def test_settings_rejects_partial_logout_configuration(
+    valid_settings_data: dict[str, object], field_name: str
+) -> None:
+    valid_settings_data[field_name] = "https://sso.example.test/logout"
+
+    with pytest.raises(ValidationError, match="logout"):
+        GovBrSettings(**valid_settings_data)
+
+
+def test_settings_rejects_non_https_logout_endpoint(
+    valid_settings_data: dict[str, object],
+) -> None:
+    valid_settings_data.update(
+        {
+            "logout_url": "http://logout.example.test/logout",
+            "post_logout_redirect_uri": "https://consumer.example.test/signed-out",
+        }
+    )
+
+    with pytest.raises(ValidationError, match="GOVBR_LOGOUT_URL"):
+        GovBrSettings(**valid_settings_data)

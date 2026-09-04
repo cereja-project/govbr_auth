@@ -8,8 +8,11 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from govbr_auth.adapters._errors import describe_auth_error
 from govbr_auth.adapters._application import create_adapter_application
+from govbr_auth.adapters._errors import (
+    INVALID_CALLBACK_MESSAGE,
+    describe_auth_error,
+)
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import GovBrAuthError
@@ -59,6 +62,7 @@ def create_govbr_router(
         router_prefix=prefix,
         login_path="/login",
         callback_path="/callback",
+        logout_path=None,
         clock=clock,
     )
 
@@ -71,6 +75,7 @@ def _create_govbr_router(
     router_prefix: str,
     login_path: str,
     callback_path: str,
+    logout_path: str | None,
     clock: Callable[[], datetime],
 ) -> APIRouter:
     router = APIRouter(prefix=router_prefix)
@@ -81,7 +86,42 @@ def _create_govbr_router(
         return RedirectResponse(authorization.url, status_code=302)
 
     @router.get(callback_path)
-    async def callback(code: str, state: str) -> Response:
+    async def callback(
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+        error_description: str | None = None,
+    ) -> Response:
+        if error is not None:
+            if not error.strip() or not isinstance(state, str) or not state.strip():
+                return JSONResponse(
+                    {"error": "invalid_callback", "message": INVALID_CALLBACK_MESSAGE},
+                    status_code=400,
+                    headers={"Cache-Control": "no-store"},
+                )
+            try:
+                service.provider_error(
+                    error=error,
+                    state=state,
+                    error_description=error_description,
+                    now=clock(),
+                )
+            except GovBrAuthError as auth_error:
+                if on_error is not None:
+                    return await on_error(auth_error)
+                return _auth_error_response(auth_error)
+            raise AssertionError("provider_error must raise")
+        if (
+            not isinstance(code, str)
+            or not code.strip()
+            or not isinstance(state, str)
+            or not state.strip()
+        ):
+            return JSONResponse(
+                {"error": "invalid_callback", "message": INVALID_CALLBACK_MESSAGE},
+                status_code=400,
+                headers={"Cache-Control": "no-store"},
+            )
         try:
             context = await service.authenticate(
                 code=code,
@@ -94,6 +134,12 @@ def _create_govbr_router(
             return _auth_error_response(error)
 
         return await on_success(context)
+
+    if logout_path is not None:
+
+        @router.get(logout_path)
+        async def logout() -> RedirectResponse:
+            return RedirectResponse(service.logout_url(), status_code=302)
 
     return router
 
@@ -147,6 +193,7 @@ class GovBrAuth:
                 router_prefix="",
                 login_path=application.login_path,
                 callback_path=application.callback_path,
+                logout_path=application.logout_path,
                 clock=clock,
             )
         )

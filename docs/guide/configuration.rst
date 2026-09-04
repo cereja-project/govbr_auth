@@ -33,11 +33,18 @@ Configure sempre as variáveis comuns do cliente uma única vez::
     GOVBR_CLIENT_ID=seu-client-id
     GOVBR_CLIENT_SECRET=seu-client-secret
     GOVBR_REDIRECT_URI=https://app.example/auth/govbr/callback
+    GOVBR_LOGOUT_URL=https://sso.acesso.gov.br/logout
+    GOVBR_POST_LOGOUT_REDIRECT_URI=https://app.example/auth/signed-out
     GOVBR_TRANSACTION_SECRET=substitua-pelo-valor-gerado
 
 Os endpoints oficiais devem pertencer ao mesmo ambiente. Fora de loopback,
 ``GOVBR_REDIRECT_URI`` exige HTTPS e deve coincidir exatamente com a URI
 cadastrada no Gov.br.
+
+O logout é habilitado quando ``GOVBR_LOGOUT_URL`` e
+``GOVBR_POST_LOGOUT_REDIRECT_URI`` são configurados juntos. A URI de retorno
+deve estar previamente autorizada no provedor; a biblioteca não aceita esse
+destino pela query string da rota local.
 
 ``GOVBR_TRANSACTION_SECRET`` protege ``state``, nonce e PKCE. Gere uma vez:
 
@@ -52,9 +59,9 @@ O ``state`` não é um registro de uso
 único; a prevenção de replay depende do authorization code descartável do
 provedor.
 
-O envelope usa Fernet e TTL, além de PKCE e nonce.
-O state não é um registro de uso único; o authorization code de uso único
-limita replay.
+O envelope usa Fernet e TTL, além de PKCE e nonce. O ``state`` não é um
+registro de uso único; a prevenção de replay depende do authorization code de
+uso único do provedor.
 
 O backend é stateless, funciona com múltiplos workers sem armazenamento
 compartilhado e mantém a mesma secret em todas as instâncias.
