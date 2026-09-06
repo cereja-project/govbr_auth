@@ -7,6 +7,35 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Added
+- Configuração opcional de logout com `GOVBR_LOGOUT_URL` e
+  `GOVBR_POST_LOGOUT_REDIRECT_URI`, com rotas nativas para FastAPI, Django e
+  Flask.
+- Validação do `code_verifier` conforme RFC 7636 no core e no FakeGov.
+
+### Changed
+- O callback agora trata erros OAuth, valida o `state` e retorna mensagens
+  públicas sem reproduzir `error_description` do provedor.
+- A documentação e a demonstração usam o rótulo oficial `Entrar com GOV.BR`.
+- O launcher FakeGov abre a autenticação em uma guia ou janela nativa e
+  atualiza a página original após a conclusão do callback; os adapters mantêm
+  o callback definido pela aplicação consumidora.
+
+### Fixed
+- O endpoint de logout do FakeGov agora valida destinos registrados e conclui
+  o fluxo local sem criar redirecionamento aberto.
+
+### Security
+- O destino pós-logout é derivado da configuração e não pode ser escolhido por
+  query string na rota do consumidor.
+- Respostas de callback inválidas mantêm `Cache-Control: no-store` e não
+  expõem parâmetros OAuth recebidos.
+
+### Histórico de compatibilidade
+- A configuração incompatível e ainda não publicada
+  `GOVBR_FAKE_END_TO_END`/`fake_end_to_end` foi removida em favor do opt-in
+  agregado `GOVBR_DEMO_PAGE`.
+
 ## [1.0.0] - 2026-09-01
 
 ### Changed

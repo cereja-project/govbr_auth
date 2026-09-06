@@ -13,7 +13,10 @@ from govbr_auth.fake import runtime as runtime_module
 from govbr_auth.fake.credentials import FakeLoginCredential
 from govbr_auth.fastapi import GovBrAuth
 from govbr_auth.fake.runtime import create_fake_gov_simulator
-from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+from govbr_auth.runtime import (
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 
 NOW = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
 
@@ -32,7 +35,11 @@ def test_fake_simulator_exposes_one_http_application_facade(
     factory = getattr(runtime_module, "create_fake_gov_simulator", None)
     assert factory is not None
 
-    simulator = factory(fake_settings, clock=fixed_clock)
+    simulator = factory(
+        fake_settings,
+        prefix=fake_settings.fake_provider_prefix,
+        clock=fixed_clock,
+    )
 
     assert simulator.provider is not None
     assert simulator.credential_authenticator is not None
@@ -45,8 +52,6 @@ def fake_settings() -> GovBrRuntimeSettings:
     """Provide a complete embedded fake-provider configuration."""
     return GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_end_to_end=True,
-        fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
     )
 
 
@@ -71,16 +76,34 @@ def test_fake_runtime_contains_one_consistent_provider_graph(
     fake_settings: GovBrRuntimeSettings,
 ) -> None:
     """Default composition must expose one coherent provider and user graph."""
-    runtime = create_fake_gov_simulator(fake_settings, clock=fixed_clock)
+    runtime = create_fake_gov_simulator(
+        fake_settings,
+        prefix=fake_settings.fake_provider_prefix,
+        clock=fixed_clock,
+    )
 
     assert str(runtime.settings.issuer) == runtime.endpoints.issuer
     assert (
         runtime.credential_authenticator.authenticate(
-            cpf="12345678901",
-            password=SecretStr("ana-demo"),
+            cpf="11122233344",
+            password=SecretStr("senha-ficticia"),
         )
         == runtime.users[0]
     )
+
+
+def test_provider_only_simulator_uses_explicit_empty_prefix(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """A standalone provider must make its root topology explicit."""
+    simulator = create_fake_gov_simulator(
+        fake_settings,
+        prefix="",
+        clock=fixed_clock,
+    )
+
+    assert simulator.prefix == ""
+    assert simulator.endpoints.authorize == "http://127.0.0.1:8000/authorize"
 
 
 def test_default_credentials_are_derived_from_the_default_user_source(
@@ -89,7 +112,7 @@ def test_default_credentials_are_derived_from_the_default_user_source(
 ) -> None:
     """Adding one default identity must also add its presented login credential."""
     extra_user = FakeUser(
-        sub="11122233344",
+        sub="44455566677",
         name="Carla Demo",
         email="carla@example.test",
     )
@@ -99,10 +122,14 @@ def test_default_credentials_are_derived_from_the_default_user_source(
         runtime_module._DEFAULT_USERS + ((extra_user, SecretStr("carla-demo")),),
     )
 
-    runtime = create_fake_gov_simulator(fake_settings, clock=fixed_clock)
+    runtime = create_fake_gov_simulator(
+        fake_settings,
+        prefix=fake_settings.fake_provider_prefix,
+        clock=fixed_clock,
+    )
 
     assert runtime.credentials[-1] == FakeLoginCredential(
-        cpf="11122233344",
+        cpf="44455566677",
         password="carla-demo",
         name="Carla Demo",
     )
@@ -126,13 +153,17 @@ def test_fake_runtime_repr_hides_users_and_credentials(
     fake_settings: GovBrRuntimeSettings,
 ) -> None:
     """Runtime diagnostics must not include fake identities or credentials."""
-    runtime = create_fake_gov_simulator(fake_settings, clock=fixed_clock)
+    runtime = create_fake_gov_simulator(
+        fake_settings,
+        prefix=fake_settings.fake_provider_prefix,
+        clock=fixed_clock,
+    )
 
     rendered = repr(runtime)
 
-    assert "12345678901" not in rendered
-    assert "ana-demo" not in rendered
-    assert "ana@example.test" not in rendered
+    assert "11122233344" not in rendered
+    assert "senha-ficticia" not in rendered
+    assert "fake@example.test" not in rendered
 
 
 def test_fake_runtime_repr_hides_credential_authenticator(
@@ -147,6 +178,7 @@ def test_fake_runtime_repr_hides_credential_authenticator(
     repository = SensitiveRepository(())
     runtime = create_fake_gov_simulator(
         fake_settings,
+        prefix=fake_settings.fake_provider_prefix,
         clock=fixed_clock,
         user_repository=repository,
     )
@@ -161,6 +193,7 @@ def test_explicit_repository_precedes_users_file(
     """An explicit repository must prevent access to a configured JSON source."""
     runtime = create_fake_gov_simulator(
         fake_settings.model_copy(update={"fake_users_file": Path("missing.json")}),
+        prefix=fake_settings.fake_provider_prefix,
         clock=fixed_clock,
         user_repository=repository,
     )
@@ -192,6 +225,7 @@ def test_json_repository_precedes_default_users(
 
     runtime = create_fake_gov_simulator(
         fake_settings.model_copy(update={"fake_users_file": users_file}),
+        prefix=fake_settings.fake_provider_prefix,
         clock=fixed_clock,
     )
 
@@ -200,25 +234,26 @@ def test_json_repository_precedes_default_users(
 
 
 @pytest.mark.parametrize(
-    ("end_to_end", "expected_prefix", "expected_issuer"),
+    ("prefix", "expected_issuer"),
     [
-        (False, "", "http://127.0.0.1:8000/"),
-        (True, "/fake-govbr", "http://127.0.0.1:8000/fake-govbr/"),
+        ("", "http://127.0.0.1:8000/"),
+        ("/fake-govbr", "http://127.0.0.1:8000/fake-govbr/"),
     ],
     ids=("provider-only", "end-to-end"),
 )
-def test_fake_runtime_derives_endpoints_from_launch_mode(
+def test_fake_runtime_derives_endpoints_from_explicit_prefix(
     fake_settings: GovBrRuntimeSettings,
-    end_to_end: bool,
-    expected_prefix: str,
+    prefix: str,
     expected_issuer: str,
 ) -> None:
     """Provider-only and mounted runtimes must expose their actual route roots."""
-    settings = fake_settings.model_copy(update={"fake_end_to_end": end_to_end})
+    runtime = create_fake_gov_simulator(
+        fake_settings,
+        prefix=prefix,
+        clock=fixed_clock,
+    )
 
-    runtime = create_fake_gov_simulator(settings, clock=fixed_clock)
-
-    assert runtime.prefix == expected_prefix
+    assert runtime.prefix == prefix
     assert runtime.endpoints.issuer == expected_issuer
     assert runtime.endpoints.authorize == f"{expected_issuer}authorize"
     assert runtime.endpoints.token == f"{expected_issuer}token"
@@ -227,23 +262,21 @@ def test_fake_runtime_derives_endpoints_from_launch_mode(
 
 
 @pytest.mark.parametrize(
-    "unused_prefix",
-    ("", "/fake-govbr/", "https://example.test/fake-govbr"),
-    ids=("empty", "trailing-slash", "absolute-url"),
+    "invalid_prefix",
+    ("/", "/fake-govbr/", "https://example.test/fake-govbr"),
+    ids=("root", "trailing-slash", "absolute-url"),
 )
-def test_provider_only_runtime_uses_root_despite_unused_invalid_prefix(
-    unused_prefix: str,
+def test_fake_runtime_rejects_invalid_explicit_prefix(
+    fake_settings: GovBrRuntimeSettings,
+    invalid_prefix: str,
 ) -> None:
-    """Provider-only endpoints must not incorporate an unused mount prefix."""
-    settings = GovBrRuntimeSettings(
-        provider=GovBrProvider.FAKE,
-        fake_provider_prefix=unused_prefix,
-    )
-
-    runtime = create_fake_gov_simulator(settings, clock=fixed_clock)
-
-    assert runtime.prefix == ""
-    assert runtime.endpoints.issuer == "http://127.0.0.1:8000/"
+    """Simulator topology must reject ambiguous explicit mount prefixes."""
+    with pytest.raises(ValueError, match="prefix"):
+        create_fake_gov_simulator(
+            fake_settings,
+            prefix=invalid_prefix,
+            clock=fixed_clock,
+        )
 
 
 def test_end_to_end_builder_revalidates_copied_prefix(
@@ -255,7 +288,11 @@ def test_end_to_end_builder_revalidates_copied_prefix(
     )
 
     with pytest.raises(ValidationError, match="fake provider prefix"):
-        create_fake_gov_simulator(invalid_settings, clock=fixed_clock)
+        create_fake_gov_simulator(
+            invalid_settings,
+            prefix=fake_settings.fake_provider_prefix,
+            clock=fixed_clock,
+        )
 
 
 @pytest.mark.asyncio
@@ -282,7 +319,10 @@ async def test_fake_facade_routes_and_transport_share_one_http_application(
         del context
         return Response(status_code=204)
 
-    auth = GovBrAuth(settings=fake_settings, on_success=success_handler)
+    auth = GovBrAuth(
+        settings=fake_settings,
+        on_success=success_handler,
+    )
 
     try:
         assert len(application_calls) == 1

@@ -25,7 +25,12 @@ class ProviderEnvironment(StrEnum):
 class GovBrSettings(BaseModel):
     """Validate immutable configuration for a Gov.br OAuth provider."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        hide_input_in_errors=True,
+        str_strip_whitespace=True,
+    )
 
     environment: ProviderEnvironment = ProviderEnvironment.PRODUCTION
     authorization_url: AnyHttpUrl
@@ -38,6 +43,8 @@ class GovBrSettings(BaseModel):
     transaction_secret: SecretStr
     issuer: AnyHttpUrl
     jwks_url: AnyHttpUrl
+    logout_url: AnyHttpUrl | None = None
+    post_logout_redirect_uri: AnyHttpUrl | None = None
     connect_timeout_seconds: PositiveFloat = 5.0
     read_timeout_seconds: PositiveFloat = 10.0
     clock_skew_seconds: NonNegativeInt = 60
@@ -60,26 +67,81 @@ class GovBrSettings(BaseModel):
 
     @model_validator(mode="after")
     def validate_url_schemes(self) -> "GovBrSettings":
-        """Require HTTPS except for explicit loopback-only local configuration."""
-        for url in self._configured_urls():
+        """Require HTTPS except for loopback-only configuration."""
+        for environment_name, url in self._configured_urls():
+            if url is None:
+                continue
             if url.scheme == "https":
                 continue
-            if self.environment is not ProviderEnvironment.LOCAL:
-                raise ValueError(
-                    "provider URLs must use https outside the local environment"
-                )
             host = (url.host or "").strip("[]")
             if host not in {"localhost", "127.0.0.1", "::1"}:
-                raise ValueError("local HTTP provider URLs must use a loopback host")
+                if environment_name == "GOVBR_REDIRECT_URI":
+                    correction = (
+                        "Configure HTTPS para esse DNS ou use uma URI de loopback"
+                    )
+                else:
+                    correction = "Configure HTTPS ou use um endpoint de loopback"
+                raise ValueError(
+                    f"{environment_name} usa HTTP em um host não-loopback. "
+                    f"{correction}"
+                )
         return self
 
-    def _configured_urls(self) -> tuple[AnyHttpUrl, ...]:
-        """Return every URL that participates in the configured OAuth exchange."""
+    @model_validator(mode="after")
+    def validate_logout_configuration(self) -> "GovBrSettings":
+        """Require a complete, paired logout configuration."""
+        if (self.logout_url is None) != (self.post_logout_redirect_uri is None):
+            raise ValueError(
+                "logout_url and post_logout_redirect_uri must be configured together"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_official_provider_environment(self) -> "GovBrSettings":
+        """Reject official Gov.br endpoints from another deployment."""
+        mismatched_variables = [
+            environment_name
+            for environment_name, url in self._provider_urls()
+            if url is not None
+            and _OFFICIAL_GOVBR_HOST_ENVIRONMENTS.get(url.host.rstrip(".")) is not None
+            and _OFFICIAL_GOVBR_HOST_ENVIRONMENTS[url.host.rstrip(".")]
+            is not self.environment
+        ]
+        if mismatched_variables:
+            rendered_variables = ", ".join(mismatched_variables)
+            raise ValueError(
+                "Endpoints oficiais do Gov.br incompatíveis com "
+                f"GOVBR_ENVIRONMENT='{self.environment.value}': "
+                f"{rendered_variables}"
+            )
+        return self
+
+    def _configured_urls(self) -> tuple[tuple[str, AnyHttpUrl | None], ...]:
+        """Return every OAuth URL with its public environment name."""
         return (
-            self.authorization_url,
-            self.token_url,
-            self.userinfo_url,
-            self.redirect_uri,
-            self.issuer,
-            self.jwks_url,
+            ("GOVBR_AUTHORIZATION_URL", self.authorization_url),
+            ("GOVBR_TOKEN_URL", self.token_url),
+            ("GOVBR_USERINFO_URL", self.userinfo_url),
+            ("GOVBR_REDIRECT_URI", self.redirect_uri),
+            ("GOVBR_ISSUER", self.issuer),
+            ("GOVBR_JWKS_URL", self.jwks_url),
+            ("GOVBR_LOGOUT_URL", self.logout_url),
+            ("GOVBR_POST_LOGOUT_REDIRECT_URI", self.post_logout_redirect_uri),
         )
+
+    def _provider_urls(self) -> tuple[tuple[str, AnyHttpUrl | None], ...]:
+        """Return provider endpoints with their public environment names."""
+        return (
+            ("GOVBR_AUTHORIZATION_URL", self.authorization_url),
+            ("GOVBR_TOKEN_URL", self.token_url),
+            ("GOVBR_USERINFO_URL", self.userinfo_url),
+            ("GOVBR_ISSUER", self.issuer),
+            ("GOVBR_JWKS_URL", self.jwks_url),
+            ("GOVBR_LOGOUT_URL", self.logout_url),
+        )
+
+
+_OFFICIAL_GOVBR_HOST_ENVIRONMENTS = {
+    "sso.acesso.gov.br": ProviderEnvironment.PRODUCTION,
+    "sso.staging.acesso.gov.br": ProviderEnvironment.STAGING,
+}

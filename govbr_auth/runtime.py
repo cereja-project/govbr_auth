@@ -5,11 +5,10 @@ from datetime import UTC, datetime
 from types import TracebackType
 from typing import TYPE_CHECKING, Callable
 import httpx
-
-from pydantic import SecretStr
+from pydantic import AnyHttpUrl
 
 from govbr_auth.core.client import GovBrClient
-from govbr_auth.core.settings import GovBrSettings, ProviderEnvironment
+from govbr_auth.core.settings import GovBrSettings
 from govbr_auth.runtime_settings import (
     GovBrProvider,
     GovBrRuntimeSettings,
@@ -17,7 +16,6 @@ from govbr_auth.runtime_settings import (
 from govbr_auth.core.token_validation import IdTokenValidator
 from govbr_auth.core.transactions import (
     EncryptedTransactionCodec,
-    generate_transaction_secret,
 )
 
 if TYPE_CHECKING:
@@ -119,24 +117,20 @@ def _create_fake_consumer_runtime(
 
     from govbr_auth.fake.runtime import create_fake_gov_simulator
 
-    effective_settings = settings
-    if not settings.fake_end_to_end:
-        values = settings.model_dump()
-        values["fake_end_to_end"] = True
-        effective_settings = GovBrRuntimeSettings.model_validate(values)
     fake = create_fake_gov_simulator(
-        effective_settings,
+        settings,
+        prefix=settings.fake_provider_prefix,
         clock=clock,
         user_repository=user_repository,
     )
-    oauth = _fake_oauth_settings(fake)
+    oauth = _fake_oauth_settings(settings, fake)
     create_client = _create_client(oauth)
     transport = fake_transport_factory(fake)
     if not isinstance(transport, httpx.AsyncBaseTransport):
         raise TypeError("fake transport factory must return AsyncBaseTransport")
     owned_http = httpx.AsyncClient(transport=transport)
     return GovBrRuntime(
-        settings=effective_settings,
+        settings=settings,
         client=create_client(owned_http),
         provider=GovBrProvider.FAKE,
         fake=fake,
@@ -144,20 +138,23 @@ def _create_fake_consumer_runtime(
     )
 
 
-def _fake_oauth_settings(fake: "FakeGovSimulator") -> GovBrSettings:
-    """Derive consumer settings from the validated fake-provider graph."""
+def _fake_oauth_settings(
+    settings: GovBrRuntimeSettings,
+    fake: "FakeGovSimulator",
+) -> GovBrSettings:
+    """Replace only provider endpoints in the shared consumer settings."""
+    if settings.oauth is None:
+        raise ValueError("fake runtime requires OAuth settings")
     client = fake.settings.clients[0]
-    return GovBrSettings(
-        environment=ProviderEnvironment.LOCAL,
-        authorization_url=fake.endpoints.authorize,
-        token_url=fake.endpoints.token,
-        userinfo_url=fake.endpoints.userinfo,
-        client_id=client.client_id,
-        client_secret=client.client_secret,
-        redirect_uri=client.registered_redirect_uris[0],
-        transaction_secret=SecretStr(generate_transaction_secret()),
-        issuer=fake.endpoints.issuer,
-        jwks_url=fake.endpoints.jwks,
+    return settings.oauth.model_copy(
+        update={
+            "authorization_url": AnyHttpUrl(fake.endpoints.authorize),
+            "token_url": AnyHttpUrl(fake.endpoints.token),
+            "userinfo_url": AnyHttpUrl(fake.endpoints.userinfo),
+            "redirect_uri": client.registered_redirect_uris[0],
+            "issuer": AnyHttpUrl(fake.endpoints.issuer),
+            "jwks_url": AnyHttpUrl(fake.endpoints.jwks),
+        }
     )
 
 

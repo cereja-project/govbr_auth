@@ -49,7 +49,7 @@ jobs:
           demo_pid=$!
           trap 'kill "$demo_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8000/jwk | grep -q '"keys"'; then
+            if curl --fail --silent http://127.0.0.1:8000/fake-govbr/jwk | grep -q '"keys"'; then
               exit 0
             fi
             sleep 1

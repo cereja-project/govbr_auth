@@ -1,8 +1,8 @@
-"""Provider selection used by the runnable framework examples."""
+"""Application configuration used by the runnable framework examples."""
 
 from govbr_auth.runtime import GovBrRuntimeSettings
 
 
-def runtime_settings() -> GovBrRuntimeSettings:
-    """Load the complete validated environment used by the public adapters."""
+def application_settings() -> GovBrRuntimeSettings:
+    """Load the validated framework-neutral runtime settings."""
     return GovBrRuntimeSettings.from_environment()

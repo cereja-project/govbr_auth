@@ -4,10 +4,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, NoReturn, Protocol
 
 from govbr_auth.core.authorization import AuthorizationRequest
-from govbr_auth.core.errors import InvalidIdTokenError
+from govbr_auth.core.errors import InvalidIdTokenError, ProviderRejectedError
 from govbr_auth.core.models import GovBrUser, TokenSet
 
 if TYPE_CHECKING:
@@ -18,6 +18,10 @@ class AuthenticationClient(Protocol):
     """Describe the core client operations needed by the auth use case."""
 
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest: ...
+
+    def validate_state(self, state: str, *, now: datetime) -> None: ...
+
+    def logout_url(self) -> str: ...
 
     async def exchange_code(
         self, *, code: str, state: str, now: datetime
@@ -55,6 +59,23 @@ class AuthenticationService:
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         """Create an authorization request through the core client."""
         return self._client.authorization_url(now=now)
+
+    def logout_url(self) -> str:
+        """Return the fixed provider logout URL configured for the client."""
+        return self._client.logout_url()
+
+    def provider_error(
+        self,
+        *,
+        error: str,
+        state: str,
+        error_description: str | None,
+        now: datetime,
+    ) -> NoReturn:
+        """Validate an OAuth error callback and raise a safe public failure."""
+        del error, error_description
+        self._client.validate_state(state, now=now)
+        raise ProviderRejectedError("Gov.br rejected the authorization request")
 
     async def authenticate(
         self,

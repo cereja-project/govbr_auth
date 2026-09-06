@@ -6,14 +6,18 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from govbr_auth.adapters._errors import describe_auth_error
-from govbr_auth.adapters._runtime import create_adapter_runtime
+from govbr_auth.adapters._application import create_adapter_application
+from govbr_auth.adapters._errors import (
+    INVALID_CALLBACK_MESSAGE,
+    describe_auth_error,
+)
 from govbr_auth.authentication import AuthenticationContext, AuthenticationService
 from govbr_auth.core.client import GovBrClient
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
@@ -50,16 +54,74 @@ def create_govbr_router(
 ) -> APIRouter:
     """Create consumer authentication routes backed by a strict core client."""
     prefix = _validate_router_prefix(prefix)
-    router = APIRouter(prefix=prefix)
     service = AuthenticationService(client, expose_tokens=expose_tokens)
+    return _create_govbr_router(
+        service=service,
+        on_success=on_success,
+        on_error=on_error,
+        router_prefix=prefix,
+        login_path="/login",
+        callback_path="/callback",
+        logout_path=None,
+        clock=clock,
+    )
 
-    @router.get("/login")
+
+def _create_govbr_router(
+    *,
+    service: AuthenticationService,
+    on_success: AuthSuccessHandler,
+    on_error: AuthErrorHandler | None,
+    router_prefix: str,
+    login_path: str,
+    callback_path: str,
+    logout_path: str | None,
+    clock: Callable[[], datetime],
+) -> APIRouter:
+    router = APIRouter(prefix=router_prefix)
+
+    @router.get(login_path)
     async def login() -> RedirectResponse:
         authorization = service.authorization_url(now=clock())
         return RedirectResponse(authorization.url, status_code=302)
 
-    @router.get("/callback")
-    async def callback(code: str, state: str) -> Response:
+    @router.get(callback_path)
+    async def callback(
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+        error_description: str | None = None,
+    ) -> Response:
+        if error is not None:
+            if not error.strip() or not isinstance(state, str) or not state.strip():
+                return JSONResponse(
+                    {"error": "invalid_callback", "message": INVALID_CALLBACK_MESSAGE},
+                    status_code=400,
+                    headers={"Cache-Control": "no-store"},
+                )
+            try:
+                service.provider_error(
+                    error=error,
+                    state=state,
+                    error_description=error_description,
+                    now=clock(),
+                )
+            except GovBrAuthError as auth_error:
+                if on_error is not None:
+                    return await on_error(auth_error)
+                return _auth_error_response(auth_error)
+            raise AssertionError("provider_error must raise")
+        if (
+            not isinstance(code, str)
+            or not code.strip()
+            or not isinstance(state, str)
+            or not state.strip()
+        ):
+            return JSONResponse(
+                {"error": "invalid_callback", "message": INVALID_CALLBACK_MESSAGE},
+                status_code=400,
+                headers={"Cache-Control": "no-store"},
+            )
         try:
             context = await service.authenticate(
                 code=code,
@@ -72,6 +134,12 @@ def create_govbr_router(
             return _auth_error_response(error)
 
         return await on_success(context)
+
+    if logout_path is not None:
+
+        @router.get(logout_path)
+        async def logout() -> RedirectResponse:
+            return RedirectResponse(service.logout_url(), status_code=302)
 
     return router
 
@@ -94,10 +162,11 @@ class GovBrAuth:
         if settings is not None and runtime is not None:
             raise TypeError("settings and runtime are mutually exclusive")
         prefix = _validate_router_prefix(prefix)
-        owner = create_adapter_runtime(
+        application = create_adapter_application(
             settings=settings,
             runtime=runtime,
             prefix=prefix,
+            expose_tokens=expose_tokens,
             clock=clock,
             user_repository=user_repository,
             fake_transport_factory=lambda fake: FakeGovHttpTransport(
@@ -105,28 +174,42 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
-        self._runtime = owner.runtime
+        self._application = application
+        self._runtime = application.runtime
 
         @asynccontextmanager
         async def lifespan(_: object):
             try:
                 yield
             finally:
-                await owner.aclose()
+                await application.aclose()
 
         router = APIRouter(lifespan=lifespan)
         router.include_router(
-            create_govbr_router(
-                client=self._runtime.client,
+            _create_govbr_router(
+                service=application.service,
                 on_success=on_success,
                 on_error=on_error,
-                expose_tokens=expose_tokens,
-                prefix=prefix,
+                router_prefix="",
+                login_path=application.login_path,
+                callback_path=application.callback_path,
+                logout_path=application.logout_path,
                 clock=clock,
             )
         )
         if self._runtime.fake is not None:
             from govbr_auth.fake.fastapi import create_fake_govbr_router
+
+            @router.get("/", include_in_schema=False)
+            @router.get(DEMO_PAGE_PATH, include_in_schema=False)
+            async def demo_page() -> HTMLResponse:
+                return HTMLResponse(
+                    render_demo_page(
+                        provider=self._runtime.provider,
+                        login_path=f"{prefix}/login" if prefix else "/login",
+                    ),
+                    headers={"Cache-Control": "no-store"},
+                )
 
             router.include_router(
                 create_fake_govbr_router(

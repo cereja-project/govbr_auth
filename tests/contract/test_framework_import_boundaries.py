@@ -38,6 +38,7 @@ def test_fastapi_adapter_import_does_not_require_asgiref() -> None:
 def test_neutral_modules_import_with_frameworks_blocked() -> None:
     code = dedent("""
         import builtins
+        import sys
 
         blocked = {"fastapi", "django", "flask", "starlette", "werkzeug", "asgiref"}
         real_import = builtins.__import__
@@ -58,8 +59,11 @@ def test_neutral_modules_import_with_frameworks_blocked() -> None:
 
         builtins.__import__ = guarded_import
         import govbr_auth.core.client
+        import govbr_auth.adapters._application
         import govbr_auth.runtime
         import govbr_auth.fake.runtime
+
+        assert not blocked.intersection(sys.modules)
         """)
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -107,8 +111,6 @@ def test_fake_runtime_exposes_one_neutral_http_application_without_frameworks() 
         runtime = create_govbr_runtime(
             GovBrRuntimeSettings(
                 provider=GovBrProvider.FAKE,
-                fake_end_to_end=True,
-                fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
             ),
             fake_transport_factory=lambda _: httpx.MockTransport(
                 lambda request: httpx.Response(500, request=request)

@@ -63,6 +63,11 @@ class ProviderStub:
     def userinfo(self, access_token: SecretStr, *, now: datetime) -> FakeUser:
         return self.user
 
+    def logout(self, post_logout_redirect_uri: str | None) -> str:
+        if post_logout_redirect_uri != "http://consumer.test/signed-out":
+            raise FakeOAuthError(error="invalid_request", description="invalid logout")
+        return post_logout_redirect_uri
+
 
 class CredentialStub:
     def authenticate(self, *, cpf: str, password: SecretStr) -> FakeUser:
@@ -130,3 +135,14 @@ def test_missing_authorization_fields_fail_as_oauth_errors() -> None:
         application.authorize({})
 
     assert error.value.error == "invalid_request"
+
+
+def test_logout_delegates_to_the_provider() -> None:
+    from govbr_auth.fake.http.application import FakeGovHttpApplication
+
+    application = FakeGovHttpApplication(RuntimeStub(), clock=lambda: FIXED_NOW)
+
+    assert (
+        application.logout("http://consumer.test/signed-out")
+        == "http://consumer.test/signed-out"
+    )

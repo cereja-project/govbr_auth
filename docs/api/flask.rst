@@ -14,17 +14,14 @@ Uso:
    auth = GovBrAuth(on_success=authenticated)
    auth.register(app)
 
-``register(app)`` registra o blueprint do consumidor e, em modo fake, o
-blueprint do FakeGov separadamente. O callback recebe o contexto autenticado e
-o proxy ``request`` nativo do Flask durante o contexto da requisição. O
-consumidor continua no mesmo runtime consumidor; a configuração fake troca
-apenas os endpoints do provedor e o transporte HTTP interno
-(``FakeGovHttpTransport``). Para composição avançada, o simulador canônico é
-``govbr_auth.fake.FakeGovSimulator``, criado por
-``govbr_auth.fake.create_fake_gov_simulator``.
+``register(app)`` registra as rotas do consumidor e, em modo fake, as rotas
+do FakeGov. Aceita ``GovBrRuntimeSettings`` ou ``GovBrRuntime``; quando
+omitidos, carrega as configurações do ambiente. Em modo fake, também registra a
+página demo na raiz ``/``; o launcher FakeGov é apenas um atalho.
+Com a configuração completa de logout, ``register(app)`` também registra
+``/auth/govbr/logout`` para iniciar o logout no provedor.
 
 .. py:class:: GovBrAuth(*, on_success, settings=None, runtime=None, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now, user_repository=None)
    :no-index:
 
-   Compõe a engine e expõe ``blueprint`` para registro manual ou ``register``
-   para registrar também as rotas condicionais do FakeGov.
+   Compõe o runtime e expõe ``blueprint`` ou ``register`` para registro manual.

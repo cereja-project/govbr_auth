@@ -5,7 +5,7 @@ Instalação::
 
    pip install "govbr-auth[django]"
 
-Uso no ``urls.py`` do projeto:
+Uso no ``urls.py``:
 
 .. code-block:: python
 
@@ -14,15 +14,16 @@ Uso no ``urls.py`` do projeto:
    auth = GovBrAuth(on_success=authenticated)
    urlpatterns = auth.urlpatterns
 
-O adapter é síncrono e entrega ``(context, request)`` ao callback. ``settings``
-e ``runtime`` são mutuamente exclusivos. Em modo fake, o consumidor continua no
-mesmo runtime consumidor; a configuração troca apenas os endpoints do provedor
-e o transporte HTTP interno (``FakeGovHttpTransport``). Para composição
-avançada, o simulador canônico é ``govbr_auth.fake.FakeGovSimulator``, criado por
-``govbr_auth.fake.create_fake_gov_simulator``. As URLs do FakeGov são
-adicionadas à lista no prefixo próprio do runtime.
+O adapter é síncrono e entrega ``(context, request)`` ao callback. Aceita
+``GovBrRuntimeSettings`` ou ``GovBrRuntime``; quando omitidos, carrega as
+configurações do ambiente. Registre ``auth.urlpatterns`` na raiz do URLconf.
+As rotas do FakeGov e a página demo na raiz ``/`` só aparecem quando
+``GOVBR_PROVIDER=fake``. O launcher FakeGov é apenas um atalho para essa
+composição.
+Com a configuração completa de logout, ``auth.urlpatterns`` também contém a
+rota ``auth/govbr/logout``.
 
 .. py:class:: GovBrAuth(*, on_success, settings=None, runtime=None, on_error=None, expose_tokens=False, prefix="/auth/govbr", clock=utc_now, user_repository=None)
    :no-index:
 
-   Compõe a engine e expõe ``urlpatterns`` para inclusão explícita no projeto.
+   Compõe o runtime e expõe ``urlpatterns`` para inclusão explícita.

@@ -5,21 +5,18 @@ Seleção do provedor
 -------------------
 
 ``GOVBR_PROVIDER`` aceita somente ``official`` ou ``fake``. O default é
-``official``. Use ``GOVBR_PROVIDER=fake`` apenas em desenvolvimento.
+``official``. Use ``fake`` apenas em desenvolvimento e testes.
 
-O launcher ``python -m govbr_auth.fake`` lê o arquivo ``.env`` apenas do
-diretório atual. A precedência é: configuração explícita passada pela aplicação,
-variável já exportada no ambiente do processo, valor do ``.env`` e, por fim,
-o padrão documentado. O ``.env`` nunca sobrescreve uma variável exportada.
-
-Nomes desconhecidos com o prefixo ``GOVBR_`` são rejeitados para que erros de
-digitação não ativem silenciosamente um valor padrão. Variáveis reconhecidas,
-mas inativas para o provider selecionado, emitem um warning contendo somente
-os nomes; valores e segredos não são incluídos. Endpoints oficiais combinados
-com ``GOVBR_PROVIDER=fake`` permanecem um erro de configuração.
+``GovBrRuntimeSettings.from_environment()`` é a única leitura comum de
+configuração. Nomes desconhecidos com prefixo ``GOVBR_`` são rejeitados;
+variáveis reconhecidas, mas inativas para o provedor selecionado, geram apenas
+warning sem incluir valores ou segredos.
 
 Provedor oficial
 ----------------
+
+As configurações do cliente são compartilhadas entre o provedor oficial e o
+FakeGov. Os endpoints abaixo são exclusivos do provedor oficial.
 
 .. code-block:: text
 
@@ -28,12 +25,26 @@ Provedor oficial
     GOVBR_AUTHORIZATION_URL=https://sso.acesso.gov.br/authorize
     GOVBR_TOKEN_URL=https://sso.acesso.gov.br/token
     GOVBR_USERINFO_URL=https://sso.acesso.gov.br/userinfo/
+    GOVBR_ISSUER=https://sso.acesso.gov.br/
+    GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
+
+Configure sempre as variáveis comuns do cliente uma única vez::
+
     GOVBR_CLIENT_ID=seu-client-id
     GOVBR_CLIENT_SECRET=seu-client-secret
     GOVBR_REDIRECT_URI=https://app.example/auth/govbr/callback
+    GOVBR_LOGOUT_URL=https://sso.acesso.gov.br/logout
+    GOVBR_POST_LOGOUT_REDIRECT_URI=https://app.example/auth/signed-out
     GOVBR_TRANSACTION_SECRET=substitua-pelo-valor-gerado
-    GOVBR_ISSUER=https://sso.acesso.gov.br/
-    GOVBR_JWKS_URL=https://sso.acesso.gov.br/jwk
+
+Os endpoints oficiais devem pertencer ao mesmo ambiente. Fora de loopback,
+``GOVBR_REDIRECT_URI`` exige HTTPS e deve coincidir exatamente com a URI
+cadastrada no Gov.br.
+
+O logout é habilitado quando ``GOVBR_LOGOUT_URL`` e
+``GOVBR_POST_LOGOUT_REDIRECT_URI`` são configurados juntos. A URI de retorno
+deve estar previamente autorizada no provedor; a biblioteca não aceita esse
+destino pela query string da rota local.
 
 ``GOVBR_TRANSACTION_SECRET`` protege ``state``, nonce e PKCE. Gere uma vez:
 
@@ -43,31 +54,40 @@ Provedor oficial
 
     print(generate_transaction_secret())
 
-Mantenha o valor secreto e use o mesmo valor em todas as instâncias. Não gere
-uma chave nova a cada inicialização.
+Mantenha o valor secreto e use o mesmo valor em todas as instâncias e workers.
+O ``state`` não é um registro de uso
+único; a prevenção de replay depende do authorization code descartável do
+provedor.
 
-O backend suporta múltiplos workers sem armazenamento compartilhado porque o
-``state`` contém um envelope de transação cifrado e autenticado por Fernet.
-Todos os workers precisam da mesma secret ``GOVBR_TRANSACTION_SECRET``. O
-envelope tem TTL e preserva os vínculos de PKCE e nonce até o callback.
+O envelope usa Fernet e TTL, além de PKCE e nonce. O ``state`` não é um
+registro de uso único; a prevenção de replay depende do authorization code de
+uso único do provedor.
 
-O ``state`` não é um registro de uso único e pode ser decodificado novamente
-durante o TTL. A prevenção de replay é responsabilidade do authorization code
-de uso único: o provedor deve invalidá-lo de forma atômica após a primeira
-troca. Rotacionar a secret invalida os fluxos que ainda estiverem em andamento.
+O backend é stateless, funciona com múltiplos workers sem armazenamento
+compartilhado e mantém a mesma secret em todas as instâncias.
 
 FakeGov
 -------
 
-``GOVBR_FAKE_END_TO_END`` aceita apenas ``true`` ou ``false``. Host, porta,
-prefixo e fonte de usuários podem ser alterados por ``GOVBR_FAKE_HOST``,
-``GOVBR_FAKE_PORT``, ``GOVBR_FAKE_PROVIDER_PREFIX`` e
-``GOVBR_FAKE_USERS_FILE``. O host precisa ser ``localhost``, ``127.0.0.1`` ou
-``::1``.
+Defina ``GOVBR_PROVIDER=fake`` e ``GOVBR_ENVIRONMENT=local``. O FakeGov
+reutiliza ``GOVBR_CLIENT_ID``, ``GOVBR_CLIENT_SECRET``,
+``GOVBR_REDIRECT_URI``, ``GOVBR_SCOPE`` e ``GOVBR_TRANSACTION_SECRET``; não
+existe uma segunda configuração de cliente para o simulador.
+
+``GOVBR_FAKE_HOST``, ``GOVBR_FAKE_PORT``, ``GOVBR_FAKE_PROVIDER_PREFIX`` e
+``GOVBR_FAKE_USERS_FILE`` controlam o simulador local. O host é restrito a
+``localhost``, ``127.0.0.1`` e ``::1``. O launcher ``python -m govbr_auth.fake``
+monta o fluxo end-to-end e a página demo na raiz em loopback.
 
 Configuração explícita
 ----------------------
 
-Aplicações avançadas podem construir ``GovBrRuntimeSettings`` e passá-lo a
-``GovBrAuth``. O caminho comum deve preferir variáveis de ambiente e a fachada
-do adapter escolhido, mantendo a composição em um único lugar.
+Aplicações podem construir diretamente ``GovBrRuntimeSettings`` e passá-lo ao
+adapter:
+
+.. code-block:: python
+
+    from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
+
+    settings = GovBrRuntimeSettings(provider=GovBrProvider.FAKE)
+    auth = GovBrAuth(settings=settings, on_success=authenticated)

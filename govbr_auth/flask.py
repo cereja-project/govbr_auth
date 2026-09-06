@@ -4,18 +4,19 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from flask import Blueprint, Flask, jsonify, redirect, request
+from flask import Blueprint, Flask, Response, jsonify, redirect, request
 
 from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
     describe_auth_error,
 )
-from govbr_auth.adapters._runtime import create_adapter_runtime
+from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.adapters._sync import run_sync
-from govbr_auth.authentication import AuthenticationContext, AuthenticationService
+from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.flask import create_fake_govbr_blueprint
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
@@ -49,13 +50,13 @@ class GovBrAuth:
     ) -> None:
         if not _is_canonical_path_prefix(prefix, allow_empty=True):
             raise ValueError("prefix must be an empty string or a canonical path")
-        self._clock = clock
         self._on_success = on_success
         self._on_error = on_error
-        self._owner = create_adapter_runtime(
+        self._application = create_adapter_application(
             settings=settings,
             runtime=runtime,
             prefix=prefix,
+            expose_tokens=expose_tokens,
             clock=clock,
             user_repository=user_repository,
             fake_transport_factory=lambda fake: FakeGovHttpTransport(
@@ -63,12 +64,9 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
-        self._service = AuthenticationService(
-            self._owner.runtime.client,
-            expose_tokens=expose_tokens,
-        )
-        self._blueprint = self._build_blueprint(prefix)
-        fake_runtime = self._owner.runtime.fake
+        self._clock = self._application.clock
+        self._blueprint = self._build_blueprint()
+        fake_runtime = self._application.runtime.fake
         self._fake_blueprint = (
             create_fake_govbr_blueprint(
                 fake_runtime,
@@ -86,7 +84,7 @@ class GovBrAuth:
 
     def close(self) -> None:
         """Close an adapter-owned runtime without closing a borrowed runtime."""
-        self._owner.close()
+        self._application.close()
 
     def register(self, application: Flask) -> None:
         """Register consumer and conditional FakeGov routes on a Flask app."""
@@ -94,18 +92,69 @@ class GovBrAuth:
         if self._fake_blueprint is not None:
             application.register_blueprint(self._fake_blueprint)
 
-    def _build_blueprint(self, prefix: str) -> Blueprint:
-        blueprint = Blueprint("govbr_auth", __name__, url_prefix=prefix or "")
+    def _build_blueprint(self) -> Blueprint:
+        blueprint = Blueprint("govbr_auth", __name__)
 
-        @blueprint.get("/login")
+        if self._application.runtime.fake is not None:
+
+            @blueprint.get("/")
+            @blueprint.get(DEMO_PAGE_PATH)
+            def demo_page() -> Response:
+                response = Response(
+                    render_demo_page(
+                        provider=self._application.runtime.provider,
+                        login_path=self._application.login_path,
+                    ),
+                    mimetype="text/html",
+                )
+                response.headers["Cache-Control"] = "no-store"
+                return response
+
+        @blueprint.get(self._application.login_path)
         def login():
-            authorization = self._service.authorization_url(now=self._clock())
+            authorization = self._application.service.authorization_url(
+                now=self._clock()
+            )
             return redirect(authorization.url)
 
-        @blueprint.route("/callback", methods=["GET", "POST"])
+        if self._application.logout_path is not None:
+
+            @blueprint.get(self._application.logout_path)
+            def logout():
+                return redirect(self._application.service.logout_url())
+
+        @blueprint.route(
+            self._application.callback_path,
+            methods=["GET", "POST"],
+        )
         def callback():
             code = request.values.get("code")
             state = request.values.get("state")
+            error = request.values.get("error")
+            error_description = request.values.get("error_description")
+            if error is not None:
+                if not error.strip() or not isinstance(state, str) or not state.strip():
+                    return (
+                        jsonify(
+                            {
+                                "error": "invalid_callback",
+                                "message": INVALID_CALLBACK_MESSAGE,
+                            }
+                        ),
+                        400,
+                    )
+                try:
+                    self._application.service.provider_error(
+                        error=error,
+                        state=state,
+                        error_description=error_description,
+                        now=self._clock(),
+                    )
+                except GovBrAuthError as auth_error:
+                    if self._on_error is not None:
+                        return self._on_error(auth_error, request)
+                    return _auth_error_response(auth_error)
+                raise AssertionError("provider_error must raise")
             if (
                 not isinstance(code, str)
                 or not code.strip()
@@ -124,7 +173,7 @@ class GovBrAuth:
             try:
 
                 async def authenticate():
-                    return await self._service.authenticate(
+                    return await self._application.service.authenticate(
                         code=code,
                         state=state,
                         now=self._clock(),

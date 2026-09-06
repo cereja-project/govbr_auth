@@ -45,13 +45,9 @@ def isolate_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GOVBR_CONNECT_TIMEOUT_SECONDS",
         "GOVBR_READ_TIMEOUT_SECONDS",
         "GOVBR_CLOCK_SKEW_SECONDS",
-        "GOVBR_FAKE_END_TO_END",
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
-        "GOVBR_FAKE_CLIENT_ID",
-        "GOVBR_FAKE_CLIENT_SECRET",
-        "GOVBR_FAKE_REDIRECT_URI",
         "GOVBR_FAKE_REQUEST_TTL_SECONDS",
         "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS",
         "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS",
@@ -84,8 +80,6 @@ def fake_settings() -> GovBrRuntimeSettings:
     """Provide complete settings for an embedded fake provider."""
     return GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_end_to_end=True,
-        fake_redirect_uri="http://127.0.0.1:8000/auth/govbr/callback",
     )
 
 
@@ -109,13 +103,48 @@ def test_runtime_settings_select_fake_explicitly(
     assert settings.provider is GovBrProvider.FAKE
 
 
-def test_runtime_settings_parse_explicit_false_end_to_end() -> None:
-    """The canonical false spelling must keep the provider-only profile."""
+def test_fake_environment_reuses_shared_oauth_configuration() -> None:
+    """FakeGov must replace only provider endpoints, not client settings."""
+    transaction_secret = Fernet.generate_key().decode("ascii")
+
     settings = GovBrRuntimeSettings.from_environment(
-        {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_END_TO_END": "false"}
+        {
+            "GOVBR_PROVIDER": "fake",
+            "GOVBR_ENVIRONMENT": "local",
+            "GOVBR_CLIENT_ID": "shared-client",
+            "GOVBR_CLIENT_SECRET": "shared-client-secret",
+            "GOVBR_REDIRECT_URI": "http://127.0.0.1:8000/auth/govbr/callback",
+            "GOVBR_SCOPE": "openid profile",
+            "GOVBR_TRANSACTION_SECRET": transaction_secret,
+        }
     )
 
-    assert settings.fake_end_to_end is False
+    assert settings.oauth is not None
+    assert settings.oauth.client_id == "shared-client"
+    assert settings.oauth.client_secret.get_secret_value() == "shared-client-secret"
+    assert str(settings.oauth.redirect_uri) == (
+        "http://127.0.0.1:8000/auth/govbr/callback"
+    )
+    assert settings.oauth.scope == "openid profile"
+    assert settings.oauth.transaction_secret.get_secret_value() == transaction_secret
+    assert str(settings.oauth.logout_url) == "http://127.0.0.1:8000/fake-govbr/logout"
+    assert str(settings.oauth.post_logout_redirect_uri) == "http://127.0.0.1:8000/"
+
+
+@pytest.mark.parametrize(
+    "variable",
+    (
+        "GOVBR_FAKE_CLIENT_ID",
+        "GOVBR_FAKE_CLIENT_SECRET",
+        "GOVBR_FAKE_REDIRECT_URI",
+    ),
+)
+def test_fake_environment_rejects_duplicated_client_variables(variable: str) -> None:
+    """FakeGov client variables must not create a second client configuration."""
+    with pytest.raises(ValueError, match=f"variável não suportada: {variable}"):
+        GovBrRuntimeSettings.from_environment(
+            {"GOVBR_PROVIDER": "fake", variable: "obsolete"}
+        )
 
 
 def test_runtime_settings_build_official_oauth_from_environment() -> None:
@@ -169,14 +198,75 @@ def test_runtime_settings_reject_unknown_provider(
     """Unsupported providers must fail before runtime construction."""
     monkeypatch.setenv("GOVBR_PROVIDER", "fallback")
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError) as exc_info:
         GovBrRuntimeSettings.from_environment()
+
+    assert type(exc_info.value) is ValueError
+    assert str(exc_info.value) == (
+        "Configuração Gov.br inválida: valor inválido para GOVBR_PROVIDER."
+    )
+
+
+def test_runtime_settings_reports_environment_mismatch_in_portuguese() -> None:
+    """The startup boundary must not expose Pydantic or configured values."""
+    sensitive_secret = "sensitive-secret-marker"
+    environment = {
+        "GOVBR_PROVIDER": "official",
+        "GOVBR_ENVIRONMENT": "staging",
+        "GOVBR_AUTHORIZATION_URL": "https://sso.staging.acesso.gov.br/authorize",
+        "GOVBR_TOKEN_URL": "https://sso.staging.acesso.gov.br/token",
+        "GOVBR_USERINFO_URL": "https://sso.staging.acesso.gov.br/userinfo/",
+        "GOVBR_CLIENT_ID": "test-client",
+        "GOVBR_CLIENT_SECRET": sensitive_secret,
+        "GOVBR_REDIRECT_URI": "https://consumer.example.test/oauth/callback",
+        "GOVBR_TRANSACTION_SECRET": sensitive_secret,
+        "GOVBR_ISSUER": "https://sso.acesso.gov.br/",
+        "GOVBR_JWKS_URL": "https://sso.acesso.gov.br/jwk",
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        GovBrRuntimeSettings.from_environment(environment)
+
+    assert type(exc_info.value) is ValueError
+    assert str(exc_info.value) == (
+        "Configuração Gov.br inválida: Endpoints oficiais do Gov.br "
+        "incompatíveis com GOVBR_ENVIRONMENT='staging': "
+        "GOVBR_ISSUER, GOVBR_JWKS_URL."
+    )
+    assert sensitive_secret not in str(exc_info.value)
+    assert exc_info.value.__cause__ is None
+
+
+def test_runtime_settings_explains_http_dns_redirect_in_portuguese() -> None:
+    """A DNS callback without TLS must identify the variable and correction."""
+    environment = {
+        "GOVBR_PROVIDER": "official",
+        "GOVBR_ENVIRONMENT": "staging",
+        "GOVBR_AUTHORIZATION_URL": "https://sso.staging.acesso.gov.br/authorize",
+        "GOVBR_TOKEN_URL": "https://sso.staging.acesso.gov.br/token",
+        "GOVBR_USERINFO_URL": "https://sso.staging.acesso.gov.br/userinfo/",
+        "GOVBR_CLIENT_ID": "test-client",
+        "GOVBR_CLIENT_SECRET": "test-client-secret",
+        "GOVBR_REDIRECT_URI": "http://app.example.test/oauth/callback",
+        "GOVBR_TRANSACTION_SECRET": "test-transaction-secret",
+        "GOVBR_ISSUER": "https://sso.staging.acesso.gov.br/",
+        "GOVBR_JWKS_URL": "https://sso.staging.acesso.gov.br/jwk",
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        GovBrRuntimeSettings.from_environment(environment)
+
+    assert str(exc_info.value) == (
+        "Configuração Gov.br inválida: GOVBR_REDIRECT_URI usa HTTP em um host "
+        "não-loopback. Configure HTTPS para esse DNS ou use uma URI de loopback."
+    )
 
 
 def test_runtime_settings_reject_unknown_govbr_variable() -> None:
     """A misspelled GOVBR variable must not disappear behind a default."""
     with pytest.raises(
-        ValueError, match="unknown GOVBR configuration.*GOVBR_FAKE_PORRT"
+        ValueError,
+        match="Configuração.*variável não suportada: GOVBR_FAKE_PORRT",
     ) as captured:
         GovBrRuntimeSettings.from_environment(
             {
@@ -194,18 +284,8 @@ def test_runtime_settings_reject_unknown_govbr_variable() -> None:
             {"GOVBR_PROVIDER": "official", "GOVBR_FAKE_PORT": "8123"},
             "GOVBR_FAKE_PORT",
         ),
-        (
-            {
-                "GOVBR_PROVIDER": "fake",
-                "GOVBR_CONNECT_TIMEOUT_SECONDS": "7",
-            },
-            "GOVBR_CONNECT_TIMEOUT_SECONDS",
-        ),
     ),
-    ids=(
-        "fake-variable-with-official-provider",
-        "official-variable-with-fake-provider",
-    ),
+    ids=("fake-variable-with-official-provider",),
 )
 def test_runtime_settings_warn_about_provider_inactive_variables(
     environment: dict[str, str],
@@ -224,11 +304,10 @@ def test_runtime_settings_warn_about_provider_inactive_variables(
         "GOVBR_AUTHORIZATION_URL",
         "GOVBR_TOKEN_URL",
         "GOVBR_USERINFO_URL",
-        "GOVBR_REDIRECT_URI",
         "GOVBR_ISSUER",
         "GOVBR_JWKS_URL",
     ),
-    ids=("authorize", "token", "userinfo", "redirect", "issuer", "jwks"),
+    ids=("authorize", "token", "userinfo", "issuer", "jwks"),
 )
 def test_fake_environment_rejects_official_endpoint_variables(variable: str) -> None:
     """Fake selection must not silently ignore an official provider endpoint."""
@@ -241,19 +320,10 @@ def test_fake_environment_rejects_official_endpoint_variables(variable: str) -> 
         )
 
 
-@pytest.mark.parametrize("value", ["1", "yes", "enabled", ""])
-def test_runtime_settings_reject_noncanonical_end_to_end(value: str) -> None:
-    """Truth-like strings must not accidentally activate the fake flow."""
-    with pytest.raises(ValidationError):
-        GovBrRuntimeSettings.from_environment(
-            {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_END_TO_END": value}
-        )
-
-
 @pytest.mark.parametrize("host", ["0.0.0.0", "192.168.0.10", "example.test"])
 def test_runtime_settings_reject_non_loopback_fake_host(host: str) -> None:
     """The local fake provider must not bind a remotely reachable host."""
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError, match="Configuração.*GOVBR_FAKE_HOST"):
         GovBrRuntimeSettings.from_environment(
             {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_HOST": host}
         )
@@ -262,7 +332,7 @@ def test_runtime_settings_reject_non_loopback_fake_host(host: str) -> None:
 @pytest.mark.parametrize("port", ["0", "65536"])
 def test_runtime_settings_reject_invalid_fake_port(port: str) -> None:
     """The runtime must reject ports outside the TCP port range."""
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError, match="Configuração.*GOVBR_FAKE_PORT"):
         GovBrRuntimeSettings.from_environment(
             {"GOVBR_PROVIDER": "fake", "GOVBR_FAKE_PORT": port}
         )
@@ -314,22 +384,20 @@ def test_end_to_end_settings_reject_invalid_fake_provider_prefix(
     with pytest.raises(ValidationError, match="fake provider prefix"):
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
             fake_provider_prefix=prefix,
         )
 
 
 def test_embedded_runtime_revalidates_fake_provider_prefix() -> None:
     """Consumer embedding must validate a prefix unused by provider-only mode."""
-    settings = GovBrRuntimeSettings(
-        provider=GovBrProvider.FAKE,
-        fake_provider_prefix="//example.test/fake-govbr",
+    settings = GovBrRuntimeSettings(provider=GovBrProvider.FAKE).model_copy(
+        update={"fake_provider_prefix": "//example.test/fake-govbr"}
     )
 
     def fail_if_factory_called(_):
         raise AssertionError("invalid prefix must fail before transport composition")
 
-    with pytest.raises(ValidationError, match="fake provider prefix"):
+    with pytest.raises(ValueError, match="prefix"):
         create_govbr_runtime(
             settings,
             fake_transport_factory=fail_if_factory_called,
@@ -513,18 +581,36 @@ def test_fake_consumer_runtime_mounts_provider_below_configured_prefix(
     fake_settings: GovBrRuntimeSettings,
 ) -> None:
     """Embedded consumers must not collide with application root routes."""
-    provider_only_settings = fake_settings.model_copy(update={"fake_end_to_end": False})
-
     runtime = create_govbr_runtime(
-        provider_only_settings,
+        fake_settings,
         fake_transport_factory=lambda _: httpx.MockTransport(
             lambda __: httpx.Response(500)
         ),
     )
 
     assert runtime.fake is not None
-    assert runtime.fake.prefix == provider_only_settings.fake_provider_prefix
+    assert runtime.fake.prefix == fake_settings.fake_provider_prefix
     assert runtime.fake.endpoints.authorize.endswith("/fake-govbr/authorize")
+
+
+@pytest.mark.asyncio
+async def test_embedded_fake_runtime_always_uses_configured_provider_prefix(
+    fake_settings: GovBrRuntimeSettings,
+) -> None:
+    """Embedded runtimes must never expose provider endpoints at the root."""
+    runtime = create_govbr_runtime(
+        fake_settings,
+        fake_transport_factory=lambda fake: httpx.MockTransport(
+            lambda request: httpx.Response(500)
+        ),
+    )
+
+    try:
+        assert runtime.fake is not None
+        assert runtime.fake.prefix == fake_settings.fake_provider_prefix
+        assert runtime.fake.endpoints.authorize.endswith("/fake-govbr/authorize")
+    finally:
+        await runtime.aclose()
 
 
 def test_fake_runtime_requires_transport_factory_before_allocating_http(

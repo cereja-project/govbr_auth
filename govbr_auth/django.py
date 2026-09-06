@@ -12,12 +12,13 @@ from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
     describe_auth_error,
 )
-from govbr_auth.adapters._runtime import create_adapter_runtime
+from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.adapters._sync import run_sync
-from govbr_auth.authentication import AuthenticationContext, AuthenticationService
+from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.django import create_fake_govbr_urlpatterns
 from govbr_auth.fake.http.transport import FakeGovHttpTransport
+from govbr_auth.presentation import DEMO_PAGE_PATH, render_demo_page
 from govbr_auth.runtime import GovBrRuntime, GovBrRuntimeSettings
 from govbr_auth.runtime_settings import _is_canonical_path_prefix
 
@@ -51,14 +52,13 @@ class GovBrAuth:
     ) -> None:
         if not _is_canonical_path_prefix(prefix, allow_empty=True):
             raise ValueError("prefix must be an empty string or a canonical path")
-        self._prefix = prefix.lstrip("/")
-        self._clock = clock
         self._on_success = on_success
         self._on_error = on_error
-        self._owner = create_adapter_runtime(
+        self._application = create_adapter_application(
             settings=settings,
             runtime=runtime,
             prefix=prefix,
+            expose_tokens=expose_tokens,
             clock=clock,
             user_repository=user_repository,
             fake_transport_factory=lambda fake: FakeGovHttpTransport(
@@ -66,10 +66,7 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
-        self._service = AuthenticationService(
-            self._owner.runtime.client,
-            expose_tokens=expose_tokens,
-        )
+        self._clock = self._application.clock
         self._urlpatterns = self._build_urlpatterns()
 
     @property
@@ -79,20 +76,42 @@ class GovBrAuth:
 
     def close(self) -> None:
         """Close an adapter-owned runtime without closing a borrowed runtime."""
-        self._owner.close()
+        self._application.close()
 
     def _build_urlpatterns(self) -> list[URLPattern]:
-        prefix = f"{self._prefix}/" if self._prefix else ""
+        callback_path = self._application.callback_path.lstrip("/")
         patterns = [
-            path(f"{prefix}login", self._login, name="govbr-auth-login"),
             path(
-                f"{prefix}callback",
+                self._application.login_path.lstrip("/"),
+                self._login,
+                name="govbr-auth-login",
+            ),
+            path(
+                callback_path,
                 self._callback,
                 name="govbr-auth-callback",
             ),
         ]
-        fake_runtime = self._owner.runtime.fake
+        if self._application.logout_path is not None:
+            patterns.append(
+                path(
+                    self._application.logout_path.lstrip("/"),
+                    self._logout,
+                    name="govbr-auth-logout",
+                )
+            )
+        fake_runtime = self._application.runtime.fake
         if fake_runtime is not None:
+            patterns.extend(
+                [
+                    path("", self._demo_page, name="govbr-auth-demo"),
+                    path(
+                        DEMO_PAGE_PATH.lstrip("/"),
+                        self._demo_page,
+                        name="govbr-auth-demo-alias",
+                    ),
+                ]
+            )
             patterns.extend(
                 create_fake_govbr_urlpatterns(
                     fake_runtime,
@@ -102,14 +121,50 @@ class GovBrAuth:
             )
         return patterns
 
+    def _demo_page(self, request: HttpRequest) -> HttpResponse:
+        del request
+        return HttpResponse(
+            render_demo_page(
+                provider=self._application.runtime.provider,
+                login_path=f"{self._application.login_path}",
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
+
     def _login(self, request: HttpRequest) -> HttpResponseRedirect:
-        authorization = self._service.authorization_url(now=self._clock())
+        authorization = self._application.service.authorization_url(now=self._clock())
         return HttpResponseRedirect(authorization.url)
+
+    def _logout(self, request: HttpRequest) -> HttpResponseRedirect:
+        del request
+        return HttpResponseRedirect(self._application.service.logout_url())
 
     @csrf_exempt
     def _callback(self, request: HttpRequest) -> HttpResponse:
         code = request.POST.get("code") or request.GET.get("code")
         state = request.POST.get("state") or request.GET.get("state")
+        error = request.POST.get("error") or request.GET.get("error")
+        error_description = request.POST.get("error_description") or request.GET.get(
+            "error_description"
+        )
+        if error is not None:
+            if not error.strip() or not isinstance(state, str) or not state.strip():
+                return JsonResponse(
+                    {"error": "invalid_callback", "message": INVALID_CALLBACK_MESSAGE},
+                    status=400,
+                )
+            try:
+                self._application.service.provider_error(
+                    error=error,
+                    state=state,
+                    error_description=error_description,
+                    now=self._clock(),
+                )
+            except GovBrAuthError as auth_error:
+                if self._on_error is not None:
+                    return self._on_error(auth_error, request)
+                return _auth_error_response(auth_error)
+            raise AssertionError("provider_error must raise")
         if (
             not isinstance(code, str)
             or not code.strip()
@@ -123,7 +178,7 @@ class GovBrAuth:
         try:
 
             async def authenticate():
-                return await self._service.authenticate(
+                return await self._application.service.authenticate(
                     code=code,
                     state=state,
                     now=self._clock(),

@@ -11,6 +11,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
 
+from govbr_auth.adapters._runtime import prepare_adapter_runtime_settings
 from govbr_auth.fake.http.routes import build_fake_govbr_routes
 from govbr_auth.fake.http.application import (
     FakeGovHttpApplication,
@@ -26,7 +27,6 @@ from govbr_auth.fake.runtime import (
 )
 from govbr_auth.fastapi import utc_now
 from govbr_auth.fake.launcher import create_end_to_end_app
-from govbr_auth.presentation import render_error, render_home, render_success
 from govbr_auth.runtime import (
     GovBrProvider,
     GovBrRuntimeSettings,
@@ -118,35 +118,21 @@ def create_fake_app(
     clock: Callable[[], datetime] = utc_now,
     user_repository: FakeUserRepository | None = None,
 ) -> FastAPI:
-    """Create the provider-only or complete local fake application profile."""
-    resolved_settings = settings or _launcher_settings()
-    if resolved_settings.provider is not GovBrProvider.FAKE:
+    """Create the complete local fake application profile."""
+    resolved = settings or _launcher_settings()
+    if resolved.provider is not GovBrProvider.FAKE:
         raise ValueError("fake launcher requires the fake provider")
-    if not resolved_settings.fake_end_to_end:
-        runtime = create_fake_gov_simulator(
-            resolved_settings,
-            clock=clock,
-            user_repository=user_repository,
-        )
-        return create_fake_govbr_app(
-            runtime,
-            application=runtime.http_application,
-            clock=clock,
-        )
-
+    runtime_settings = prepare_adapter_runtime_settings(
+        resolved,
+        prefix="/auth/govbr",
+    )
     runtime = create_govbr_runtime(
-        resolved_settings,
+        runtime_settings,
         fake_transport_factory=lambda fake: _fake_asgi_transport(fake, clock=clock),
         clock=clock,
         user_repository=user_repository,
     )
-    return create_end_to_end_app(
-        runtime,
-        clock=clock,
-        render_success_page=render_success,
-        render_error_page=render_error,
-        render_home_page=render_home,
-    )
+    return create_end_to_end_app(runtime, clock=clock)
 
 
 def run() -> None:

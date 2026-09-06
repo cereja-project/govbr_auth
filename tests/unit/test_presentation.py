@@ -6,7 +6,9 @@ import pytest
 from govbr_auth.core import GovBrUser
 from govbr_auth.fake.credentials import FakeLoginCredential
 from govbr_auth.presentation import (
+    DEMO_PAGE_PATH,
     render_error,
+    render_demo_page,
     render_home,
     render_page,
     render_primary_action,
@@ -15,6 +17,41 @@ from govbr_auth.presentation import (
     render_success,
     responsive_css,
 )
+from govbr_auth.runtime import GovBrProvider
+
+
+def test_official_demo_page_has_neutral_copy_and_configured_login() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.OFFICIAL,
+        login_path="/oauth/govbr/login",
+    )
+
+    assert DEMO_PAGE_PATH == "/govbr-auth-demo"
+    assert 'href="/oauth/govbr/login"' in page
+    assert ">Entrar com GOV.BR<" in page
+    assert "Provedor oficial Gov.br" in page
+    assert "SIMULAÇÃO" not in page
+    assert "credenciais fictícias" not in page
+    assert "ambiente local" not in page
+
+
+def test_fake_demo_page_identifies_simulation_without_credentials() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+    )
+
+    assert "FakeGov" in page
+    assert "SIMULAÇÃO LOCAL" in page
+    assert "Não use credenciais reais" in page
+    for forbidden in (
+        "12345678901",
+        "ana-demo",
+        "GOVBR_FAKE_CLIENT_SECRET",
+        "access_token",
+        "id_token",
+    ):
+        assert forbidden not in page
 
 
 def test_shared_shell_preserves_accessibility_and_simulation_identity() -> None:
@@ -242,13 +279,49 @@ def test_home_does_not_render_credentials_in_the_launcher_response() -> None:
     assert "bruno-demo" not in page
     assert "nunca são exibidos" in page
     assert 'href="/auth/govbr/login"' in page
-    assert ">Entrar com gov.br</a>" in page
+    assert ">Entrar com GOV.BR</a>" in page
     assert ":focus-visible" in page
     assert "@media" in page
 
 
 def test_home_omits_credentials_for_external_repository() -> None:
     assert "Credenciais da demo" not in render_home(credentials=())
+
+
+def test_demo_page_opens_native_auth_window_and_updates_on_completion() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+        interactive=True,
+    )
+
+    assert "window.open" in page
+    assert "window.location.origin" in page
+    assert 'event.data.type !== "govbr-authentication-completed"' in page
+    assert 'id="demo-success"' in page
+    assert "iframe" not in page
+
+
+def test_interactive_demo_repeat_flow_returns_to_demo_home() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+        interactive=True,
+    )
+
+    assert '<a class="primary" href="/">Repetir o fluxo</a>' in page
+    assert '<a class="primary" href="/auth/govbr/login">Repetir o fluxo</a>' not in page
+
+
+def test_demo_page_is_a_plain_link_for_consumers_by_default() -> None:
+    page = render_demo_page(
+        provider=GovBrProvider.FAKE,
+        login_path="/auth/govbr/login",
+    )
+
+    assert 'href="/auth/govbr/login"' in page
+    assert "window.open" not in page
+    assert 'id="demo-success"' not in page
 
 
 def test_success_masks_cpf_and_escapes_identity() -> None:
@@ -264,9 +337,18 @@ def test_success_masks_cpf_and_escapes_identity() -> None:
     assert "12345678901" not in page
     assert "<b>Ana</b>" not in page
     assert "ana@example.test" in page
-    assert 'href="/auth/govbr/login"' in page
+    assert 'href="/"' in page
     assert "access_token" not in page
     assert "id_token" not in page
+    assert 'type: "govbr-authentication-completed"' in page
+    assert "window.opener" in page
+
+
+def test_success_repeat_flow_returns_to_the_demo_home() -> None:
+    page = render_success(GovBrUser(sub="12345678901", name="Ana"))
+
+    assert 'href="/"' in page
+    assert 'href="/auth/govbr/login"' not in page
 
 
 def test_result_pages_use_semantic_feedback_without_color_only_meaning() -> None:

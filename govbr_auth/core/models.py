@@ -1,6 +1,7 @@
 """Immutable domain models for the new Gov.br OAuth core."""
 
 from datetime import datetime
+import re
 from typing import Literal
 
 from pydantic import (
@@ -10,6 +11,11 @@ from pydantic import (
     SecretStr,
     field_validator,
     model_validator,
+)
+
+_PKCE_VERIFIER_PATTERN = re.compile(
+    r"[A-Za-z0-9\-._~]{43,128}",
+    flags=re.ASCII,
 )
 
 
@@ -42,10 +48,19 @@ class AuthTransaction(BaseModel):
         """Reject blank identifiers that cannot safely bind an OAuth transaction."""
         return _require_nonempty_text(value)
 
-    @field_validator("code_verifier", "nonce")
+    @field_validator("code_verifier")
     @classmethod
-    def validate_transaction_secrets(cls, value: SecretStr) -> SecretStr:
-        """Reject blank PKCE and nonce secrets without exposing their contents."""
+    def validate_code_verifier(cls, value: SecretStr) -> SecretStr:
+        """Require the ASCII unreserved verifier syntax defined by RFC 7636."""
+        value = _require_nonempty_secret(value)
+        if _PKCE_VERIFIER_PATTERN.fullmatch(value.get_secret_value()) is None:
+            raise ValueError("code_verifier must be an RFC 7636 verifier")
+        return value
+
+    @field_validator("nonce")
+    @classmethod
+    def validate_nonce(cls, value: SecretStr) -> SecretStr:
+        """Reject blank nonce secrets without exposing their contents."""
         return _require_nonempty_secret(value)
 
     @field_validator("issued_at", "expires_at")

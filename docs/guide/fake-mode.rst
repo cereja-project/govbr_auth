@@ -2,167 +2,92 @@ FakeGov local
 =============
 
 O FakeGov é um simulador local do provedor OAuth 2.0/OpenID Connect Gov.br.
-Ele não é o frontend da aplicação consumidora: seu papel é responder às
-interações de autorização, emissão de tokens, JWKS e ``userinfo`` como um
-Gov.br controlado para desenvolvimento, testes e demonstrações.
+Ele responde autorização, emissão de tokens, JWKS e ``userinfo`` para
+desenvolvimento e testes. Não é o frontend da aplicação consumidora.
 
-A aplicação consumidora continua tendo seu próprio frontend e sua própria API.
-A API usa ``govbr_auth`` no backend; o frontend chama a API, e a API inicia e
-conclui o fluxo OAuth. A tela HTML de login do FakeGov existe somente porque o
-protocolo OAuth redireciona o navegador para a interface do provedor.
+Usar FakeGov na aplicação
+-------------------------
 
-A mesma fachada e as mesmas rotas do backend são usadas com o provedor oficial;
-somente a composição selecionada pela configuração muda.
+Instale o extra do adapter e o FakeGov quando necessário::
 
-Usar FakeGov no meu app
------------------------
+    pip install "govbr-auth[fastapi,fake]"
+    pip install "govbr-auth[django]"
+    pip install "govbr-auth[flask]"
 
-Instale o extra exato para o adapter e o fluxo que você vai executar::
-
-    pip install "govbr-auth[fastapi,fake]"   # FastAPI com rotas fake locais e launcher
-    pip install "govbr-auth[django]"         # Django com provedor fake montado no app
-    pip install "govbr-auth[flask]"          # Flask com provedor fake montado no app
-
-Monte a fachada do adaptador na API:
+Monte o adapter normalmente:
 
 .. code-block:: python
 
+    from pathlib import Path
+
+    from dotenv import load_dotenv
     from fastapi import FastAPI
     from govbr_auth.fastapi import AuthContext, GovBrAuth
+    from govbr_auth.runtime import GovBrRuntimeSettings
 
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
+    settings = GovBrRuntimeSettings.from_environment()
     app = FastAPI()
 
     async def authenticated(context: AuthContext):
         return {"authenticated": True, "subject": context.user.sub}
 
-    auth = GovBrAuth(on_success=authenticated)
+    auth = GovBrAuth(settings=settings, on_success=authenticated)
     app.include_router(auth.router)
 
-Inicie a API com ``GOVBR_PROVIDER=fake``. O frontend da aplicação continua
-chamando a API normalmente. A biblioteca monta as rotas do FakeGov junto ao
-adaptador e usa ``FakeGovHttpTransport`` para as chamadas de backend; o código
-da aplicação não precisa criar factories do provedor. O app continua no mesmo
-runtime consumidor; a configuração fake troca apenas os endpoints do provedor e
-o transporte HTTP interno.
+Configure ``GOVBR_PROVIDER=fake`` e, opcionalmente,
+``GOVBR_FAKE_USERS_FILE``. O adapter monta as rotas FakeGov na própria API e
+usa ``FakeGovHttpTransport`` para as chamadas internas. No modo fake, o adapter
+também monta a página inicial demo na raiz ``/`` e mantém a resposta do callback
+definida pelo ``on_success`` da aplicação.
 
-Para os adapters síncronos suportados, mantenha a mesma lógica de consumo e
-troque apenas o extra de instalação e a montagem do adapter:
+Launcher end-to-end
+-------------------
 
-- Django: ``from govbr_auth.django import GovBrAuth`` e ``urlpatterns = auth.urlpatterns``
-- Flask: ``from govbr_auth.flask import GovBrAuth`` e ``auth.register(app)``
-
-O fluxo completo entre frontend, API, FakeGov e runtime está em
-:doc:`communication-flow`.
-
-Executar end-to-end
--------------------------
-
-O launcher é uma conveniência para demonstrar o fluxo sem uma aplicação
-frontend separada. Ele cria uma página inicial de demonstração, a API do
-consumidor e o FakeGov no mesmo processo. Essa página inicial não transforma o
-FakeGov em frontend: ela apenas substitui temporariamente o frontend real para
-permitir um teste manual imediato.
-
-No POSIX::
-
-    GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake
-
-No PowerShell::
-
-    $env:GOVBR_FAKE_END_TO_END = "true"
-    python -m govbr_auth.fake
-
-Abra ``http://localhost:8000`` e complete o login. Para publicar somente o
-servidor/provedor FakeGov, sem a página inicial de demonstração::
+Para executar o fluxo completo com a página de demonstração, use::
 
     python -m govbr_auth.fake
 
-Esse perfil continua limitado a loopback. Portanto, a versão atual não deve
-ser tratada como um serviço FakeGov compartilhado entre máquinas.
-
-FakeGov compartilhado
----------------------
-
-Um ambiente compartilhado para desenvolvedores ou testadores é uma evolução
-natural do simulador: a API de cada ambiente poderia apontar para um FakeGov
-central com usuários, chaves e dados de teste controlados. Isso exige um modo
-de implantação explícito, com host não-loopback opt-in, autenticação de
-administração, isolamento de dados, rotação de chaves e política para replay.
-
-A implementação atual mantém o launcher em loopback e não oferece esse modo
-remoto. Não remova essa restrição alterando apenas ``GOVBR_FAKE_HOST`` sem
-revisar essas garantias.
+O launcher monta consumidor, FakeGov e a página demo interativa na raiz ``/``
+em loopback. O botão abre a autenticação em uma nova guia ou janela nativa; ao
+final, o callback comunica somente a conclusão à página original, que exibe o
+estado de sucesso. O caminho ``/govbr-auth-demo`` permanece disponível como
+alias. O launcher não deve ser exposto na rede. A seleção fake é explícita no launcher, mas o
+provedor nunca é fallback automático para uma aplicação oficial. O provedor
+oficial permanece disponível na mesma aplicação com ``GOVBR_PROVIDER=official``.
+O provedor oficial usa os endpoints oficiais configurados.
 
 Customizar usuários
 -------------------
 
-Os usuários fictícios default tornam o primeiro fluxo executável. Para
-substituí-los, defina ``GOVBR_FAKE_USERS_FILE``:
+Sem ``GOVBR_FAKE_USERS_FILE``, o perfil padrão aceita
+``11122233344`` com a senha ``senha-ficticia``. Quando a variável é definida,
+o arquivo substitui os usuários padrão.
 
-No POSIX::
+Defina ``GOVBR_FAKE_USERS_FILE`` com um JSON no formato::
 
-    cat > fake-users.local.json <<'JSON'
     {"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
-    JSON
-    export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"
 
-No PowerShell::
+Use somente credenciais fictícias; não use credenciais reais.
 
-    @'
-    {"users": [{"cpf": "11122233344", "password": "senha-ficticia", "name": "Usuário Fake", "email": "fake@example.test"}]}
-    '@ | Set-Content -Encoding UTF8 .\fake-users.local.json
-    $env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"
+O arquivo é validado na inicialização, fica em memória e deve permanecer fora
+do Git. Use somente credenciais fictícias.
 
-O arquivo é carregado na inicialização, exige ao menos um usuário, CPF com 11
-dígitos e CPFs únicos. JSON inválido, campos extras e campos ausentes são
-rejeitados; não use credenciais reais e mantenha o arquivo fora do Git.
+No POSIX, use ``export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"``. No
+PowerShell, use ``$env:GOVBR_FAKE_USERS_FILE = "$PWD\fake-users.local.json"``.
 
-Para persistência própria, implemente o protocolo público
-``govbr_auth.fake.FakeUserRepository``. O repositório deve fornecer
-identidades e verificar credenciais sem expor senhas. Use hashes apropriados
-em fontes persistentes. ``InMemoryFakeUserRepository`` e
-``JsonFakeUserRepository`` são implementações prontas.
+FakeGov compartilhado
+---------------------
 
-Responsabilidades
------------------
-
-``govbr_auth`` / API consumidora
-    Mantém ``state``, PKCE e transações, troca o código, valida o ID Token,
-    consulta ``userinfo`` e entrega o resultado ao frontend da aplicação.
-
-FakeGov
-    Simula o provedor OAuth/OIDC: autorização, login de usuário de teste,
-    emissão de tokens, JWKS e ``userinfo``. Não substitui a API nem o frontend
-    da aplicação.
-
-Core
-    Mantém as regras de segurança e validação do fluxo, independentemente de
-    o transporte apontar para o Gov.br ou para o FakeGov.
+O launcher atual é restrito a loopback. Um ambiente compartilhado exigiria
+TLS, origem pública explícita, isolamento de usuários e tokens de teste,
+rotação de chaves e controles administrativos. Não altere apenas
+``GOVBR_FAKE_HOST`` para publicar o simulador.
 
 Uso avançado
 ------------
 
-``GovBrRuntimeSettings`` e ``create_govbr_runtime`` formam o núcleo neutro de
-framework. ``create_fake_gov_simulator`` cria o grafo canônico do simulador.
-As factories ``create_fake_govbr_router`` e ``create_fake_govbr_app`` atendem
-topologias ASGI avançadas:
-
-``create_fake_govbr_router(runtime, *, prefix=None, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)``
-    Cria rotas ASGI para um ``FakeGovSimulator`` ou ``FakeGovBrProvider``.
-
-``create_fake_govbr_app(runtime, *, application=None, credential_authenticator=None, automatic_subject=None, clock=utc_now)``
-    Cria uma aplicação ASGI de provedor separado para uso avançado.
-
-O argumento ``application`` aceita uma ``FakeGovHttpApplication`` já composta.
-Com ``FakeGovSimulator``, omita esse argumento ou passe
-``runtime.http_application`` para preservar a fachada canônica do simulador.
-Com ``FakeGovBrProvider`` cru, declare a estratégia de login: passe
-``credential_authenticator`` para o fluxo interativo por CPF e senha, ou
-``automatic_subject`` somente para automação. A factory rejeita composições
-sem uma dessas estratégias. O argumento ``application`` permite substituir a
-fachada HTTP, mas não reativa o antigo formulário de seleção direta por
-``subject``.
-
-Os adapters públicos desta versão são FastAPI, Django e Flask. O store em memória rejeita replay
-de authorization code apenas na mesma instância; distribuição entre
-processos exige um store compartilhado fornecido pela aplicação.
+``GovBrRuntimeSettings`` e ``create_govbr_runtime`` formam o núcleo neutro.
+``create_fake_gov_simulator`` cria o simulador canônico. As factories
+``create_fake_govbr_router`` e ``create_fake_govbr_app`` atendem topologias
+ASGI que precisam somente do provedor.

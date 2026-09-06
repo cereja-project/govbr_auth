@@ -229,8 +229,8 @@ def simulator_with_marked_http_application(
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
 
@@ -302,6 +302,37 @@ def test_factories_expose_exact_provider_routes_only_after_explicit_calls() -> N
     }
 
 
+@pytest.mark.asyncio
+async def test_fake_provider_logout_redirects_only_to_registered_uri() -> None:
+    application = create_fake_govbr_app(
+        provider_factory(),
+        automatic_subject="12345678900",
+        clock=lambda: FIXED_NOW,
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application),
+        base_url="http://localhost",
+    ) as http:
+        response = await http.get(
+            "/logout",
+            params={"post_logout_redirect_uri": "http://localhost/"},
+            follow_redirects=False,
+        )
+        rejected = await http.get(
+            "/logout",
+            params={"post_logout_redirect_uri": "http://attacker.test/"},
+        )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "http://localhost/"
+    assert rejected.status_code == 400
+    assert rejected.json() == {
+        "error": "invalid_request",
+        "error_description": "The authorization request is invalid.",
+    }
+
+
 @pytest.mark.parametrize(
     "factory",
     (
@@ -361,9 +392,12 @@ async def test_router_consumes_canonical_fake_runtime() -> None:
 
     settings = GovBrRuntimeSettings(
         provider=GovBrProvider.FAKE,
-        fake_end_to_end=True,
     )
-    runtime = create_fake_gov_simulator(settings, clock=lambda: FIXED_NOW)
+    runtime = create_fake_gov_simulator(
+        settings,
+        prefix=settings.fake_provider_prefix,
+        clock=lambda: FIXED_NOW,
+    )
     application = FastAPI()
     application.include_router(
         create_fake_govbr_router(runtime, clock=lambda: FIXED_NOW)
@@ -421,8 +455,8 @@ async def test_app_publishes_canonical_fake_runtime_endpoint() -> None:
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
     application = create_fake_govbr_app(runtime, clock=lambda: FIXED_NOW)
@@ -472,8 +506,8 @@ def test_runtime_router_rejects_prefix_that_diverges_from_canonical_endpoints() 
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
 
@@ -495,8 +529,8 @@ def test_simulator_factories_reject_divergent_http_application(factory) -> None:
     runtime = create_fake_gov_simulator(
         GovBrRuntimeSettings(
             provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
         ),
+        prefix="/fake-govbr",
         clock=lambda: FIXED_NOW,
     )
 

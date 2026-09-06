@@ -14,11 +14,13 @@ from pydantic import (
     ConfigDict,
     PositiveInt,
     SecretStr,
+    ValidationError,
     field_validator,
     model_validator,
 )
 
 from govbr_auth.core.settings import GovBrSettings
+from govbr_auth.core.transactions import generate_transaction_secret
 
 
 class GovBrProvider(StrEnum):
@@ -31,34 +33,22 @@ class GovBrProvider(StrEnum):
 class GovBrRuntimeSettings(BaseModel):
     """Keep provider selection and runtime inputs independent of web frameworks."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        hide_input_in_errors=True,
+    )
 
     provider: GovBrProvider = GovBrProvider.OFFICIAL
     oauth: GovBrSettings | None = None
-    fake_end_to_end: bool = False
     fake_host: str = "127.0.0.1"
     fake_port: int = 8000
     fake_provider_prefix: str = "/fake-govbr"
-    fake_client_id: str = "govbr-auth-local"
-    fake_client_secret: SecretStr = SecretStr("local-fake-only")
-    fake_redirect_uri: AnyHttpUrl | None = None
     fake_request_ttl_seconds: PositiveInt = 300
     fake_authorization_code_ttl_seconds: PositiveInt = 60
     fake_access_token_ttl_seconds: PositiveInt = 600
     fake_id_token_ttl_seconds: PositiveInt = 300
     fake_users_file: Path | None = None
-
-    @field_validator("fake_end_to_end", mode="before")
-    @classmethod
-    def validate_fake_end_to_end(cls, value: object) -> bool:
-        """Accept only canonical environment boolean spellings."""
-        if isinstance(value, bool):
-            return value
-        if value == "true":
-            return True
-        if value == "false":
-            return False
-        raise ValueError("must be 'true' or 'false'")
 
     @field_validator("fake_host")
     @classmethod
@@ -77,17 +67,25 @@ class GovBrRuntimeSettings(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_mounted_fake_provider_prefix(self) -> "GovBrRuntimeSettings":
-        """Require one unambiguous path prefix when fake routes are mounted."""
-        if not self.fake_end_to_end:
-            return self
-        prefix = self.fake_provider_prefix
-        if not _is_canonical_path_prefix(prefix):
+    def validate_fake_provider_prefix(self) -> "GovBrRuntimeSettings":
+        """Require one unambiguous path prefix for fake-provider embedding."""
+        if self.provider is GovBrProvider.FAKE and not _is_canonical_path_prefix(
+            self.fake_provider_prefix
+        ):
             raise ValueError(
                 "fake provider prefix must be a non-root path without a trailing "
                 "slash, query, fragment, or absolute URL"
             )
         return self
+
+    def model_post_init(self, __context: object) -> None:
+        """Give direct fake settings the same consumer OAuth defaults."""
+        if (
+            self.provider is GovBrProvider.FAKE
+            and self.oauth is None
+            and _is_canonical_path_prefix(self.fake_provider_prefix)
+        ):
+            object.__setattr__(self, "oauth", _default_fake_oauth(self))
 
     @classmethod
     def from_environment(
@@ -95,7 +93,10 @@ class GovBrRuntimeSettings(BaseModel):
     ) -> "GovBrRuntimeSettings":
         """Build validated settings from an explicit environment mapping."""
         values = os.environ if environ is None else environ
-        return cls.model_validate(_runtime_values(values))
+        try:
+            return cls.model_validate(_runtime_values(values))
+        except ValidationError as error:
+            raise ValueError(_configuration_error_message(error)) from None
 
 
 def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
@@ -115,28 +116,48 @@ def _runtime_values(environ: Mapping[str, str]) -> dict[str, object]:
             values["oauth"] = oauth_values
     elif provider == GovBrProvider.FAKE.value:
         conflicting_endpoints = sorted(
-            set(environ).intersection(_OFFICIAL_ENDPOINT_FIELDS)
+            set(environ).intersection(_OFFICIAL_PROVIDER_ENDPOINT_FIELDS)
         )
         if conflicting_endpoints:
             raise ValueError(
                 "official endpoint variable(s) conflict with fake provider "
                 "selection: " + ", ".join(conflicting_endpoints)
             )
-        _warn_about_inactive_variables(
-            environ,
-            provider=provider,
-            inactive_variables=(
-                _OFFICIAL_OAUTH_FIELDS.keys() - _OFFICIAL_ENDPOINT_FIELDS
-            ),
-        )
-        values.update(_prefixed_values(environ, _FAKE_FIELDS))
-        if (
-            values.get("fake_end_to_end") == "true"
-            and "fake_redirect_uri" not in values
-        ):
-            values["fake_redirect_uri"] = _default_fake_redirect_uri(values)
+        fake_values = _prefixed_values(environ, _FAKE_FIELDS)
+        oauth_values = _fake_oauth_values(environ, fake_values)
+        values["oauth"] = oauth_values
+        values.update(fake_values)
 
     return values
+
+
+def _configuration_error_message(error: ValidationError) -> str:
+    """Translate validation failures without exposing configured values."""
+    details = [
+        _configuration_issue_message(issue)
+        for issue in error.errors(include_url=False, include_input=False)
+    ]
+    unique_details = list(dict.fromkeys(details))
+    return "Configuração Gov.br inválida: " + "; ".join(unique_details) + "."
+
+
+def _configuration_issue_message(issue: Mapping[str, object]) -> str:
+    """Describe one Pydantic issue in concise Brazilian Portuguese."""
+    context = issue.get("ctx")
+    if isinstance(context, Mapping):
+        custom_error = context.get("error")
+        detail = str(custom_error) if custom_error is not None else ""
+        if detail.startswith(("Endpoints oficiais do Gov.br", "GOVBR_")):
+            return detail
+
+    location = issue.get("loc")
+    field_name = location[-1] if isinstance(location, tuple) and location else None
+    environment_name = _ENVIRONMENT_NAMES_BY_FIELD.get(field_name)
+    if environment_name is None:
+        return "combinação de valores inválida"
+    if issue.get("type") == "missing":
+        return f"variável obrigatória ausente: {environment_name}"
+    return f"valor inválido para {environment_name}"
 
 
 def _reject_unknown_govbr_variables(environ: Mapping[str, str]) -> None:
@@ -148,7 +169,9 @@ def _reject_unknown_govbr_variables(environ: Mapping[str, str]) -> None:
     )
     if unknown:
         raise ValueError(
-            "unknown GOVBR configuration variable(s): " + ", ".join(unknown)
+            "Configuração Gov.br inválida: variável não suportada: "
+            + ", ".join(unknown)
+            + "."
         )
 
 
@@ -180,10 +203,51 @@ def _prefixed_values(
     }
 
 
-def _default_fake_redirect_uri(values: Mapping[str, object]) -> str:
-    """Return the callback URL used by the local end-to-end runtime."""
-    host = str(values.get("fake_host", "127.0.0.1"))
-    return _fake_callback_url(host, values.get("fake_port", 8000), "/auth/govbr")
+def _fake_oauth_values(
+    environ: Mapping[str, str], fake_values: Mapping[str, object]
+) -> dict[str, object]:
+    """Build shared consumer settings against derived FakeGov endpoints."""
+    host = str(fake_values.get("fake_host", "127.0.0.1"))
+    port = fake_values.get("fake_port", 8000)
+    prefix = str(fake_values.get("fake_provider_prefix", "/fake-govbr"))
+    origin = _fake_origin(host, port)
+    base_url = f"{origin}{prefix}"
+    shared = _prefixed_values(environ, _COMMON_OAUTH_FIELDS)
+    shared.setdefault("environment", "local")
+    shared.setdefault("authorization_url", f"{base_url}/authorize")
+    shared.setdefault("token_url", f"{base_url}/token")
+    shared.setdefault("userinfo_url", f"{base_url}/userinfo")
+    shared.setdefault("issuer", f"{base_url}/")
+    shared.setdefault("jwks_url", f"{base_url}/jwk")
+    shared.setdefault("logout_url", f"{base_url}/logout")
+    shared.setdefault("post_logout_redirect_uri", _fake_origin(host, port) + "/")
+    shared.setdefault("client_id", "govbr-auth-local")
+    shared.setdefault("client_secret", "local-fake-only")
+    shared.setdefault(
+        "redirect_uri",
+        _fake_callback_url(host, port, "/auth/govbr"),
+    )
+    shared.setdefault("transaction_secret", generate_transaction_secret())
+    return shared
+
+
+def _default_fake_oauth(settings: GovBrRuntimeSettings) -> GovBrSettings:
+    """Create defaults for direct fake settings without environment input."""
+    return GovBrSettings.model_validate(
+        _fake_oauth_values(
+            {},
+            {
+                "fake_host": settings.fake_host,
+                "fake_port": settings.fake_port,
+                "fake_provider_prefix": settings.fake_provider_prefix,
+            },
+        )
+    )
+
+
+def _fake_origin(host: str, port: object) -> str:
+    rendered_host = f"[{host}]" if host == "::1" else host
+    return f"http://{rendered_host}:{port}"
 
 
 def _fake_callback_url(host: object, port: object, prefix: str) -> str:
@@ -194,40 +258,54 @@ def _fake_callback_url(host: object, port: object, prefix: str) -> str:
 
 _OFFICIAL_OAUTH_FIELDS = {
     "GOVBR_ENVIRONMENT": "environment",
-    "GOVBR_AUTHORIZATION_URL": "authorization_url",
-    "GOVBR_TOKEN_URL": "token_url",
-    "GOVBR_USERINFO_URL": "userinfo_url",
     "GOVBR_CLIENT_ID": "client_id",
     "GOVBR_CLIENT_SECRET": "client_secret",
     "GOVBR_REDIRECT_URI": "redirect_uri",
     "GOVBR_SCOPE": "scope",
     "GOVBR_TRANSACTION_SECRET": "transaction_secret",
-    "GOVBR_ISSUER": "issuer",
-    "GOVBR_JWKS_URL": "jwks_url",
     "GOVBR_CONNECT_TIMEOUT_SECONDS": "connect_timeout_seconds",
     "GOVBR_READ_TIMEOUT_SECONDS": "read_timeout_seconds",
     "GOVBR_CLOCK_SKEW_SECONDS": "clock_skew_seconds",
+    "GOVBR_AUTHORIZATION_URL": "authorization_url",
+    "GOVBR_TOKEN_URL": "token_url",
+    "GOVBR_USERINFO_URL": "userinfo_url",
+    "GOVBR_ISSUER": "issuer",
+    "GOVBR_JWKS_URL": "jwks_url",
+    "GOVBR_LOGOUT_URL": "logout_url",
+    "GOVBR_POST_LOGOUT_REDIRECT_URI": "post_logout_redirect_uri",
 }
 
-_OFFICIAL_ENDPOINT_FIELDS = frozenset(
+_COMMON_OAUTH_FIELDS = {
+    name: field_name
+    for name, field_name in _OFFICIAL_OAUTH_FIELDS.items()
+    if name
+    not in {
+        "GOVBR_AUTHORIZATION_URL",
+        "GOVBR_TOKEN_URL",
+        "GOVBR_USERINFO_URL",
+        "GOVBR_ISSUER",
+        "GOVBR_JWKS_URL",
+        "GOVBR_LOGOUT_URL",
+        "GOVBR_POST_LOGOUT_REDIRECT_URI",
+    }
+}
+
+_OFFICIAL_PROVIDER_ENDPOINT_FIELDS = frozenset(
     {
         "GOVBR_AUTHORIZATION_URL",
         "GOVBR_TOKEN_URL",
         "GOVBR_USERINFO_URL",
-        "GOVBR_REDIRECT_URI",
         "GOVBR_ISSUER",
         "GOVBR_JWKS_URL",
+        "GOVBR_LOGOUT_URL",
+        "GOVBR_POST_LOGOUT_REDIRECT_URI",
     }
 )
 
 _FAKE_FIELDS = {
-    "GOVBR_FAKE_END_TO_END": "fake_end_to_end",
     "GOVBR_FAKE_HOST": "fake_host",
     "GOVBR_FAKE_PORT": "fake_port",
     "GOVBR_FAKE_PROVIDER_PREFIX": "fake_provider_prefix",
-    "GOVBR_FAKE_CLIENT_ID": "fake_client_id",
-    "GOVBR_FAKE_CLIENT_SECRET": "fake_client_secret",
-    "GOVBR_FAKE_REDIRECT_URI": "fake_redirect_uri",
     "GOVBR_FAKE_REQUEST_TTL_SECONDS": "fake_request_ttl_seconds",
     "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS": "fake_authorization_code_ttl_seconds",
     "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS": "fake_access_token_ttl_seconds",
@@ -238,6 +316,11 @@ _FAKE_FIELDS = {
 _KNOWN_ENVIRONMENT_VARIABLES = frozenset(
     {"GOVBR_PROVIDER", *_OFFICIAL_OAUTH_FIELDS, *_FAKE_FIELDS}
 )
+_ENVIRONMENT_NAMES_BY_FIELD = {
+    "provider": "GOVBR_PROVIDER",
+    **{field_name: name for name, field_name in _OFFICIAL_OAUTH_FIELDS.items()},
+    **{field_name: name for name, field_name in _FAKE_FIELDS.items()},
+}
 
 
 def _is_canonical_path_prefix(prefix: str, *, allow_empty: bool = False) -> bool:

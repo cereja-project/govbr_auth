@@ -23,6 +23,10 @@ import httpx
 
 import govbr_auth
 from govbr_auth.fake.fastapi import create_fake_app
+from govbr_auth.runtime import (
+    GovBrProvider,
+    GovBrRuntimeSettings,
+)
 from myapp import app as fastapi_app
 
 
@@ -38,12 +42,12 @@ async def verify_http_boundaries():
             follow_redirects=False,
         ) as client:
             assert (await client.get("/auth/govbr/login")).status_code == 302
-
-    fake_app = create_fake_app()
+    fake_app = create_fake_app(GovBrRuntimeSettings(provider=GovBrProvider.FAKE))
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fake_app),
         base_url="http://127.0.0.1:8000",
     ) as client:
+        assert (await client.get("/")).status_code == 200
         response = await client.get("/fake-govbr/jwk")
         assert response.status_code == 200
         assert response.json()["keys"]
@@ -52,6 +56,12 @@ async def verify_http_boundaries():
 asyncio.run(verify_http_boundaries())
 print(f"verified govbr-auth {govbr_auth.__version__} from {govbr_auth.__file__}")
 """
+
+_DEMO_DOCUMENTATION_SYMBOLS = (
+    "GovBrRuntimeSettings",
+    "/govbr-auth-demo",
+    "python -m govbr_auth.fake",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +111,15 @@ def _rst_quickstart(source: str, name: str) -> str:
     return textwrap.dedent(code).strip() + "\n"
 
 
+def _validate_demo_documentation(source: str, document_name: str) -> None:
+    """Require every packaged entry guide to describe the demo-page surface."""
+    for symbol in _DEMO_DOCUMENTATION_SYMBOLS:
+        if symbol not in source:
+            raise ValueError(
+                f"{document_name} is missing demo documentation symbol: {symbol}"
+            )
+
+
 def _install_profile(python: Path, wheel: Path, profile: DistributionProfile) -> None:
     extras = ",".join(profile.extras)
     subprocess.run(
@@ -122,6 +141,8 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
     resolved_wheel = wheel.resolve(strict=True)
     readme_source = readme.resolve(strict=True).read_text(encoding="utf-8")
     guide_source = guide.resolve(strict=True).read_text(encoding="utf-8")
+    _validate_demo_documentation(readme_source, readme.name)
+    _validate_demo_documentation(guide_source, guide.name)
     snippets = {
         "fastapi": _markdown_quickstart(readme_source),
         "django": _rst_quickstart(guide_source, "django"),
@@ -148,13 +169,13 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
         )
         child_environment = {
             **os.environ,
-            "GOVBR_FAKE_END_TO_END": "true",
             "GOVBR_FAKE_USERS_FILE": str(users_file),
             "GOVBR_PROVIDER": "fake",
             "PYTHONNOUSERSITE": "1",
             "PYTHONPATH": "",
             "PYTHONUTF8": "1",
         }
+        child_environment.pop("GOVBR_FAKE_END_TO_END", None)
         for profile in distribution_profiles():
             profile_root = root / profile.name
             profile_root.mkdir()
@@ -176,10 +197,15 @@ def verify_distribution(wheel: Path, readme: Path, guide: Path) -> None:
             elif profile.name == "django":
                 command = (
                     str(python),
-                    "-m",
-                    "django",
-                    "check",
-                    "--settings=django_app",
+                    "-c",
+                    "import os; "
+                    "os.environ['DJANGO_SETTINGS_MODULE'] = 'django_app'; "
+                    "import django; django.setup(); "
+                    "from django.core.management import call_command; "
+                    "call_command('check'); "
+                    "from django_app import urlpatterns; "
+                    "assert any(str(pattern.pattern) == 'auth/govbr/login' "
+                    "for pattern in urlpatterns)",
                 )
             else:
                 command = (

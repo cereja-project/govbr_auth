@@ -3,7 +3,9 @@
 import importlib
 import re
 import runpy
+import subprocess
 import xml.etree.ElementTree as ET
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -53,6 +55,20 @@ def _contrast_ratio(first: str, second: str) -> float:
         (_relative_luminance(first), _relative_luminance(second)), reverse=True
     )
     return (lighter + 0.05) / (darker + 0.05)
+
+
+def _composite_color(foreground: str, background: str, opacity: float) -> str:
+    foreground_channels = tuple(
+        int(foreground[index : index + 2], 16) for index in (1, 3, 5)
+    )
+    background_channels = tuple(
+        int(background[index : index + 2], 16) for index in (1, 3, 5)
+    )
+    channels = tuple(
+        round(front * opacity + back * (1 - opacity))
+        for front, back in zip(foreground_channels, background_channels)
+    )
+    return "#" + "".join(f"{channel:02x}" for channel in channels)
 
 
 def _svg_paint_values(source: str) -> set[str]:
@@ -206,23 +222,20 @@ def test_environment_example_documents_every_supported_variable() -> None:
         "GOVBR_TRANSACTION_SECRET",
         "GOVBR_ISSUER",
         "GOVBR_JWKS_URL",
+        "GOVBR_LOGOUT_URL",
+        "GOVBR_POST_LOGOUT_REDIRECT_URI",
         "GOVBR_CONNECT_TIMEOUT_SECONDS",
         "GOVBR_READ_TIMEOUT_SECONDS",
         "GOVBR_CLOCK_SKEW_SECONDS",
-        "GOVBR_FAKE_END_TO_END",
         "GOVBR_FAKE_HOST",
         "GOVBR_FAKE_PORT",
         "GOVBR_FAKE_PROVIDER_PREFIX",
-        "GOVBR_FAKE_CLIENT_ID",
-        "GOVBR_FAKE_CLIENT_SECRET",
-        "GOVBR_FAKE_REDIRECT_URI",
         "GOVBR_FAKE_REQUEST_TTL_SECONDS",
         "GOVBR_FAKE_AUTHORIZATION_CODE_TTL_SECONDS",
         "GOVBR_FAKE_ACCESS_TOKEN_TTL_SECONDS",
         "GOVBR_FAKE_ID_TOKEN_TTL_SECONDS",
         "GOVBR_FAKE_USERS_FILE",
     }
-
     assert supported_variables == expected_variables
     assert documented_variables == expected_variables
 
@@ -312,45 +325,128 @@ def test_user_docs_do_not_reference_the_removed_transaction_store() -> None:
     assert "cifrados no state" in diagram
 
 
-def test_fake_launcher_commands_are_consistent_across_entry_documents() -> None:
-    required_commands = (
-        'pip install "govbr-auth[fake]"',
-        "python -m govbr_auth.fake",
-        "GOVBR_FAKE_END_TO_END=true python -m govbr_auth.fake",
-        '$env:GOVBR_FAKE_END_TO_END = "true"',
-        "http://localhost:8000",
+def test_readme_leads_with_an_executable_configurable_application() -> None:
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    required_guidance = (
+        "from dotenv import load_dotenv",
+        "GovBrRuntimeSettings.from_environment()",
+        'if __name__ == "__main__":',
+        "uvicorn.run(",
+        "python myapp.py",
+        "GovBrRuntimeSettings(",
+        "GovBrProvider.FAKE",
+        "/govbr-auth-demo",
+        "context.user",
+        "context.claims",
+        "context.tokens",
     )
+
+    assert all(guidance in source for guidance in required_guidance)
+
+
+def test_fastapi_quickstarts_do_not_render_untrusted_claims_as_html() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
     )
 
-    assert tuple(
-        tuple(command in source for command in required_commands) for source in sources
-    ) == (
-        (True, True, True, True, True),
-        (True, True, True, True, True),
+    assert all("HTMLResponse" not in source for source in sources)
+    assert all('JSONResponse({"authenticated": True})' in source for source in sources)
+
+
+def test_readme_communication_section_embeds_animation_and_links_static_flow() -> None:
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    animated_embed = (
+        "![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação "
+        "e provedor]"
+        "(https://raw.githubusercontent.com/cereja-project/govbr_auth/main/"
+        "docs/media/authentication-sequence-animated.svg)"
     )
+    static_link = (
+        "[Ver versão estática do fluxo]"
+        "(https://raw.githubusercontent.com/cereja-project/govbr_auth/main/"
+        "docs/media/authentication-sequence.svg)"
+    )
+    section = re.search(
+        r"^## Como a comunicação funciona\s*$.*?(?=^## |\Z)",
+        source,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+
+    assert section is not None
+    assert animated_embed in section.group()
+    assert static_link in section.group()
+    assert source.count(animated_embed) == 1
+    assert source.count(static_link) == 1
+
+
+def test_animated_authentication_flow_is_accessible_and_motion_safe() -> None:
+    source = (DOCS_ROOT / "media" / "authentication-sequence-animated.svg").read_text(
+        encoding="utf-8"
+    )
+    root = ET.fromstring(source)
+    namespace = "{http://www.w3.org/2000/svg}"
+    styles = root.findall(f".//{namespace}style")
+    phases = {
+        element.attrib["id"]
+        for element in root.findall(f".//{namespace}g")
+        if element.attrib.get("id", "").startswith("phase-")
+    }
+
+    assert root.attrib["role"] == "img"
+    assert root.attrib["aria-labelledby"] == "title desc"
+    assert root.find(f"{namespace}title") is not None
+    assert root.find(f"{namespace}desc") is not None
+    assert len(styles) == 1
+    stylesheet = styles[0].text or ""
+    phase_rule = re.search(r"\.phase\s*\{(?P<body>[^}]*)\}", stylesheet)
+    reduced_motion_rule = re.search(
+        r"@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*"
+        r"\.phase\s*\{(?P<body>[^}]*)\}",
+        stylesheet,
+    )
+
+    assert phase_rule is not None
+    opacity_match = re.search(r"opacity:\s*(?P<opacity>[\d.]+)", phase_rule["body"])
+    assert opacity_match is not None
+    inactive_text = _composite_color(
+        "#0f172a", "#f8fafc", float(opacity_match["opacity"])
+    )
+    assert _contrast_ratio(inactive_text, "#f8fafc") >= 4.5
+    assert reduced_motion_rule is not None
+    assert "animation: none" in reduced_motion_rule["body"]
+    assert "opacity: 1" in reduced_motion_rule["body"]
+    assert phases == {f"phase-{number}" for number in range(1, 9)}
+    assert root.findall(f".//{namespace}script") == []
+    assert all(
+        launcher_guidance not in source
+        for launcher_guidance in (
+            "python -m govbr_auth.fake",
+            "END_TO_END",
+            "Launcher",
+            "launcher",
+            "provider-only",
+        )
+    )
+
+
+def test_sphinx_quickstart_keeps_the_provider_only_fake_launcher() -> None:
+    source = (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8")
+
+    assert 'pip install "govbr-auth[fastapi,fake]"' in source
+    assert "python -m govbr_auth.fake" in source
+    assert "/govbr-auth-demo" in source
 
 
 def test_fastapi_fake_quickstart_install_is_complete_for_uvicorn() -> None:
     required_guidance = (
         'pip install "govbr-auth[fastapi,fake]"',
-        "uvicorn myapp:app --reload",
+        "python myapp.py",
         "http://localhost:8000/auth/govbr/login",
     )
-    sources = (
-        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
-        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
-    )
+    source = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert tuple(
-        tuple(guidance in source for guidance in required_guidance)
-        for source in sources
-    ) == (
-        (True, True, True),
-        (True, True, True),
-    )
+    assert all(guidance in source for guidance in required_guidance)
 
 
 def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
@@ -358,11 +454,12 @@ def test_readme_leads_with_the_fakegov_value_and_visual_flow() -> None:
     sections = [line for line in source.splitlines() if line.startswith("## ")]
     assert sections[0] == "## Índice"
     assert sections[1] == "## Instalação"
-    assert sections[2] == "## Teste a integração sem depender do gov.br"
+    assert sections[2] == "## Como a comunicação funciona"
+    assert sections[3] == "## Teste a integração sem depender do gov.br"
     assert "docs/media/fakegov-flow.svg" in source
     assert "**FakeGov**" in source
     assert "Instalar" in source
-    assert "Iniciar" in source
+    assert "Configurar" in source
     assert "Entrar" in source
     assert "Concluir" in source
 
@@ -372,7 +469,7 @@ def test_entry_docs_quote_the_launcher_button_label_verbatim() -> None:
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
     )
-    assert tuple("**Entrar com gov.br**" in source for source in sources) == (
+    assert tuple("**Entrar com GOV.BR**" in source for source in sources) == (
         True,
         True,
     )
@@ -380,6 +477,109 @@ def test_entry_docs_quote_the_launcher_button_label_verbatim() -> None:
         False,
         False,
     )
+
+
+def test_public_docs_publish_only_the_application_demo_page_contract() -> None:
+    sources = _published_documents() | {
+        PROJECT_ROOT / ".env.example",
+        PROJECT_ROOT / "README.md",
+        PROJECT_ROOT / "examples" / "example_settings.py",
+        PROJECT_ROOT / "examples" / "example_fastapi.py",
+        PROJECT_ROOT / "examples" / "example_django.py",
+        PROJECT_ROOT / "examples" / "example_flask.py",
+    }
+    combined = "\n".join(document.read_text(encoding="utf-8") for document in sources)
+    normalized = _normalized_prose(combined)
+
+    assert "GovBrApplicationSettings" not in combined
+    assert "GOVBR_DEMO_PAGE" not in combined
+    assert "demo_page" not in normalized
+    assert "/govbr-auth-demo" in combined
+    assert "python -m govbr_auth.fake" in normalized
+    assert "em modo fake" in normalized
+
+
+def test_removed_fake_switch_occurs_only_in_the_closed_tracked_file_allowlist() -> None:
+    legacy_environment_name = "GOVBR_FAKE_" + "END_TO_END"
+    legacy_field_name = "fake_" + "end_to_end"
+    tokens = {
+        "environment_variable": legacy_environment_name,
+        "field_name": legacy_field_name,
+    }
+    completed = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+    )
+    tracked_files = tuple(
+        path for path in completed.stdout.decode("utf-8").split("\0") if path
+    )
+    occurrences: Counter[tuple[str, str, str]] = Counter()
+    for relative_path in tracked_files:
+        content = (PROJECT_ROOT / relative_path).read_bytes()
+        for raw_line in content.splitlines():
+            line = raw_line.decode("utf-8", errors="replace").strip()
+            for token_kind, token in tokens.items():
+                if count := line.count(token):
+                    occurrences[(relative_path, token_kind, line)] += count
+
+    expected: Counter[tuple[str, str, str]] = Counter(
+        {
+            (
+                "CHANGELOG.md",
+                "environment_variable",
+                f"`{legacy_environment_name}`/`{legacy_field_name}` foi removida em favor do opt-in",
+            ): 1,
+            (
+                "CHANGELOG.md",
+                "field_name",
+                f"`{legacy_environment_name}`/`{legacy_field_name}` foi removida em favor do opt-in",
+            ): 1,
+            (
+                "scripts/verify_distribution.py",
+                "environment_variable",
+                f'child_environment.pop("{legacy_environment_name}", None)',
+            ): 1,
+            (
+                "tests/unit/test_verify_distribution.py",
+                "environment_variable",
+                f'monkeypatch.setenv("{legacy_environment_name}", "true")',
+            ): 1,
+            (
+                "tests/unit/test_verify_distribution.py",
+                "environment_variable",
+                f'assert "{legacy_environment_name}" not in environment',
+            ): 1,
+        }
+    )
+
+    assert "AGENTS.md" in tracked_files
+    assert "scripts/verify_distribution.py" in tracked_files
+    assert occurrences == expected
+
+
+def test_launcher_docs_publish_the_end_to_end_profile() -> None:
+    sources = (
+        (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8"),
+    )
+
+    for source in sources:
+        normalized = _normalized_prose(source)
+        assert "loopback" in normalized
+        assert "python -m govbr_auth.fake" in normalized
+        assert "govbr-auth-demo" in normalized
+
+
+def test_launcher_docs_describe_the_demo_page_in_fake_adapters() -> None:
+    sources = (
+        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+        (DOCS_ROOT / "guide" / "fake-mode.rst").read_text(encoding="utf-8"),
+    )
+    assert all("python -m govbr_auth.fake" in source for source in sources)
+    assert all("raiz" in source for source in sources)
+    assert all("não é injetada nos adapters" not in source for source in sources)
 
 
 def test_communication_guide_uses_versioned_diagrams_instead_of_ascii_art() -> None:
@@ -717,12 +917,10 @@ def test_sphinx_theme_uses_the_approved_brand_and_local_fonts() -> None:
 def test_brand_guide_publishes_the_approved_usage_contract() -> None:
     index = (DOCS_ROOT / "index.rst").read_text(encoding="utf-8")
     guide = (DOCS_ROOT / "guide" / "brand.rst").read_text(encoding="utf-8")
-    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     normalized_guide = _normalized_prose(guide)
     descriptor = "biblioteca python open source para integração com gov.br"
 
     assert "guide/brand" in _toctree_entries(index)
-    assert descriptor in _normalized_prose(readme)
     assert descriptor in normalized_guide
     assert "50% da altura visível" in normalized_guide
     assert "mínimo de 24 px" in normalized_guide
@@ -786,12 +984,12 @@ def test_fastapi_api_doc_describes_the_fakegov_provider_facade_surface() -> None
         (DOCS_ROOT / "api" / "fastapi.rst").read_text(encoding="utf-8"),
     )
 
-    assert "FakeGovSimulator" in source
-    assert "create_fake_gov_simulator" in source
-    assert "FakeGovBrRuntime" not in source
-    assert "create_fake_govbr_runtime" not in source
-    assert "mesmo runtime consumidor" in source
-    assert "troca apenas os endpoints do provedor e o transporte HTTP interno" in source
+    assert "GovBrRuntimeSettings" in source
+    assert "GovBrRuntime" in source
+    assert "GovBrApplicationSettings" not in source
+    assert "demo_page" not in source
+    assert "GOVBR_PROVIDER=fake" in source
+    assert "raiz" in source
 
 
 def test_fake_mode_guide_documents_the_supported_installation_matrix() -> None:
@@ -803,23 +1001,25 @@ def test_fake_mode_guide_documents_the_supported_installation_matrix() -> None:
     assert 'pip install "govbr-auth[fake]"' not in source
 
 
-def test_installable_fake_command_is_an_exact_line_in_every_instruction() -> None:
-    sources = (
-        (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
-        (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
-        (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8"),
+def test_installable_fake_commands_are_exact_lines_in_every_instruction() -> None:
+    instructions = (
+        (
+            (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+            'pip install "govbr-auth[fastapi,fake]"',
+        ),
+        (
+            (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),
+            'pip install "govbr-auth[fastapi,fake]"',
+        ),
+        (
+            (DOCS_ROOT / "guide" / "troubleshooting.rst").read_text(encoding="utf-8"),
+            'pip install "govbr-auth[fake]"',
+        ),
     )
 
-    assert tuple(
-        any(
-            'pip install "govbr-auth[fake]"' == line.strip()
-            for line in source.splitlines()
-        )
-        for source in sources
-    ) == (
-        True,
-        True,
-        True,
+    assert all(
+        any(command == line.strip() for line in source.splitlines())
+        for source, command in instructions
     )
 
 
@@ -829,8 +1029,8 @@ def test_docs_explain_both_fake_intents_and_official_provider() -> None:
     assert all(
         term in source
         for term in (
-            "Usar FakeGov no meu app",
-            "Executar end-to-end",
+            "Usar FakeGov na aplicação",
+            "Launcher end-to-end",
             "Uso avançado",
             "provedor oficial",
         )
@@ -849,31 +1049,25 @@ def test_docs_explain_both_fake_intents_and_official_provider() -> None:
 def test_fake_credentials_journey_is_documented_in_every_entry_guide(
     document: Path,
 ) -> None:
-    required_guidance = (
+    common_guidance = (
         "GOVBR_FAKE_USERS_FILE",
         "fake-users.local.json",
         '"users"',
         '"cpf": "11122233344"',
         '"password": "senha-ficticia"',
-        'export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"',
-        '$env:GOVBR_FAKE_USERS_FILE = "$PWD\\fake-users.local.json"',
         "não use credenciais reais",
-        "python -m govbr_auth.fake",
     )
 
     source = document.read_text(encoding="utf-8")
 
-    assert tuple(guidance in source for guidance in required_guidance) == (
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-    )
+    assert all(guidance in source for guidance in common_guidance)
+    if document == PROJECT_ROOT / "README.md":
+        assert "python myapp.py" in source
+        assert "GOVBR_PROVIDER=fake" in source
+    else:
+        assert 'export GOVBR_FAKE_USERS_FILE="$PWD/fake-users.local.json"' in source
+        assert '$env:GOVBR_FAKE_USERS_FILE = "$PWD\\fake-users.local.json"' in source
+        assert "python -m govbr_auth.fake" in source
 
 
 def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
@@ -886,6 +1080,11 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "from govbr_auth.django import GovBrAuth" in source
     assert "from govbr_auth.flask import GovBrAuth" in source
     assert "GOVBR_PROVIDER=fake" in source
+    assert "GovBrRuntimeSettings.from_environment()" in source
+    assert "GovBrApplicationSettings" not in source
+    assert "GOVBR_DEMO_PAGE" not in source
+    assert "demo_page" not in source
+    assert "/govbr-auth-demo" in source
     assert "app.include_router(auth.router)" in source
     assert "urlpatterns = auth.urlpatterns" in source
     assert "auth.register(app)" in source
@@ -899,7 +1098,7 @@ def test_user_docs_use_only_the_canonical_framework_adapter_surfaces() -> None:
     assert "from govbr_auth import AuthContext, GovBrAuth" not in source
 
 
-def test_entry_docs_use_explicit_local_credentials_not_built_in_defaults() -> None:
+def test_entry_docs_use_canonical_local_credentials() -> None:
     sources = (
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
         (DOCS_ROOT / "guide" / "quick-start.rst").read_text(encoding="utf-8"),

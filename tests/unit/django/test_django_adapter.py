@@ -3,10 +3,12 @@
 from collections.abc import Mapping
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory
+from django.urls import Resolver404, resolve
 from pydantic import SecretStr
 
 if not settings.configured:
@@ -23,7 +25,13 @@ django.setup()
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
-from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
+from govbr_auth.core.settings import GovBrSettings
+from govbr_auth.runtime import (
+    GovBrProvider,
+    GovBrRuntime,
+    GovBrRuntimeSettings,
+    create_govbr_runtime,
+)
 
 FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 
@@ -42,6 +50,17 @@ class ContractClient:
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         return AuthorizationRequest("https://sso.example.test/authorize", "state")
 
+    def validate_state(self, state: str, *, now: datetime) -> None:
+        del now
+        if state != "state":
+            raise AssertionError("unexpected state")
+
+    def logout_url(self) -> str:
+        return (
+            "https://sso.example.test/logout?"
+            "post_logout_redirect_uri=https%3A%2F%2Fconsumer.example.test%2Fsigned-out"
+        )
+
     async def exchange_code(
         self, *, code: str, state: str, now: datetime
     ) -> AuthenticationResult:
@@ -53,9 +72,31 @@ class ContractClient:
         return GovBrUser(sub=expected_subject, name="Django user")
 
 
-def _runtime(client: ContractClient) -> GovBrRuntime:
+def _runtime(
+    client: ContractClient,
+    *,
+    redirect_uri: str | None = None,
+    with_logout: bool = False,
+) -> GovBrRuntime:
+    oauth = None
+    if redirect_uri is not None or with_logout:
+        oauth = GovBrSettings(
+            authorization_url="https://sso.example.test/authorize",
+            token_url="https://sso.example.test/token",
+            userinfo_url="https://sso.example.test/userinfo",
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+            redirect_uri=redirect_uri or "https://consumer.example.test/callback",
+            transaction_secret=SecretStr("transaction-secret"),
+            issuer="https://sso.example.test/",
+            jwks_url="https://sso.example.test/jwks",
+            logout_url=("https://sso.example.test/logout" if with_logout else None),
+            post_logout_redirect_uri=(
+                "https://consumer.example.test/signed-out" if with_logout else None
+            ),
+        )
     return GovBrRuntime(
-        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL, oauth=oauth),
         client=client,
         provider=GovBrProvider.OFFICIAL,
         fake=None,
@@ -68,6 +109,23 @@ def _route(auth: object, suffix: str):
         pattern.callback
         for pattern in auth.urlpatterns
         if str(pattern.pattern).endswith(suffix)
+    )
+
+
+def _fake_runtime_settings() -> GovBrRuntimeSettings:
+    return GovBrRuntimeSettings(provider=GovBrProvider.FAKE)
+
+
+def _colliding_fake_runtime() -> GovBrRuntime:
+    return create_govbr_runtime(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_provider_prefix="/auth/govbr",
+        ),
+        fake_transport_factory=lambda _: httpx.MockTransport(
+            lambda __: httpx.Response(500)
+        ),
+        clock=lambda: FIXED_NOW,
     )
 
 
@@ -84,6 +142,46 @@ def test_django_facade_exposes_native_login_and_callback_patterns() -> None:
         "auth/govbr/login",
         "auth/govbr/callback",
     ]
+
+
+def test_django_configured_logout_redirects_to_provider_endpoint() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(ContractClient({"sub": "subject"}), with_logout=True),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    response = _route(auth, "logout")(RequestFactory().get("/auth/govbr/logout"))
+
+    assert response.status_code == 302
+    assert response["Location"].startswith("https://sso.example.test/logout?")
+
+
+def test_django_facade_mounts_callback_at_configured_redirect_uri_path() -> None:
+    from govbr_auth.django import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(
+            ContractClient({"sub": "subject"}),
+            redirect_uri=(
+                "https://staging.example.test/oauth/govbr/caf%C3%A9%20retorno"
+            ),
+        ),
+        on_success=lambda context, request: HttpResponse(status=204),
+        clock=lambda: FIXED_NOW,
+    )
+
+    assert [str(pattern.pattern) for pattern in auth.urlpatterns] == [
+        "auth/govbr/login",
+        "oauth/govbr/café retorno",
+    ]
+    match = resolve("/oauth/govbr/café retorno", urlconf=tuple(auth.urlpatterns))
+    response = match.func(RequestFactory().get("/oauth/govbr/caf%C3%A9%20retorno"))
+    assert response.status_code == 400
+    with pytest.raises(Resolver404):
+        resolve("/auth/govbr/callback", urlconf=tuple(auth.urlpatterns))
 
 
 def test_django_login_redirects_using_the_core_authorization_url() -> None:
@@ -145,10 +243,7 @@ def test_django_fake_runtime_adds_provider_patterns_without_fastapi() -> None:
     from govbr_auth.django import GovBrAuth
 
     auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
+        settings=_fake_runtime_settings(),
         on_success=lambda context, request: HttpResponse(status=204),
         clock=lambda: FIXED_NOW,
     )
@@ -158,6 +253,7 @@ def test_django_fake_runtime_adds_provider_patterns_without_fastapi() -> None:
         assert {
             "auth/govbr/login",
             "auth/govbr/callback",
+            "auth/govbr/logout",
             "fake-govbr/authorize",
             "fake-govbr/login",
             "fake-govbr/token",
@@ -187,17 +283,72 @@ def test_django_fake_runtime_passes_simulator_http_application_to_provider_patte
     )
 
     auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
+        settings=_fake_runtime_settings(),
         on_success=lambda context, request: HttpResponse(status=204),
         clock=lambda: FIXED_NOW,
     )
 
     try:
-        runtime = auth._owner.runtime.fake
+        runtime = auth._application.runtime.fake
         assert runtime is not None
         assert mounted == [(runtime, runtime.http_application, auth._clock)]
     finally:
         auth.close()
+
+
+def test_django_rejects_owned_fake_prefix_collision_before_duplicate_post_route() -> (
+    None
+):
+    from govbr_auth.django import GovBrAuth
+
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_provider_prefix="/auth/govbr",
+    )
+    auth = None
+    raised = None
+
+    try:
+        try:
+            auth = GovBrAuth(
+                settings=settings,
+                on_success=lambda context, request: HttpResponse(status=204),
+                clock=lambda: FIXED_NOW,
+            )
+        except ValueError as error:
+            raised = error
+
+        if auth is not None:
+            match = resolve("/auth/govbr/login", urlconf=tuple(auth.urlpatterns))
+            response = match.func(RequestFactory().post("/auth/govbr/login"))
+            assert (
+                response.status_code != 302
+            ), "a rota de login do consumidor sombreou o POST do FakeGov"
+    finally:
+        if auth is not None:
+            auth.close()
+
+    assert isinstance(raised, ValueError)
+    assert str(raised) == (
+        "o prefixo do FakeGov deve ser diferente do prefixo do adapter"
+    )
+
+
+def test_django_rejects_borrowed_fake_prefix_collision() -> None:
+    from govbr_auth.adapters._sync import run_sync
+    from govbr_auth.django import GovBrAuth
+
+    runtime = _colliding_fake_runtime()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="o prefixo do FakeGov deve ser diferente do prefixo do adapter",
+        ):
+            GovBrAuth(
+                runtime=runtime,
+                on_success=lambda context, request: HttpResponse(status=204),
+                clock=lambda: FIXED_NOW,
+            )
+    finally:
+        run_sync(runtime.aclose)

@@ -115,6 +115,16 @@ def build_fake_govbr_routes(
             return oauth_error_response(error)
         return JSONResponse(user.model_dump(exclude_none=True, mode="json"))
 
+    @router.get("/logout")
+    async def logout(request: Request) -> Response:
+        try:
+            redirect_uri = application.logout(
+                request.query_params.get("post_logout_redirect_uri")
+            )
+        except FakeOAuthError as error:
+            return oauth_error_response(error)
+        return RedirectResponse(redirect_uri, status_code=302)
+
     return router
 
 

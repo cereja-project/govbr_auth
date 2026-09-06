@@ -3,13 +3,21 @@
 from collections.abc import Mapping
 from datetime import UTC, datetime
 
+import httpx
+import pytest
 from flask import Flask
 from pydantic import SecretStr
 
 from govbr_auth.core.authorization import AuthorizationRequest
 from govbr_auth.core.client import AuthenticationResult
 from govbr_auth.core.models import GovBrUser, TokenSet
-from govbr_auth.runtime import GovBrProvider, GovBrRuntime, GovBrRuntimeSettings
+from govbr_auth.core.settings import GovBrSettings
+from govbr_auth.runtime import (
+    GovBrProvider,
+    GovBrRuntime,
+    GovBrRuntimeSettings,
+    create_govbr_runtime,
+)
 
 FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 
@@ -28,6 +36,17 @@ class ContractClient:
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         return AuthorizationRequest("https://sso.example.test/authorize", "state")
 
+    def validate_state(self, state: str, *, now: datetime) -> None:
+        del now
+        if state != "state":
+            raise AssertionError("unexpected state")
+
+    def logout_url(self) -> str:
+        return (
+            "https://sso.example.test/logout?"
+            "post_logout_redirect_uri=https%3A%2F%2Fconsumer.example.test%2Fsigned-out"
+        )
+
     async def exchange_code(
         self, *, code: str, state: str, now: datetime
     ) -> AuthenticationResult:
@@ -39,13 +58,52 @@ class ContractClient:
         return GovBrUser(sub=expected_subject, name="Flask user")
 
 
-def _runtime(client: ContractClient) -> GovBrRuntime:
+def _runtime(
+    client: ContractClient,
+    *,
+    redirect_uri: str | None = None,
+    with_logout: bool = False,
+) -> GovBrRuntime:
+    oauth = None
+    if redirect_uri is not None or with_logout:
+        oauth = GovBrSettings(
+            authorization_url="https://sso.example.test/authorize",
+            token_url="https://sso.example.test/token",
+            userinfo_url="https://sso.example.test/userinfo",
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+            redirect_uri=redirect_uri or "https://consumer.example.test/callback",
+            transaction_secret=SecretStr("transaction-secret"),
+            issuer="https://sso.example.test/",
+            jwks_url="https://sso.example.test/jwks",
+            logout_url=("https://sso.example.test/logout" if with_logout else None),
+            post_logout_redirect_uri=(
+                "https://consumer.example.test/signed-out" if with_logout else None
+            ),
+        )
     return GovBrRuntime(
-        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL),
+        settings=GovBrRuntimeSettings(provider=GovBrProvider.OFFICIAL, oauth=oauth),
         client=client,
         provider=GovBrProvider.OFFICIAL,
         fake=None,
         _owned_http=None,
+    )
+
+
+def _fake_runtime_settings() -> GovBrRuntimeSettings:
+    return GovBrRuntimeSettings(provider=GovBrProvider.FAKE)
+
+
+def _colliding_fake_runtime() -> GovBrRuntime:
+    return create_govbr_runtime(
+        GovBrRuntimeSettings(
+            provider=GovBrProvider.FAKE,
+            fake_provider_prefix="/auth/govbr",
+        ),
+        fake_transport_factory=lambda _: httpx.MockTransport(
+            lambda __: httpx.Response(500)
+        ),
+        clock=lambda: FIXED_NOW,
     )
 
 
@@ -63,6 +121,49 @@ def test_flask_facade_exposes_a_blueprint_with_consumer_routes() -> None:
     paths = {rule.rule for rule in application.url_map.iter_rules()}
 
     assert {"/auth/govbr/login", "/auth/govbr/callback"} <= paths
+
+
+def test_flask_configured_logout_redirects_to_provider_endpoint() -> None:
+    from govbr_auth.flask import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(ContractClient({"sub": "subject"}), with_logout=True),
+        on_success=lambda context, request: ("", 204),
+        clock=lambda: FIXED_NOW,
+    )
+    application = Flask(__name__)
+    application.register_blueprint(auth.blueprint)
+
+    response = application.test_client().get(
+        "/auth/govbr/logout", follow_redirects=False
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("https://sso.example.test/logout?")
+
+
+def test_flask_facade_mounts_callback_at_configured_redirect_uri_path() -> None:
+    from govbr_auth.flask import GovBrAuth
+
+    auth = GovBrAuth(
+        runtime=_runtime(
+            ContractClient({"sub": "subject"}),
+            redirect_uri=(
+                "https://staging.example.test/oauth/govbr/caf%C3%A9%20retorno"
+            ),
+        ),
+        on_success=lambda context, request: ("", 204),
+        clock=lambda: FIXED_NOW,
+    )
+    application = Flask(__name__)
+    application.register_blueprint(auth.blueprint)
+
+    paths = {rule.rule for rule in application.url_map.iter_rules()}
+    assert "/auth/govbr/login" in paths
+    assert "/oauth/govbr/café retorno" in paths
+    assert "/auth/govbr/callback" not in paths
+    callback = application.test_client().get("/oauth/govbr/caf%C3%A9%20retorno")
+    assert callback.status_code == 400
 
 
 def test_flask_login_redirects_using_the_core_authorization_url() -> None:
@@ -112,10 +213,7 @@ def test_flask_fake_runtime_adds_provider_routes() -> None:
     from govbr_auth.flask import GovBrAuth
 
     auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
+        settings=_fake_runtime_settings(),
         on_success=lambda context, request: ("", 204),
         clock=lambda: FIXED_NOW,
     )
@@ -127,6 +225,7 @@ def test_flask_fake_runtime_adds_provider_routes() -> None:
         assert {
             "/auth/govbr/login",
             "/auth/govbr/callback",
+            "/auth/govbr/logout",
             "/fake-govbr/authorize",
             "/fake-govbr/login",
             "/fake-govbr/token",
@@ -158,17 +257,58 @@ def test_flask_fake_runtime_passes_simulator_http_application_to_provider_bluepr
     )
 
     auth = GovBrAuth(
-        settings=GovBrRuntimeSettings(
-            provider=GovBrProvider.FAKE,
-            fake_end_to_end=True,
-        ),
+        settings=_fake_runtime_settings(),
         on_success=lambda context, request: ("", 204),
         clock=lambda: FIXED_NOW,
     )
 
     try:
-        runtime = auth._owner.runtime.fake
+        runtime = auth._application.runtime.fake
         assert runtime is not None
         assert mounted == [(runtime, runtime.http_application, auth._clock)]
     finally:
         auth.close()
+
+
+def test_flask_rejects_owned_fake_prefix_collision() -> None:
+    from govbr_auth.flask import GovBrAuth
+
+    settings = GovBrRuntimeSettings(
+        provider=GovBrProvider.FAKE,
+        fake_provider_prefix="/auth/govbr",
+    )
+    auth = None
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="o prefixo do FakeGov deve ser diferente do prefixo do adapter",
+        ):
+            auth = GovBrAuth(
+                settings=settings,
+                on_success=lambda context, request: ("", 204),
+                clock=lambda: FIXED_NOW,
+            )
+    finally:
+        if auth is not None:
+            auth.close()
+
+
+def test_flask_rejects_borrowed_fake_prefix_collision() -> None:
+    from govbr_auth.adapters._sync import run_sync
+    from govbr_auth.flask import GovBrAuth
+
+    runtime = _colliding_fake_runtime()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="o prefixo do FakeGov deve ser diferente do prefixo do adapter",
+        ):
+            GovBrAuth(
+                runtime=runtime,
+                on_success=lambda context, request: ("", 204),
+                clock=lambda: FIXED_NOW,
+            )
+    finally:
+        run_sync(runtime.aclose)

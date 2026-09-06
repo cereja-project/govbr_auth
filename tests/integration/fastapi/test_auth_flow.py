@@ -609,8 +609,8 @@ async def test_fake_provider_environment_uses_simulator_http_application_for_ful
                     "/fake-govbr/login",
                     data={
                         "request": request_match.group(1),
-                        "cpf": "12345678901",
-                        "password": "ana-demo",
+                        "cpf": "11122233344",
+                        "password": "senha-ficticia",
                     },
                 )
                 callback = await http.get(_path(fake_login.headers["location"]))
@@ -620,7 +620,7 @@ async def test_fake_provider_environment_uses_simulator_http_application_for_ful
         assert fake_login.status_code == 302
         assert callback.status_code == 200
         assert callback.json() == {"authenticated": True}
-        assert received == ["12345678901"]
+        assert received == ["11122233344"]
     finally:
         if not auth.runtime.is_closed:
             await auth.runtime.aclose()

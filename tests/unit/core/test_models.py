@@ -13,12 +13,14 @@ from govbr_auth.core.errors import (
 )
 from govbr_auth.core.models import AuthTransaction, GovBrAddress, GovBrUser, TokenSet
 
+VALID_CODE_VERIFIER = "v" * 43
+
 
 def test_auth_transaction_is_immutable() -> None:
     issued_at = datetime(2026, 8, 11, tzinfo=timezone.utc)
     transaction = AuthTransaction(
         transaction_id="transaction-123",
-        code_verifier="verifier-secret",
+        code_verifier=VALID_CODE_VERIFIER,
         nonce="nonce-secret",
         issued_at=issued_at,
         expires_at=issued_at + timedelta(minutes=5),
@@ -34,7 +36,7 @@ def test_auth_transaction_rejects_expiration_before_issuance() -> None:
     with pytest.raises(ValidationError, match="expires_at"):
         AuthTransaction(
             transaction_id="transaction-123",
-            code_verifier="verifier-secret",
+            code_verifier=VALID_CODE_VERIFIER,
             nonce="nonce-secret",
             issued_at=issued_at,
             expires_at=issued_at - timedelta(seconds=1),
@@ -47,7 +49,7 @@ def test_auth_transaction_rejects_naive_datetimes() -> None:
     with pytest.raises(ValidationError, match="timezone-aware"):
         AuthTransaction(
             transaction_id="transaction-123",
-            code_verifier="verifier-secret",
+            code_verifier=VALID_CODE_VERIFIER,
             nonce="nonce-secret",
             issued_at=issued_at,
             expires_at=issued_at + timedelta(minutes=5),
@@ -66,7 +68,7 @@ def test_auth_transaction_rejects_blank_security_values(field_name: str) -> None
     issued_at = datetime(2026, 8, 11, tzinfo=timezone.utc)
     transaction_data = {
         "transaction_id": "transaction-123",
-        "code_verifier": "verifier-secret",
+        "code_verifier": VALID_CODE_VERIFIER,
         "nonce": "nonce-secret",
         "issued_at": issued_at,
         "expires_at": issued_at + timedelta(minutes=5),
@@ -75,6 +77,30 @@ def test_auth_transaction_rejects_blank_security_values(field_name: str) -> None
 
     with pytest.raises(ValidationError, match="must not be empty"):
         AuthTransaction(**transaction_data)
+
+
+@pytest.mark.parametrize(
+    "code_verifier",
+    [
+        pytest.param("v" * 42, id="too_short"),
+        pytest.param("v" * 129, id="too_long"),
+        pytest.param("v" * 42 + "!", id="invalid_character"),
+        pytest.param("v" * 42 + "é", id="non_ascii_character"),
+    ],
+)
+def test_auth_transaction_rejects_invalid_rfc7636_verifiers(
+    code_verifier: str,
+) -> None:
+    issued_at = datetime(2026, 8, 11, tzinfo=timezone.utc)
+
+    with pytest.raises(ValidationError, match="RFC 7636"):
+        AuthTransaction(
+            transaction_id="transaction-123",
+            code_verifier=code_verifier,
+            nonce="nonce-secret",
+            issued_at=issued_at,
+            expires_at=issued_at + timedelta(minutes=5),
+        )
 
 
 def test_token_set_requires_bearer_tokens() -> None:
