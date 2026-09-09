@@ -37,6 +37,11 @@ autorizado.
    :alt: Sequência entre navegador, API com govbr-auth e provedor OAuth OIDC.
    :align: center
 
+No README, a versão animada percorre as doze setas em ordem com um marcador
+verde, em um ciclo de 24 segundos. Todos os textos permanecem visíveis.
+Quando a preferência por movimento reduzido está ativada no sistema ou
+navegador, essa versão também permanece estática.
+
 Provedor oficial
 ----------------
 

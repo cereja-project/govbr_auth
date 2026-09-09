@@ -14,6 +14,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Validação do `code_verifier` conforme RFC 7636 no core e no FakeGov.
 
 ### Changed
+- O diagrama animado de autenticação usa um marcador verde para percorrer
+  requisições e respostas em ordem, mantendo os textos visíveis e respeitando
+  a preferência por movimento reduzido. As setas de retorno acompanham o
+  sentido do percurso.
 - A logo adota o símbolo de acoplamento em grafite e verde, com versões para
   fundos claros, escuros, reprodução monocromática e favicon. A demonstração
   e o FakeGov usam o mesmo desenho.

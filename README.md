@@ -64,8 +64,9 @@ Instale somente o core ou o extra correspondente à aplicação:
 
 ![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação e provedor](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence-animated.svg)
 
-[Ver versão estática do fluxo](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence.svg)
-
+O marcador verde percorre as requisições e respostas em ordem, em um ciclo
+de 24 segundos. Se a preferência por movimento reduzido estiver ativada no
+sistema ou navegador, o diagrama permanece estático.
 
 A aplicação expõe `/auth/govbr/login`. O navegador é redirecionado para o
 provedor selecionado e retorna pelo callback configurado. Depois do login, o
