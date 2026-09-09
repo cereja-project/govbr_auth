@@ -90,7 +90,7 @@ def _assert_brand_svg_contract(source: str) -> None:
     assert "<!doctype" not in source.lower()
     root = ET.fromstring(source)
     namespace = "{http://www.w3.org/2000/svg}"
-    allowed_elements = {"svg", "title", "desc", "g", "path", "circle"}
+    allowed_elements = {"svg", "title", "desc", "g", "path", "circle", "rect"}
 
     assert root.tag == f"{namespace}svg"
     assert root.attrib["role"] == "img"
@@ -362,11 +362,6 @@ def test_readme_communication_section_embeds_animation_and_links_static_flow() -
         "(https://raw.githubusercontent.com/cereja-project/govbr_auth/main/"
         "docs/media/authentication-sequence-animated.svg)"
     )
-    static_link = (
-        "[Ver versão estática do fluxo]"
-        "(https://raw.githubusercontent.com/cereja-project/govbr_auth/main/"
-        "docs/media/authentication-sequence.svg)"
-    )
     section = re.search(
         r"^## Como a comunicação funciona\s*$.*?(?=^## |\Z)",
         source,
@@ -375,9 +370,7 @@ def test_readme_communication_section_embeds_animation_and_links_static_flow() -
 
     assert section is not None
     assert animated_embed in section.group()
-    assert static_link in section.group()
     assert source.count(animated_embed) == 1
-    assert source.count(static_link) == 1
 
 
 def test_animated_authentication_flow_is_accessible_and_motion_safe() -> None:
@@ -428,6 +421,65 @@ def test_animated_authentication_flow_is_accessible_and_motion_safe() -> None:
             "provider-only",
         )
     )
+
+
+def test_animated_flow_traces_every_arrow_in_protocol_order() -> None:
+    root = ET.parse(DOCS_ROOT / "media" / "authentication-sequence-animated.svg")
+    namespace = "{http://www.w3.org/2000/svg}"
+    phases = root.findall(f".//{namespace}g[@class='phase']")
+    markers = []
+    for phase in phases:
+        arrows = phase.findall(f"{namespace}path[@marker-end]")
+        packets = phase.findall(f"{namespace}circle[@class='packet']")
+        assert len(packets) == len(arrows), phase.attrib["id"]
+        for arrow, packet in zip(arrows, packets, strict=True):
+            route = re.fullmatch(r"M(\d+) (\d+)H(\d+)", arrow.attrib["d"])
+            assert route is not None
+            start, height, end = map(int, route.groups())
+            assert float(packet.attrib["cx"]) == start
+            assert float(packet.attrib["cy"]) == height
+            assert packet.attrib["aria-hidden"] == "true"
+            distance = re.search(r"--travel:\s*(-?\d+)px", packet.attrib["style"])
+            delay = re.search(r"--delay:\s*(\d+)s", packet.attrib["style"])
+            assert distance is not None and int(distance[1]) == end - start
+            assert delay is not None and int(delay[1]) == len(markers) * 2
+            markers.append(packet)
+
+    assert len(markers) == 12
+    stylesheet = root.find(f".//{namespace}style").text or ""
+    assert "packet-travel 24s linear infinite" in stylesheet
+    assert "animation-delay: var(--delay)" in stylesheet
+    assert "transform: translateX(var(--travel))" in stylesheet
+    reduced = stylesheet.split("@media (prefers-reduced-motion: reduce)")[1]
+    packet_rule = re.search(r"\.packet\s*\{([^}]+)\}", reduced)
+    assert packet_rule is not None
+    assert "animation: none" in packet_rule[1]
+    assert "display: none" in packet_rule[1]
+
+
+def test_authentication_diagrams_keep_copy_and_arrow_direction_consistent() -> None:
+    namespace = "{http://www.w3.org/2000/svg}"
+    diagrams = [
+        ET.parse(DOCS_ROOT / "media" / name)
+        for name in (
+            "authentication-sequence.svg",
+            "authentication-sequence-animated.svg",
+        )
+    ]
+    assert [node.text for node in diagrams[0].findall(f".//{namespace}text")] == [
+        node.text for node in diagrams[1].findall(f".//{namespace}text")
+    ]
+    for diagram in diagrams:
+        forward = diagram.find(f".//{namespace}marker[@id='arrow']")
+        backward = diagram.find(f".//{namespace}marker[@id='arrowBack']")
+        assert forward is not None and backward is not None
+        assert forward.attrib["orient"] == backward.attrib["orient"] == "auto"
+        # O orient=auto já gira o marcador em uma seta de retorno.
+        assert (
+            forward.find(f"{namespace}path").attrib["d"]
+            == backward.find(f"{namespace}path").attrib["d"]
+        )
+        assert forward.attrib["refX"] == backward.attrib["refX"]
 
 
 def test_sphinx_quickstart_keeps_the_provider_only_fake_launcher() -> None:
@@ -718,73 +770,39 @@ def test_brand_mark_family_is_complete() -> None:
         "govbr-auth-mark-small.svg",
     ),
 )
-def test_brand_marks_use_the_network_connector(filename: str) -> None:
+def test_brand_marks_use_the_approved_coupling_palette(filename: str) -> None:
     root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
-    namespace = "{http://www.w3.org/2000/svg}"
-
-    assert len(root.findall(f".//{namespace}path")) == 2
-
-
-def test_brand_mark_variants_share_the_same_connector_geometry() -> None:
-    namespace = "{http://www.w3.org/2000/svg}"
-    filenames = (
-        "govbr-auth-mark.svg",
-        "govbr-auth-mark-light.svg",
-        "govbr-auth-mark-monochrome.svg",
-    )
-    connectors = {
-        tuple(
-            path.attrib["d"]
-            for path in ET.parse(DOCS_ROOT / "media" / filename)
-            .getroot()
-            .findall(f".//{namespace}path")
-        )
-        for filename in filenames
+    colors = {
+        element.attrib["fill"].lower()
+        for element in root.iter()
+        if "fill" in element.attrib
     }
-
-    assert connectors == {
-        (
-            "M 32 10 V 22 L 22 32 V 38",
-            "M 32 22 L 42 32 V 38",
-        )
+    expected = {
+        "govbr-auth-mark.svg": {"#111827", "#10b981"},
+        "govbr-auth-mark-light.svg": {"#ffffff", "#10b981"},
+        "govbr-auth-mark-monochrome.svg": {"#111827"},
+        "govbr-auth-mark-small.svg": {"#111827", "#10b981"},
     }
+    assert colors == expected[filename]
 
 
-def test_small_brand_mark_compensates_for_sixteen_pixels() -> None:
-    root = ET.parse(DOCS_ROOT / "media" / "govbr-auth-mark-small.svg").getroot()
+def test_brand_mark_and_wordmark_variants_share_coupling_geometry() -> None:
     namespace = "{http://www.w3.org/2000/svg}"
-    connector = root.find(f".//{namespace}path")
-    cherries = root.findall(f".//{namespace}circle")
-
-    assert connector is not None
-    assert connector.attrib["d"] == "M 32 10 V 22 L 22 32 V 38"
-    assert len(cherries) == 6
-    assert {circle.attrib["r"] for circle in cherries} == {"3", "4", "11"}
-    assert any(
-        group.attrib.get("stroke-width") == "5"
-        for group in root.findall(f".//{namespace}g")
-    )
-
-
-@pytest.mark.parametrize(
-    "filename",
-    (
-        "govbr-auth-logo.svg",
-        "govbr-auth-logo-light.svg",
-        "govbr-auth-logo-monochrome.svg",
-    ),
-)
-def test_wordmark_cherries_align_with_the_letter_baseline(filename: str) -> None:
-    source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
-    root = ET.fromstring(source)
-    namespace = "{http://www.w3.org/2000/svg}"
-    cherries = root.findall(f".//{namespace}circle")
-
-    fruit = [cherry for cherry in cherries if cherry.attrib.get("r") == "11"]
-    assert len(fruit) == 2
-    assert all(
-        float(cherry.attrib["cy"]) + float(cherry.attrib["r"]) <= 64 for cherry in fruit
-    )
+    master = ET.parse(DOCS_ROOT / "media" / "govbr-auth-mark.svg").getroot()
+    expected = [path.attrib["d"] for path in master.iter(f"{namespace}path")]
+    assert expected
+    for suffix in ("", "-light", "-monochrome"):
+        mark = ET.parse(DOCS_ROOT / "media" / f"govbr-auth-mark{suffix}.svg").getroot()
+        wordmark = ET.parse(
+            DOCS_ROOT / "media" / f"govbr-auth-logo{suffix}.svg"
+        ).getroot()
+        symbol = wordmark.find(f"{namespace}g")
+        assert symbol is not None
+        assert [p.attrib["d"] for p in mark.iter(f"{namespace}path")] == expected
+        assert [p.attrib["d"] for p in symbol.iter(f"{namespace}path")] == expected
+        assert [p.attrib["fill"] for p in symbol.iter(f"{namespace}path")] == [
+            p.attrib["fill"] for p in mark.iter(f"{namespace}path")
+        ]
 
 
 @pytest.mark.parametrize(

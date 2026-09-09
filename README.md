@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo-light.svg">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg">
-    <img src="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg" alt="govbr-auth" width="320">
+    <img src="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg" alt="govbr-auth — símbolo de acoplamento grafite e verde" width="320">
   </picture>
 </p>
 
@@ -64,8 +64,9 @@ Instale somente o core ou o extra correspondente à aplicação:
 
 ![Fluxo animado de autenticação OAuth/OIDC entre navegador, aplicação e provedor](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence-animated.svg)
 
-[Ver versão estática do fluxo](https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/authentication-sequence.svg)
-
+O marcador verde percorre as requisições e respostas em ordem, em um ciclo
+de 24 segundos. Se a preferência por movimento reduzido estiver ativada no
+sistema ou navegador, o diagrama permanece estático.
 
 A aplicação expõe `/auth/govbr/login`. O navegador é redirecionado para o
 provedor selecionado e retorna pelo callback configurado. Depois do login, o

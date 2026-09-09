@@ -7,7 +7,7 @@ Federal. Em materiais públicos, mantenha esse descritor próximo à primeira
 apresentação da marca.
 
 .. image:: ../media/govbr-auth-logo.svg
-   :alt: Assinatura govbr-auth com rede verde e duas cerejas sobrepostas.
+   :alt: govbr-auth com símbolo de acoplamento grafite e encaixe verde.
    :align: center
    :width: 520px
 
@@ -26,24 +26,30 @@ Use os arquivos sem alterar proporções, cores ou desenho:
 * ``govbr-auth-mark-monochrome.svg``: símbolo para reprodução em uma cor;
 * ``govbr-auth-mark-small.svg``: mestre óptico para exibição de 16 a 23 px.
 
-O símbolo combina uma rede lógica com duas cerejas sobrepostas. A haste verde
-usa ângulos retos e nós para representar rotas, APIs e infraestrutura. Os
-frutos formam um diagrama de Venn: a interseção representa o handshake OAuth e
-a autenticação validada.
+O símbolo de acoplamento reúne duas peças grafite e um encaixe central verde.
+As peças representam sistemas distintos; o encaixe destaca a integração entre
+eles. Os espaços vazios separam as três partes e permanecem transparentes em
+todas as versões. O desenho é uma metáfora visual, não uma garantia de segurança.
+
+Em fundos escuros, as peças externas são brancas e o encaixe continua verde.
+A versão monocromática usa grafite nas três peças. Todos os arquivos são
+vetoriais, com cores chapadas e sem fundo, gradientes ou sombras.
 
 Paleta
 ------
 
-As quatro cores principais são imutáveis:
+A logo usa somente duas cores:
 
 * **Dark Graphite** ``#111827``: fundos escuros, texto e estrutura;
-* **Verde Tech** ``#10B981``: rede, estados positivos e destaques técnicos;
-* **Vermelho Vivo** ``#EF4444``: primeiro fruto da marca;
-* **Vermelho Vinho** ``#991B1B``: segundo fruto e estados críticos.
+* **Verde Tech** ``#10B981``: encaixe central e destaques técnicos.
+
+O **Vermelho Vivo** ``#EF4444`` e o **Vermelho Vinho** ``#991B1B`` permanecem
+disponíveis para avisos e estados de erro na interface, mas não fazem parte
+da logo aprovada.
 
 Fundos claros usam ``#F8FAFC`` como canvas e branco nas superfícies. Tons
-neutros podem apoiar hierarquia e contraste, mas não substituem as quatro cores
-da marca.
+neutros podem apoiar hierarquia e contraste. A variante clara substitui o
+grafite das peças externas por branco ``#FFFFFF``.
 
 Tipografia e voz
 ----------------
@@ -70,7 +76,8 @@ Redução e fundos
 
 A assinatura horizontal deve ter pelo menos 200 px de largura. O símbolo
 principal tem mínimo de 24 px; entre 16 e 23 px, use somente
-``govbr-auth-mark-small.svg``.
+``govbr-auth-mark-small.svg``, com contornos simplificados e maior ocupação
+do quadro para preservar a leitura dos encaixes.
 
 A assinatura e o símbolo principais usam fundo branco, ``#F8FAFC`` ou outro
 fundo claro e uniforme. As variantes claras estão homologadas sobre

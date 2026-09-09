@@ -1,4 +1,6 @@
 import re
+import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Literal, cast
 
 import pytest
@@ -77,6 +79,29 @@ def test_shared_shell_uses_the_approved_brand_without_external_assets() -> None:
     assert "<script" not in page
     assert "<link" not in page
     assert "url(http" not in page
+
+
+@pytest.mark.parametrize("layout", ("wide", "card"))
+def test_shared_shell_uses_the_published_coupling_symbol(
+    layout: Literal["wide", "card"],
+) -> None:
+    page = render_page(title="Teste", body="<p>conteúdo</p>", layout=layout)
+    match = re.search(r'<svg class="brand-mark".*?</svg>', page, re.DOTALL)
+    assert match is not None
+    symbol = ET.fromstring(match.group())
+    master = ET.parse(
+        Path(__file__).resolve().parents[2] / "docs/media/govbr-auth-mark.svg"
+    ).getroot()
+    namespace = "{http://www.w3.org/2000/svg}"
+    assert [p.attrib["d"] for p in symbol.iter("path")] == [
+        p.attrib["d"] for p in master.iter(f"{namespace}path")
+    ]
+    assert {p.attrib["fill"] for p in symbol.iter("path")} == {
+        "currentColor",
+        "#10b981",
+    }
+    assert ".site-header .brand-mark { color: #ffffff; }" in page
+    assert ".brand-mark { color: #111827;" in page
 
 
 def test_feedback_text_and_input_focus_meet_minimum_contrast() -> None:
