@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo-light.svg">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg">
-    <img src="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg" alt="govbr-auth" width="320">
+    <img src="https://raw.githubusercontent.com/cereja-project/govbr_auth/main/docs/media/govbr-auth-logo.svg" alt="govbr-auth — símbolo de acoplamento grafite e verde" width="320">
   </picture>
 </p>
 

@@ -90,7 +90,7 @@ def _assert_brand_svg_contract(source: str) -> None:
     assert "<!doctype" not in source.lower()
     root = ET.fromstring(source)
     namespace = "{http://www.w3.org/2000/svg}"
-    allowed_elements = {"svg", "title", "desc", "g", "path", "circle"}
+    allowed_elements = {"svg", "title", "desc", "g", "path", "circle", "rect"}
 
     assert root.tag == f"{namespace}svg"
     assert root.attrib["role"] == "img"
@@ -718,73 +718,39 @@ def test_brand_mark_family_is_complete() -> None:
         "govbr-auth-mark-small.svg",
     ),
 )
-def test_brand_marks_use_the_network_connector(filename: str) -> None:
+def test_brand_marks_use_the_approved_coupling_palette(filename: str) -> None:
     root = ET.parse(DOCS_ROOT / "media" / filename).getroot()
-    namespace = "{http://www.w3.org/2000/svg}"
-
-    assert len(root.findall(f".//{namespace}path")) == 2
-
-
-def test_brand_mark_variants_share_the_same_connector_geometry() -> None:
-    namespace = "{http://www.w3.org/2000/svg}"
-    filenames = (
-        "govbr-auth-mark.svg",
-        "govbr-auth-mark-light.svg",
-        "govbr-auth-mark-monochrome.svg",
-    )
-    connectors = {
-        tuple(
-            path.attrib["d"]
-            for path in ET.parse(DOCS_ROOT / "media" / filename)
-            .getroot()
-            .findall(f".//{namespace}path")
-        )
-        for filename in filenames
+    colors = {
+        element.attrib["fill"].lower()
+        for element in root.iter()
+        if "fill" in element.attrib
     }
-
-    assert connectors == {
-        (
-            "M 32 10 V 22 L 22 32 V 38",
-            "M 32 22 L 42 32 V 38",
-        )
+    expected = {
+        "govbr-auth-mark.svg": {"#111827", "#10b981"},
+        "govbr-auth-mark-light.svg": {"#ffffff", "#10b981"},
+        "govbr-auth-mark-monochrome.svg": {"#111827"},
+        "govbr-auth-mark-small.svg": {"#111827", "#10b981"},
     }
+    assert colors == expected[filename]
 
 
-def test_small_brand_mark_compensates_for_sixteen_pixels() -> None:
-    root = ET.parse(DOCS_ROOT / "media" / "govbr-auth-mark-small.svg").getroot()
+def test_brand_mark_and_wordmark_variants_share_coupling_geometry() -> None:
     namespace = "{http://www.w3.org/2000/svg}"
-    connector = root.find(f".//{namespace}path")
-    cherries = root.findall(f".//{namespace}circle")
-
-    assert connector is not None
-    assert connector.attrib["d"] == "M 32 10 V 22 L 22 32 V 38"
-    assert len(cherries) == 6
-    assert {circle.attrib["r"] for circle in cherries} == {"3", "4", "11"}
-    assert any(
-        group.attrib.get("stroke-width") == "5"
-        for group in root.findall(f".//{namespace}g")
-    )
-
-
-@pytest.mark.parametrize(
-    "filename",
-    (
-        "govbr-auth-logo.svg",
-        "govbr-auth-logo-light.svg",
-        "govbr-auth-logo-monochrome.svg",
-    ),
-)
-def test_wordmark_cherries_align_with_the_letter_baseline(filename: str) -> None:
-    source = (DOCS_ROOT / "media" / filename).read_text(encoding="utf-8")
-    root = ET.fromstring(source)
-    namespace = "{http://www.w3.org/2000/svg}"
-    cherries = root.findall(f".//{namespace}circle")
-
-    fruit = [cherry for cherry in cherries if cherry.attrib.get("r") == "11"]
-    assert len(fruit) == 2
-    assert all(
-        float(cherry.attrib["cy"]) + float(cherry.attrib["r"]) <= 64 for cherry in fruit
-    )
+    master = ET.parse(DOCS_ROOT / "media" / "govbr-auth-mark.svg").getroot()
+    expected = [path.attrib["d"] for path in master.iter(f"{namespace}path")]
+    assert expected
+    for suffix in ("", "-light", "-monochrome"):
+        mark = ET.parse(DOCS_ROOT / "media" / f"govbr-auth-mark{suffix}.svg").getroot()
+        wordmark = ET.parse(
+            DOCS_ROOT / "media" / f"govbr-auth-logo{suffix}.svg"
+        ).getroot()
+        symbol = wordmark.find(f"{namespace}g")
+        assert symbol is not None
+        assert [p.attrib["d"] for p in mark.iter(f"{namespace}path")] == expected
+        assert [p.attrib["d"] for p in symbol.iter(f"{namespace}path")] == expected
+        assert [p.attrib["fill"] for p in symbol.iter(f"{namespace}path")] == [
+            p.attrib["fill"] for p in mark.iter(f"{namespace}path")
+        ]
 
 
 @pytest.mark.parametrize(
