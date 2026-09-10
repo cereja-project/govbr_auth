@@ -14,10 +14,6 @@ armazenamento compartilhado quando recebem a mesma secret
 de PKCE e nonce. O ``state`` não é um registro de uso único; o replay é
 rejeitado pelo authorization code de uso único no provedor.
 
-.. image:: media/fakegov-flow.svg
-   :alt: Jornada local do FakeGov, da instalação ao callback autenticado.
-   :align: center
-
 O :doc:`guide/fake-mode` permite executar o fluxo completo localmente com
 usuários fictícios, sem alterar a fachada usada com o provedor oficial.
 

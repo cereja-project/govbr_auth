@@ -5,6 +5,10 @@ O FakeGov é um simulador local do provedor OAuth 2.0/OpenID Connect Gov.br.
 Ele responde autorização, emissão de tokens, JWKS e ``userinfo`` para
 desenvolvimento e testes. Não é o frontend da aplicação consumidora.
 
+.. image:: ../media/fakegov-flow.svg
+   :alt: Jornada local do FakeGov, da instalação ao callback autenticado.
+   :align: center
+
 Usar FakeGov na aplicação
 -------------------------
 
