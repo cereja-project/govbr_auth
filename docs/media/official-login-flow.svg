@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-labelledby="title desc">
+  <title id="title">Login com o provedor oficial gov.br</title>
+  <desc id="desc">A aplicação inicia o login. O usuário se autentica no Login Único gov.br e o navegador retorna ao callback da aplicação. O govbr-auth troca o código e valida os tokens; a aplicação estabelece sua própria sessão.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#10b981"/></marker>
+  </defs>
+  <rect width="1200" height="330" rx="24" fill="#f8fafc"/>
+  <g font-family="Inter, Arial, sans-serif">
+    <text x="40" y="48" fill="#0f172a" font-size="24" font-weight="700">Login com o gov.br</text>
+    <text x="40" y="78" fill="#475569" font-size="16">Visão resumida do fluxo com o provedor oficial</text>
+    <g stroke="#10b981" stroke-width="3" fill="none" marker-end="url(#arrow)">
+      <path d="M286 185H318"/>
+      <path d="M570 185H602"/>
+      <path d="M854 185H886"/>
+    </g>
+    <rect x="40" y="116" width="240" height="138" rx="16" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
+    <rect x="324" y="116" width="240" height="138" rx="16" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+    <rect x="608" y="116" width="240" height="138" rx="16" fill="#111827"/>
+    <rect x="892" y="116" width="268" height="138" rx="16" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
+    <g text-anchor="middle">
+      <g font-size="20" font-weight="700">
+        <text x="160" y="154" fill="#0f172a">1. Aplicação</text>
+        <text x="444" y="154" fill="#0f172a">2. Login Único gov.br</text>
+        <text x="728" y="154" fill="#f8fafc">3. Callback</text>
+        <text x="1026" y="154" fill="#0f172a">4. Usuário autenticado</text>
+      </g>
+      <g font-size="16" fill="#475569">
+        <text x="160" y="193">Inicia a autorização</text>
+        <text x="160" y="219">com govbr-auth</text>
+        <text x="444" y="193">Usuário se autentica</text>
+        <text x="444" y="219">no provedor oficial</text>
+        <text x="728" y="193" fill="#e2e8f0">govbr-auth troca o código</text>
+        <text x="728" y="219" fill="#e2e8f0">e valida os tokens</text>
+        <text x="1026" y="193">A aplicação estabelece</text>
+        <text x="1026" y="219">sua própria sessão</text>
+      </g>
+    </g>
+    <text x="40" y="294" fill="#475569" font-size="16">O navegador retorna do gov.br ao callback da aplicação para concluir a autenticação.</text>
+  </g>
+</svg>

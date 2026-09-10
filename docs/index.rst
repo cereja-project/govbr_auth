@@ -14,6 +14,14 @@ armazenamento compartilhado quando recebem a mesma secret
 de PKCE e nonce. O ``state`` não é um registro de uso único; o replay é
 rejeitado pelo authorization code de uso único no provedor.
 
+.. image:: media/official-login-flow.svg
+   :alt: A aplicação inicia o login no gov.br; o navegador retorna ao callback, o govbr-auth valida a autenticação e a aplicação estabelece sua sessão.
+   :align: center
+
+O ``govbr-auth`` conduz a autorização e valida os tokens. A aplicação
+consumidora decide como estabelecer a sessão do usuário autenticado.
+Veja o :doc:`guide/communication-flow` para a sequência técnica detalhada.
+
 O :doc:`guide/fake-mode` permite executar o fluxo completo localmente com
 usuários fictícios, sem alterar a fachada usada com o provedor oficial.
 
