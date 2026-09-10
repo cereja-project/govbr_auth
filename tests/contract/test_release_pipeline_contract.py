@@ -43,7 +43,7 @@ def test_release_version_is_consistent_across_package_and_documentation() -> Non
         "1.0",
         "1.0.0",
     )
-    assert "## [1.0.0] - 2026-09-01" in changelog
+    assert "## [1.0.0] - 2026-09-10" in changelog
 
 
 def test_docs_configuration_does_not_prepend_the_source_checkout() -> None:
