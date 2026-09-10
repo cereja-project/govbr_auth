@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-10
+
 ### Added
 - Configuração opcional de logout com `GOVBR_LOGOUT_URL` e
   `GOVBR_POST_LOGOUT_REDIRECT_URI`, com rotas nativas para FastAPI, Django e
@@ -27,25 +29,6 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - O launcher FakeGov abre a autenticação em uma guia ou janela nativa e
   atualiza a página original após a conclusão do callback; os adapters mantêm
   o callback definido pela aplicação consumidora.
-
-### Fixed
-- O endpoint de logout do FakeGov agora valida destinos registrados e conclui
-  o fluxo local sem criar redirecionamento aberto.
-
-### Security
-- O destino pós-logout é derivado da configuração e não pode ser escolhido por
-  query string na rota do consumidor.
-- Respostas de callback inválidas mantêm `Cache-Control: no-store` e não
-  expõem parâmetros OAuth recebidos.
-
-### Histórico de compatibilidade
-- A configuração incompatível e ainda não publicada
-  `GOVBR_FAKE_END_TO_END`/`fake_end_to_end` foi removida em favor do opt-in
-  agregado `GOVBR_DEMO_PAGE`.
-
-## [1.0.0] - 2026-09-01
-
-### Changed
 - A identidade visual agora inclui símbolos responsivos para fundos claros,
   escuros, reprodução monocromática e favicon, com regras documentadas de
   redução, área de proteção e posicionamento de projeto independente e open source.
@@ -58,12 +41,25 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   vez de reconstruir apenas provider, host e porta.
 
 ### Fixed
+- O endpoint de logout do FakeGov agora valida destinos registrados e conclui
+  o fluxo local sem criar redirecionamento aberto.
 - O launcher `python -m govbr_auth.fake` agora carrega o `.env` do
   diretório atual sem sobrescrever variáveis exportadas pelo terminal e valida
   todas as configurações FakeGov antes de iniciar o servidor.
 - Variáveis `GOVBR_*` desconhecidas agora falham explicitamente; variáveis
   reconhecidas mas inativas para o provider selecionado emitem warning sem
   revelar seus valores.
+
+### Security
+- O destino pós-logout é derivado da configuração e não pode ser escolhido por
+  query string na rota do consumidor.
+- Respostas de callback inválidas mantêm `Cache-Control: no-store` e não
+  expõem parâmetros OAuth recebidos.
+
+### Histórico de compatibilidade
+- A configuração incompatível e ainda não publicada
+  `GOVBR_FAKE_END_TO_END`/`fake_end_to_end` foi removida em favor do opt-in
+  agregado `GOVBR_DEMO_PAGE`.
 
 ## [1.0.0rc1] - 2026-08-26
 
