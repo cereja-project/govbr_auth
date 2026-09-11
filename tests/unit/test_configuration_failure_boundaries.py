@@ -41,7 +41,9 @@ def test_callback_route_rejects_invalid_utf8_path(fake_settings):
 def test_fake_callback_preparation_rejects_incomplete_settings(fake_settings):
     incomplete = fake_settings.model_copy(update={"oauth": None})
     with pytest.raises(ValueError, match="requires OAuth settings"):
-        adapter_runtime.prepare_adapter_runtime_settings(incomplete, prefix="/auth/govbr")
+        adapter_runtime.prepare_adapter_runtime_settings(
+            incomplete, prefix="/auth/govbr"
+        )
 
 
 def test_borrowed_fake_runtime_rejects_missing_oauth_settings(fake_settings):
@@ -95,7 +97,9 @@ def test_logout_builder_rejects_absent_logout_configuration(fake_settings):
 
 def test_fake_simulator_rejects_noncanonical_prefix(fake_settings):
     with pytest.raises(ValueError, match="canonical path"):
-        create_fake_gov_simulator(fake_settings, prefix="/bad//prefix", clock=lambda: NOW)
+        create_fake_gov_simulator(
+            fake_settings, prefix="/bad//prefix", clock=lambda: NOW
+        )
 
 
 def test_fake_simulator_fails_closed_if_revalidation_returns_incomplete_settings(
@@ -118,7 +122,9 @@ def test_consumer_endpoint_composition_rejects_incomplete_oauth(fake_settings):
         _fake_oauth_settings(incomplete, None)
 
 
-@pytest.mark.parametrize("cpf", ("", "not-a-cpf", "１２３４５６７８９０１", "123456789012"))
+@pytest.mark.parametrize(
+    "cpf", ("", "not-a-cpf", "１２３４５６７８９０１", "123456789012")
+)
 def test_invalid_cpf_cannot_resolve_or_authenticate_a_user(cpf):
     user = FakeUser(sub="11122233344", name="Test User")
     repository = InMemoryFakeUserRepository(((user, SecretStr("test-password")),))

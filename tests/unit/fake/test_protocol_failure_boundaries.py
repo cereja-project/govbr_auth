@@ -13,7 +13,11 @@ from govbr_auth.fake.artifacts import (
     FakeArtifactCodec,
 )
 from govbr_auth.fake.protocol import FakeOAuthProtocolRules, _pkce_challenge
-from govbr_auth.fake.provider import FakeClientCredentials, FakeOAuthError, FakeTokenRequest
+from govbr_auth.fake.provider import (
+    FakeClientCredentials,
+    FakeOAuthError,
+    FakeTokenRequest,
+)
 from govbr_auth.fake.runtime import create_fake_gov_simulator
 from govbr_auth.fake.stores import InMemoryAuthorizationCodeReplayStore
 from govbr_auth.runtime import GovBrProvider, GovBrRuntimeSettings
@@ -96,7 +100,9 @@ def test_pkce_challenge_rejects_non_ascii_input():
     assert _pkce_challenge(VERIFIER) == CHALLENGE
 
 
-def test_missing_user_rejects_exchange_without_consuming_the_code(exchange, monkeypatch):
+def test_missing_user_rejects_exchange_without_consuming_the_code(
+    exchange, monkeypatch
+):
     simulator, _, _, request, credentials = exchange
     with monkeypatch.context() as patch:
         patch.setattr(simulator.credential_authenticator, "get", lambda subject: None)
@@ -110,7 +116,9 @@ def test_missing_user_rejects_exchange_without_consuming_the_code(exchange, monk
         credentials=credentials, request=request, now=NOW
     )
     assert tokens.token_type == "Bearer"
-    assert simulator.provider.userinfo(tokens.access_token, now=NOW).sub == "11122233344"
+    assert (
+        simulator.provider.userinfo(tokens.access_token, now=NOW).sub == "11122233344"
+    )
 
 
 def test_userinfo_rejects_valid_artifact_for_unregistered_client(exchange):

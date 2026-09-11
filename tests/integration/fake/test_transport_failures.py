@@ -46,9 +46,13 @@ def _basic(simulator):
         ("GET", "/fake-govbr/not-a-route"),
     ),
 )
-async def test_transport_rejects_unsupported_routes_and_methods(simulator, method, path):
+async def test_transport_rejects_unsupported_routes_and_methods(
+    simulator, method, path
+):
     transport = FakeGovHttpTransport(simulator, clock=lambda: NOW)
-    async with httpx.AsyncClient(transport=transport, base_url="http://localhost") as http:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost"
+    ) as http:
         response = await http.request(method, path)
     assert response.status_code == 404
     assert response.json() == {"detail": "Not Found"}
@@ -66,7 +70,9 @@ async def test_transport_requires_client_or_bearer_credentials(
     simulator, route, method, status, error, challenge
 ):
     transport = FakeGovHttpTransport(simulator, clock=lambda: NOW)
-    async with httpx.AsyncClient(transport=transport, base_url="http://localhost") as http:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost"
+    ) as http:
         response = await http.request(method, f"/fake-govbr/{route}")
     assert response.status_code == status
     assert response.json()["error"] == error
@@ -95,7 +101,9 @@ async def test_transport_preserves_error_status_and_cache_contracts(
 
     monkeypatch.setattr(simulator.http_application, route, fail)
     transport = FakeGovHttpTransport(simulator, clock=lambda: NOW)
-    async with httpx.AsyncClient(transport=transport, base_url="http://localhost") as http:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost"
+    ) as http:
         response = await http.request(
             "POST" if route == "token" else "GET",
             f"/fake-govbr/{route}",
@@ -117,7 +125,9 @@ async def test_transport_preserves_error_status_and_cache_contracts(
 @pytest.mark.asyncio
 async def test_transport_rejects_non_utf8_token_form(simulator):
     transport = FakeGovHttpTransport(simulator, clock=lambda: NOW)
-    async with httpx.AsyncClient(transport=transport, base_url="http://localhost") as http:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost"
+    ) as http:
         response = await http.post(
             "/fake-govbr/token",
             headers=_basic(simulator),
