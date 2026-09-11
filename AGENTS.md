@@ -111,8 +111,9 @@ substituem casos discriminantes.
 
 Mantenha `requirements-min.txt` alinhado aos pisos de `pyproject.toml`. Mudanças
 de dependências exigem ambiente mínimo isolado, `pip check` e auditoria de
-vulnerabilidades. O candidato a lançamento exige cobertura global mínima de
-90%, 100% nos ramos críticos definidos pelo projeto e CI multiplataforma verde.
+vulnerabilidades. O candidato a lançamento exige 100% de cobertura de linhas
+e branches em todo o pacote `govbr_auth`, sem exclusões artificiais, e CI
+multiplataforma verde.
 
 ## Documentação, commits e pull requests
 
