@@ -295,6 +295,13 @@ def render_demo_page(
         else render_primary_action(href=login_path, label="Entrar com GOV.BR")
     )
     if provider is GovBrProvider.FAKE:
+        action += (
+            '<form action="/govbr-auth-demo/debug" method="get">'
+            '<button type="submit" role="switch" aria-checked="false" '
+            'aria-label="Ativar modo debug">◉ Ativar modo debug</button>'
+            '<p class="lead">Explore o fluxo por etapas, com animações e painel técnico.</p>'
+            "</form>"
+        )
         badge = render_simulation_badge()
         provider_copy = (
             "<strong>FakeGov</strong> simula o provedor somente para testes. "

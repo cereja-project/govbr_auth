@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="referrer" content="no-referrer">
+<title>Flow Lab · modo debug | govbr-auth</title>
+<style>__STYLE__</style>
+</head>
+<body>
+<a class="skip" href="#workspace">Pular para o fluxo</a>
+<header class="masthead"><div class="masthead-inner">
+__BRAND__
+<div class="header-context"><span class="divider"></span><strong>FLOW LAB</strong><span class="local-badge">FakeGov · local</span></div>
+<button id="debug-toggle" class="mode-switch" role="switch" aria-checked="true"><span class="switch-track" aria-hidden="true"></span>Modo debug</button>
+</div></header>
+<main class="shell">
+<div class="hero"><div><p class="eyebrow">LABORATÓRIO DE AUTENTICAÇÃO</p><h1>O login, <span>por dentro.</span></h1>
+<p class="lead">Acompanhe cada troca. Entenda cada proteção. Explore o que acontece entre o navegador, a aplicação e o FakeGov.</p></div>
+<div class="privacy"><span class="shield" aria-hidden="true">◇</span><div><strong>Segredos ficam fora do painel</strong><p>Captura voluntária, saneada e temporária.<br>Somente simulação. Não use credenciais reais.</p></div></div></div>
+<section class="command-bar" aria-label="Controle da captura">
+<div class="capture-label"><span id="status-dot" class="dot"></span><div><strong id="capture-state">Pronto para explorar</strong><small id="capture-note">Uma captura ativa por navegador.</small></div></div>
+<div class="capture-actions"><button id="clear" class="quiet" disabled>Limpar captura</button><button id="start" class="primary"><span aria-hidden="true">↗</span> Iniciar fluxo</button></div>
+</section>
+<p id="notice" class="notice" role="status" aria-live="polite">O login acontece em uma janela nativa. A reprodução abaixo é desacelerada; a autenticação não espera as animações.</p>
+<div id="workspace" class="workspace" tabindex="-1">
+<nav class="timeline panel" aria-label="Etapas do fluxo"><div class="panel-heading"><h2>Etapas do fluxo</h2><span id="step-count" class="counter">00 / 10</span></div><ol id="steps"></ol><div class="timeline-foot"><span class="small-dot"></span><span>HTTP observado<br><span class="muted">ou validação identificada como inferida</span></span></div></nav>
+<div class="middle">
+<section class="map panel" aria-labelledby="map-heading"><div class="panel-heading"><h2 id="map-heading">Mapa da comunicação</h2><span id="channel" class="tag">Visão geral</span></div>
+<div class="actors"><div id="actor-browser" class="actor"><span class="actor-icon" aria-hidden="true">▣</span><strong>Navegador</strong><small>Você inicia o fluxo</small></div><div id="actor-backend" class="actor"><span class="actor-icon" aria-hidden="true">⌘</span><strong>Backend</strong><small>Aplicação + govbr-auth</small></div><div id="actor-provider" class="actor"><span class="actor-icon" aria-hidden="true">◇</span><strong>FakeGov</strong><small>Provedor simulado</small></div></div>
+<svg class="flow-map" viewBox="0 0 600 150" role="img" aria-labelledby="graph-title graph-desc"><title id="graph-title">Fluxo de comunicação</title><desc id="graph-desc">Selecione uma etapa para acompanhar origem e destino.</desc><defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="context-stroke"/></marker></defs><path class="rail" d="M100 0V138 M300 0V138 M500 0V138"/><path class="connection" d="M100 65H500"/><path id="wire" class="wire" d="M100 65H300" marker-end="url(#arrow)"/><path id="wire-response" class="wire" marker-end="url(#arrow)"/><circle id="reply-packet" class="packet" r="5"/><circle id="packet" class="packet" r="5"/><text id="wire-label" x="300" y="128" text-anchor="middle">Aguardando uma captura</text></svg>
+<div class="legend"><span><i class="front"></i>Pelo navegador</span><span><i class="back"></i>Backend ↔ provedor</span><span><i class="internal"></i>Validação local</span></div>
+</section>
+<section class="stage panel" aria-labelledby="stage-title"><div class="stage-top"><span id="stage-kicker" class="eyebrow">COMO LER O FLUXO</span><span id="evidence" class="tag">Conceitual · sem captura</span></div><h2 id="stage-title" aria-live="polite">Uma autenticação, duas conversas.</h2><p id="stage-copy">O navegador leva você ao provedor. Depois, o backend troca o código e valida a identidade sem enviar tokens ao painel.</p><div id="stage-fact" class="fact"><span aria-hidden="true">i</span><p>Inicie um login para ver evidências reais. Use as etapas à esquerda para explorar os conceitos antes da captura.</p></div><div class="stage-meta"><span id="event-position">Nenhum evento capturado</span><span id="event-timing">Tempo real: —</span></div></section>
+<section class="playback panel" aria-label="Reprodução didática"><div class="playback-title"><strong>Reprodução didática</strong><span>Não reenvia requisições</span></div><div class="playback-controls"><button id="previous" class="icon-button" aria-label="Etapa anterior" disabled>←</button><button id="play" class="secondary" disabled>Reproduzir</button><button id="next" class="icon-button" aria-label="Próxima etapa" disabled>→</button><button id="replay" class="quiet" disabled>↺ Replay</button><label class="speed">Velocidade <select id="speed"><option value="3200">0,5× · lenta</option><option value="1600" selected>1× · didática</option><option value="800">2× · rápida</option></select></label></div><div class="progress-track"><div id="progress"></div></div><p id="motion-note" class="muted">Pausar afeta somente a apresentação, nunca o tempo de validade do login.</p></section>
+</div>
+<aside class="inspector panel" aria-labelledby="inspector-title"><div class="panel-heading"><div><p class="eyebrow">POR TRÁS DA ETAPA</p><h2 id="inspector-title">Painel técnico</h2></div><span class="code-icon" aria-hidden="true">&lt;/&gt;</span></div>
+<div class="tabs" role="tablist" aria-label="Detalhes técnicos"><button id="tab-summary" role="tab" aria-controls="technical-content" aria-selected="true" data-tab="summary">Resumo</button><button id="tab-http" role="tab" aria-controls="technical-content" aria-selected="false" tabindex="-1" data-tab="http">HTTP</button><button id="tab-data" role="tab" aria-controls="technical-content" aria-selected="false" tabindex="-1" data-tab="data">Dados</button><button id="tab-security" role="tab" aria-controls="technical-content" aria-selected="false" tabindex="-1" data-tab="security">Segurança</button><button id="tab-events" role="tab" aria-controls="technical-content" aria-selected="false" tabindex="-1" data-tab="events">Eventos</button></div>
+<div id="technical-content" class="technical-content" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"></div><div class="inspector-footer"><span>Valores sensíveis: <code>[oculto]</code></span><button id="export" class="quiet" disabled>↓ Exportar JSON</button></div></aside>
+</div>
+<footer class="page-footer"><span><strong>Aprender sem expor.</strong> Trace local com expiração de 10 minutos. Não é auditoria ou homologação.</span><a id="normal-link" href="/govbr-auth-demo">Voltar à demo normal ↗</a></footer>
+<noscript><p class="notice">Este explorador exige JavaScript. A <a href="/govbr-auth-demo">demo normal</a> continua disponível.</p></noscript>
+</main><script>__SCRIPT__</script></body></html>

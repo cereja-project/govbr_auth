@@ -281,6 +281,20 @@ Os exemplos completos de FastAPI, Django e Flask no
 criam os arquivos da aplicação no diretório do usuário e funcionam após a
 instalação do extra correspondente; não dependem de um checkout deste repositório.
 
+### Explorar a comunicação
+
+Na demo local, selecione **Ativar modo debug** e depois **Iniciar fluxo**.
+O explorador mostra navegador, backend e FakeGov em uma timeline animada,
+com painel técnico de request/response saneados. A reprodução pode ser
+pausada, avançada manualmente ou revista por replay, sem reenviar requisições.
+
+Somente a apresentação é desacelerada: o fluxo OAuth não recebe atrasos.
+Eventos HTTP observados são distinguidos de validações inferidas. Tokens,
+cookies e dados pessoais são ocultados integralmente, inclusive na exportação.
+A captura é voluntária, temporária e restrita ao FakeGov; o modo normal e o
+provedor oficial não criam traces. Use um worker e a mesma origem do callback.
+Veja o [guia do modo debug](docs/guide/demo-debug.rst).
+
 ## Credenciais de teste
 
 | Campo | Valor |

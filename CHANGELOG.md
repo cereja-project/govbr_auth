@@ -7,6 +7,15 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Added
+- Explorador debug da demo FakeGov em FastAPI, Django e Flask, com timeline,
+  mapa animado, painel técnico e reprodução visual independente da autenticação.
+- Captura HTTP voluntária e isolada por navegador, com projeção segura antes do
+  armazenamento, expiração, limites e exportação saneada. Validações inferidas
+  são identificadas; não há captura de segredos ou formulários de credenciais.
+- Controles de pausa, avanço, velocidade, replay e limpeza, navegação por teclado
+  e suporte à preferência de movimento reduzido, sem dependência de CDN.
+
 ## [1.0.0] - 2026-09-10
 
 ### Added
