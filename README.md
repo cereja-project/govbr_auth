@@ -367,6 +367,23 @@ O backend cifra e autentica com Fernet um envelope de `state` com TTL, PKCE e
 nonce. O state não é um registro de uso único: a prevenção de replay depende do
 authorization code de uso único validado pelo provedor.
 
+Os adapters também exigem uma prova de navegador independente do `state`, em
+cookie autenticado e `HttpOnly`, antes de trocar o código. Inicie o fluxo pela
+rota de login no **mesmo navegador e host** que receberão o callback; copiar
+apenas a URL de callback para outro navegador não autentica. O cookie expira em
+cinco minutos e é removido ao concluir o callback, inclusive em respostas de
+erro. Até oito tentativas simultâneas são preservadas por cliente/callback.
+
+Em HTTPS, o cookie é host-only, usa `__Host-`, `Secure`, `Path=/` e
+`SameSite=None` para permitir os callbacks POST de Django/Flask. Em HTTP de
+loopback, usa nome distinto e `SameSite=Lax`. A política é definida pela URI de
+callback configurada, não por cabeçalhos de proxy. O cookie não contém tokens,
+PKCE, nonce nem dados pessoais e não substitui a sessão da aplicação.
+
+Integrações que usam apenas o core devem implementar seu próprio vínculo entre
+navegador e transação. Callbacks iniciados antes desta atualização precisam
+reiniciar o login para obter o novo cookie.
+
 ### Múltiplos workers
 
 Esse desenho permite múltiplos workers sem armazenamento compartilhado; todos
@@ -376,6 +393,11 @@ exemplo:
 ```bash
 uvicorn myapp:app --workers 4
 ```
+
+Em Django/Flask sob WSGI, a ponte síncrona mantém um event loop dedicado por
+processo, permitindo reutilizar conexões HTTP entre autenticações. Encerre o
+adapter com `auth.close()` no desligamento do worker. Não compartilhe um runtime
+HTTP já utilizado entre processos ou com um event loop ASGI independente.
 
 Consulte a [documentação](https://govbr-auth.readthedocs.io/en/latest/index.html) para configuração completa, solução
 de problemas e uso avançado.
