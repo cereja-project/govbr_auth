@@ -14,6 +14,7 @@ from govbr_auth.adapters._errors import (
 )
 from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.adapters._sync import run_sync
+from govbr_auth.adapters._browser import BrowserBinding
 from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.django import create_fake_govbr_urlpatterns
@@ -66,6 +67,7 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
+        self._browser = BrowserBinding(self._application.runtime.client.settings)
         self._clock = self._application.clock
         self._urlpatterns = self._build_urlpatterns()
 
@@ -132,8 +134,13 @@ class GovBrAuth:
         )
 
     def _login(self, request: HttpRequest) -> HttpResponseRedirect:
-        authorization = self._application.service.authorization_url(now=self._clock())
-        return HttpResponseRedirect(authorization.url)
+        now = self._clock()
+        authorization = self._application.service.authorization_url(now=now)
+        response = HttpResponseRedirect(authorization.url)
+        self._browser.start(
+            response, authorization.state, now=now, cookies=request.COOKIES
+        )
+        return response
 
     def _logout(self, request: HttpRequest) -> HttpResponseRedirect:
         del request
@@ -141,6 +148,12 @@ class GovBrAuth:
 
     @csrf_exempt
     def _callback(self, request: HttpRequest) -> HttpResponse:
+        response = self._handle_callback(request)
+        state = request.POST.get("state") or request.GET.get("state")
+        self._browser.finish(response, state)
+        return response
+
+    def _handle_callback(self, request: HttpRequest) -> HttpResponse:
         code = request.POST.get("code") or request.GET.get("code")
         state = request.POST.get("state") or request.GET.get("state")
         error = request.POST.get("error") or request.GET.get("error")
@@ -154,6 +167,7 @@ class GovBrAuth:
                     status=400,
                 )
             try:
+                self._browser.validate(state, request.COOKIES, now=self._clock())
                 self._application.service.provider_error(
                     error=error,
                     state=state,
@@ -176,6 +190,7 @@ class GovBrAuth:
                 status=400,
             )
         try:
+            self._browser.validate(state, request.COOKIES, now=self._clock())
 
             async def authenticate():
                 return await self._application.service.authenticate(

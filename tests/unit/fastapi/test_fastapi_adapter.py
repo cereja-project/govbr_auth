@@ -27,6 +27,8 @@ class RecordingClient:
     """Represent the strict core at the adapter boundary."""
 
     def __init__(self, *, exchange_error: Exception | None = None) -> None:
+        self.settings = GovBrRuntimeSettings(provider=GovBrProvider.FAKE).oauth
+        self.authorization_state = "state"
         self.authorization_calls: list[datetime] = []
         self.exchange_calls: list[tuple[str, str, datetime]] = []
         self.userinfo_calls: list[tuple[SecretStr, str]] = []
@@ -42,7 +44,8 @@ class RecordingClient:
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         self.authorization_calls.append(now)
         return AuthorizationRequest(
-            "https://sso.example.test/authorize?state=opaque", "opaque"
+            f"https://sso.example.test/authorize?state={self.authorization_state}",
+            self.authorization_state,
         )
 
     async def exchange_code(
@@ -102,6 +105,8 @@ def client_runtime(
 async def request(app: FastAPI, path: str):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
+        if "code=" in path or "error=" in path:
+            await http.get("/auth/govbr/login", follow_redirects=False)
         return await http.get(path, follow_redirects=False)
 
 
@@ -525,8 +530,7 @@ async def test_login_redirects_to_the_core_authorization_url() -> None:
 
     assert response.status_code == 302
     assert (
-        response.headers["location"]
-        == "https://sso.example.test/authorize?state=opaque"
+        response.headers["location"] == "https://sso.example.test/authorize?state=state"
     )
     assert client.authorization_calls == [FIXED_NOW]
 
@@ -604,6 +608,7 @@ async def test_callback_maps_invalid_or_replayed_state_to_safe_bad_request(
     client = RecordingClient(
         exchange_error=getattr(errors, error_name)("sensitive state")
     )
+    client.authorization_state = "sensitive-state"
 
     async def success_handler(context) -> Response:
         return Response(status_code=204)
