@@ -69,7 +69,7 @@ pública explícita, TLS, isolamento de dados de teste e controles
 administrativos; não é oferecido por esta versão.
 
 Vínculo com o navegador
-----------------------
+-----------------------
 
 As rotas de login dos três adapters e ``create_govbr_router`` emitem um cookie
 ``HttpOnly`` autenticado com Fernet. A prova vincula o resumo do ``state`` ao
@@ -103,7 +103,7 @@ O envelope OAuth do core permanece inalterado. Consumidores que usam diretamente
 aplicação nem transforma o ``state`` em um registro de uso único no servidor.
 
 Ciclo de vida em WSGI
---------------------
+---------------------
 
 Django e Flask executam as operações assíncronas em um loop dedicado, criado
 sob demanda por processo. As autenticações consecutivas e concorrentes usam o
