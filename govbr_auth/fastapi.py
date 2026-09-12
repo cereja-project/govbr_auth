@@ -204,20 +204,27 @@ class GovBrAuth:
             finally:
                 await application.aclose()
 
+        demo = None
+        if self._runtime.fake is not None:
+            from govbr_auth.fake.debug.controller import DebugController
+            from govbr_auth.fake.debug.fastapi import observe_router, add_debug_routes
+
+            demo = DebugController(application)
         router = APIRouter(lifespan=lifespan)
-        router.include_router(
-            _create_govbr_router(
-                service=application.service,
-                browser=BrowserBinding(application.runtime.client.settings),
-                on_success=on_success,
-                on_error=on_error,
-                router_prefix="",
-                login_path=application.login_path,
-                callback_path=application.callback_path,
-                logout_path=application.logout_path,
-                clock=clock,
-            )
+        consumer_router = _create_govbr_router(
+            service=application.service,
+            browser=BrowserBinding(application.runtime.client.settings),
+            on_success=on_success,
+            on_error=on_error,
+            router_prefix="",
+            login_path=application.login_path,
+            callback_path=application.callback_path,
+            logout_path=application.logout_path,
+            clock=clock,
         )
+        if demo is not None:
+            consumer_router = observe_router(consumer_router, demo)
+        router.include_router(consumer_router)
         if self._runtime.fake is not None:
             from govbr_auth.fake.fastapi import create_fake_govbr_router
 
@@ -232,13 +239,13 @@ class GovBrAuth:
                     headers={"Cache-Control": "no-store"},
                 )
 
-            router.include_router(
-                create_fake_govbr_router(
-                    self._runtime.fake,
-                    application=self._runtime.fake.http_application,
-                    clock=clock,
-                )
+            provider_router = create_fake_govbr_router(
+                self._runtime.fake,
+                application=self._runtime.fake.http_application,
+                clock=clock,
             )
+            router.include_router(observe_router(provider_router, demo))
+            add_debug_routes(router, demo)
         self._router = router
 
     @property

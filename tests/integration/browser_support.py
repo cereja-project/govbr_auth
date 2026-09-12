@@ -59,9 +59,12 @@ def browser_application(framework, settings, *, clock, runtime=None):
             def browser():
                 client = Client()
 
-                def send(path, *, method="GET", data=None):
+                def send(path, *, method="GET", data=None, headers=None):
                     response = getattr(client, method.lower())(
-                        path, data=data or {}, secure=origin.startswith("https:")
+                        path,
+                        data=data or {},
+                        headers=headers or {},
+                        secure=origin.startswith("https:"),
                     )
                     headers = list(response.headers.items()) + [
                         ("Set-Cookie", value.OutputString())
@@ -84,9 +87,9 @@ def browser_application(framework, settings, *, clock, runtime=None):
             def browser():
                 client = app.test_client()
 
-                def send(path, *, method="GET", data=None):
+                def send(path, *, method="GET", data=None, headers=None):
                     response = client.open(
-                        path, method=method, data=data, base_url=origin
+                        path, method=method, data=data, headers=headers, base_url=origin
                     )
                     return httpx.Response(
                         response.status_code,
@@ -106,9 +109,9 @@ def browser_application(framework, settings, *, clock, runtime=None):
             def browser():
                 client = stack.enter_context(TestClient(app, base_url=origin))
 
-                def send(path, *, method="GET", data=None):
+                def send(path, *, method="GET", data=None, headers=None):
                     return client.request(
-                        method, path, data=data, follow_redirects=False
+                        method, path, data=data, headers=headers, follow_redirects=False
                     )
 
                 return send

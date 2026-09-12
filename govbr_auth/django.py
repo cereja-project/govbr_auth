@@ -121,6 +121,9 @@ class GovBrAuth:
                     clock=self._clock,
                 )
             )
+            from govbr_auth.fake.debug.django import with_debug_patterns
+
+            patterns = with_debug_patterns(patterns, self._application)
         return patterns
 
     def _demo_page(self, request: HttpRequest) -> HttpResponse:

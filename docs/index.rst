@@ -31,6 +31,7 @@ usuários fictícios, sem alterar a fachada usada com o provedor oficial.
 
    guide/quick-start
    guide/fake-mode
+   guide/demo-debug
    guide/communication-flow
    guide/configuration
    guide/brand

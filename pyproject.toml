@@ -50,7 +50,7 @@ include = ["govbr_auth*"]
 exclude = ["govbr_auth.__pycache__*", "govbr_auth.*.__pycache__*"]
 
 [tool.setuptools.package-data]
-govbr_auth = ["_assets/fonts/*.woff2", "_assets/fonts/*.txt"]
+govbr_auth = ["_assets/fonts/*.woff2", "_assets/fonts/*.txt", "_assets/demo/*.html", "_assets/demo/*.css", "_assets/demo/*.js"]
 
 [project.urls]
 Homepage = "https://github.com/cereja-project/govbr_auth"

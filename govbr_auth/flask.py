@@ -79,6 +79,11 @@ class GovBrAuth:
             else None
         )
 
+        if self._fake_blueprint is not None:
+            from govbr_auth.fake.debug.flask import install_debug
+
+            install_debug(self._blueprint, self._fake_blueprint, self._application)
+
     @property
     def blueprint(self) -> Blueprint:
         """Return the consumer blueprint for explicit app registration."""
