@@ -30,7 +30,7 @@ altera a validade do state e não reexecuta a troca do código. Os tempos em
 milissegundos são medidos na fronteira observada, não pelo tempo de animação.
 
 O que a interface mostra
------------------------
+------------------------
 
 A timeline separa preparação, autorização, login fictício no provedor,
 recebimento do callback, vínculo com o navegador, troca do código, consulta
@@ -106,7 +106,7 @@ autenticação. Cobertura de testes e o painel não substituem revisão de segur
 ou homologação com o provedor oficial.
 
 Verificação da interface
------------------------
+------------------------
 
 Os testes de integração em ``tests/integration/test_demo_debug.py`` exercitam
 as requisições reais nos clientes nativos dos três frameworks. A regressão
