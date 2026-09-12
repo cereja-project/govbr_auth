@@ -99,6 +99,16 @@ def test_allowlist_redacts_secrets_unknown_fields_and_nested_values():
             {"body": "[corpo excede o limite de captura]"},
         ),
     ),
+    # Keep raw bodies out of pytest node IDs and PYTEST_CURRENT_TEST on Windows.
+    ids=(
+        "json-object",
+        "urlencoded-form",
+        "json-array",
+        "malformed-json",
+        "invalid-utf8-form",
+        "html-body",
+        "oversized-body",
+    ),
 )
 def test_body_projection_never_persists_unrecognized_content(
     content, content_type, expected
