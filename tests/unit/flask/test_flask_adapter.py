@@ -24,6 +24,7 @@ FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 
 class ContractClient:
     def __init__(self, claims: Mapping[str, object]) -> None:
+        self.settings = GovBrRuntimeSettings(provider=GovBrProvider.FAKE).oauth
         self.claims = dict(claims)
         self.tokens = TokenSet(
             access_token=SecretStr("access-token"),
@@ -200,9 +201,9 @@ def test_flask_callback_passes_context_and_native_request_to_success_handler() -
     application = Flask(__name__)
     application.register_blueprint(auth.blueprint)
 
-    response = application.test_client().get(
-        "/auth/govbr/callback?code=code&state=state"
-    )
+    browser = application.test_client()
+    browser.get("/auth/govbr/login")
+    response = browser.get("/auth/govbr/callback?code=code&state=state")
 
     assert response.status_code == 204
     assert received[0][0].user.subject == "subject"

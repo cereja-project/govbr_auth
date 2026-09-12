@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from flask import Blueprint, Flask, Response, jsonify, redirect, request
+from flask import Blueprint, Flask, Response, jsonify, make_response, redirect, request
 
 from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
@@ -12,6 +12,7 @@ from govbr_auth.adapters._errors import (
 )
 from govbr_auth.adapters._application import create_adapter_application
 from govbr_auth.adapters._sync import run_sync
+from govbr_auth.adapters._browser import BrowserBinding
 from govbr_auth.authentication import AuthenticationContext
 from govbr_auth.core.errors import GovBrAuthError
 from govbr_auth.fake.flask import create_fake_govbr_blueprint
@@ -64,6 +65,7 @@ class GovBrAuth:
                 clock=clock,
             ),
         )
+        self._browser = BrowserBinding(self._application.runtime.client.settings)
         self._clock = self._application.clock
         self._blueprint = self._build_blueprint()
         fake_runtime = self._application.runtime.fake
@@ -112,10 +114,13 @@ class GovBrAuth:
 
         @blueprint.get(self._application.login_path)
         def login():
-            authorization = self._application.service.authorization_url(
-                now=self._clock()
+            now = self._clock()
+            authorization = self._application.service.authorization_url(now=now)
+            response = redirect(authorization.url)
+            self._browser.start(
+                response, authorization.state, now=now, cookies=request.cookies
             )
-            return redirect(authorization.url)
+            return response
 
         if self._application.logout_path is not None:
 
@@ -128,6 +133,11 @@ class GovBrAuth:
             methods=["GET", "POST"],
         )
         def callback():
+            response = make_response(handle_callback())
+            self._browser.finish(response, request.values.get("state"))
+            return response
+
+        def handle_callback():
             code = request.values.get("code")
             state = request.values.get("state")
             error = request.values.get("error")
@@ -144,6 +154,7 @@ class GovBrAuth:
                         400,
                     )
                 try:
+                    self._browser.validate(state, request.cookies, now=self._clock())
                     self._application.service.provider_error(
                         error=error,
                         state=state,
@@ -171,6 +182,7 @@ class GovBrAuth:
                     400,
                 )
             try:
+                self._browser.validate(state, request.cookies, now=self._clock())
 
                 async def authenticate():
                     return await self._application.service.authenticate(

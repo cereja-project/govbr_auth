@@ -192,8 +192,10 @@ def test_callback_fails_closed_if_provider_error_service_returns(
     monkeypatch.setattr(
         auth._application.service, "provider_error", lambda **kwargs: None
     )
+    login = send("/auth/govbr/login")
+    state = parse_qs(urlsplit(login.headers["Location"]).query)["state"][0]
     with pytest.raises(AssertionError, match="provider_error must raise"):
-        _callback(send, {"error": "access_denied", "state": "present"})
+        _callback(send, {"error": "access_denied", "state": state})
     assert received == []
 
 

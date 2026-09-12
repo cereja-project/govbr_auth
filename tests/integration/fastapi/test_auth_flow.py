@@ -700,17 +700,22 @@ async def test_expired_state_returns_safe_bad_request(
 async def test_authorization_code_replay_returns_safe_provider_rejection(
     browser: OAuthBrowser,
 ) -> None:
-    result = await browser.authenticate()
+    _, callback_location = await browser.authorize()
+    # Deliberately retain the original proof to test code replay independently
+    # of browser-side proof deletion at the first callback.
+    proof_cookies = dict(browser._consumer_http.cookies)
+    response = await browser.callback(callback_location)
+    browser._consumer_http.cookies.update(proof_cookies)
 
-    replay_response = await browser.callback(result.callback_location)
+    replay_response = await browser.callback(callback_location)
 
-    assert result.response.status_code == 200
+    assert response.status_code == 200
     assert replay_response.status_code == 502
     assert replay_response.json() == {
         "error": "provider_rejected",
         "message": "Gov.br rejected the request.",
     }
-    replayed_state = parse_qs(urlsplit(result.callback_location).query)["state"][0]
+    replayed_state = parse_qs(urlsplit(callback_location).query)["state"][0]
     assert replayed_state not in replay_response.text
 
 

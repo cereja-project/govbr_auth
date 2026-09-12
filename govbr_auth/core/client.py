@@ -66,6 +66,11 @@ class GovBrClient:
         self._transport = GovBrHttpTransport(settings, http)
         self._authorization = AuthorizationBuilder(settings, transactions)
 
+    @property
+    def settings(self) -> GovBrSettings:
+        """Expose immutable configuration to framework boundary policies."""
+        return self._settings
+
     def authorization_url(self, *, now: datetime) -> AuthorizationRequest:
         """Create an authorization request bound to a protected transaction."""
         return self._authorization.build(now=now)
