@@ -64,3 +64,13 @@ build-backend = "setuptools.build_meta"
 
 [tool.black]
 target-version = ["py311"]
+
+[tool.coverage.run]
+source = ["govbr_auth"]
+branch = true
+patch = ["subprocess"]
+
+[tool.coverage.report]
+fail_under = 100
+precision = 2
+show_missing = true

@@ -32,7 +32,7 @@ jobs:
         run: >-
           python -m pytest --tb=short --disable-warnings -q
           --cov=govbr_auth --cov-branch --cov-report=term-missing
-          --cov-fail-under=90
+          --cov-fail-under=100
           --basetemp="${{ runner.temp }}/govbr-auth-pytest"
           -o cache_dir="${{ runner.temp }}/govbr-auth-cache"
       - run: python -m black --check govbr_auth tests examples scripts

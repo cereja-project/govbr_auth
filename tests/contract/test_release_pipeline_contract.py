@@ -140,10 +140,24 @@ def test_ci_enforces_formatting_coverage_and_distribution_validation() -> None:
     )
 
     assert "black --check govbr_auth tests examples scripts" in quality_commands
-    assert "--cov-fail-under=90" in quality_commands
+    assert "--cov-fail-under=100" in quality_commands
     assert "python -m build" in package_commands
     assert "python -m twine check" in package_commands
     assert "python scripts/verify_distribution.py" in package_commands
+
+
+def test_coverage_policy_requires_all_package_lines_and_branches() -> None:
+    with (PROJECT_ROOT / "pyproject.toml").open("rb") as pyproject_file:
+        coverage = tomllib.load(pyproject_file)["tool"]["coverage"]
+
+    assert coverage["run"]["source"] == ["govbr_auth"]
+    assert coverage["run"]["branch"] is True
+    assert "subprocess" in coverage["run"]["patch"]
+    assert coverage["report"]["fail_under"] == 100
+    assert not coverage["run"].get("omit")
+    assert not coverage["report"].get("omit")
+    assert not coverage["report"].get("exclude_lines")
+    assert not coverage["report"].get("exclude_also")
 
 
 def test_ci_exposes_one_stable_required_status_for_branch_protection() -> None:
@@ -205,7 +219,7 @@ def test_release_verifies_tag_main_commit_tests_and_built_wheel() -> None:
     assert "GITHUB_REF_NAME" in commands
     assert "git merge-base --is-ancestor" in commands
     assert "python -m pytest" in commands
-    assert "--cov-fail-under=90" in commands
+    assert "--cov-fail-under=100" in commands
     assert "python scripts/verify_distribution.py" in commands
     assert "python -m twine check" in commands
 

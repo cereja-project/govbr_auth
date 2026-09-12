@@ -23,6 +23,11 @@ solicita um token OIDC de curta duração e só executa depois que o job
 Checklist da versão
 -------------------
 
+A cobertura exigida é de 100% das linhas executáveis e branches de todo o
+pacote ``govbr_auth``, incluindo as execuções em subprocessos dos testes.
+Não exclua código da medição para atingir o limite. Cobertura completa não
+substitui a revisão dos contratos de segurança nem a homologação oficial.
+
 #. Confirme que a versão coincide em ``pyproject.toml``,
    ``govbr_auth/__init__.py``, ``docs/conf.py`` e ``CHANGELOG.md``.
 #. Substitua ``{TEMP}`` por um diretório temporário absoluto fora do checkout e
@@ -38,7 +43,7 @@ Checklist da versão
 
        python -m black --check govbr_auth tests examples scripts
        python -m flake8 govbr_auth tests examples scripts --count --select=E9,F63,F7,F82 --show-source --statistics
-       python -m pytest --cov=govbr_auth --cov-branch --cov-fail-under=90 --basetemp "{TEMP}/pytest" -o cache_dir="{TEMP}/pytest-cache"
+       python -m pytest --cov=govbr_auth --cov-branch --cov-fail-under=100 --basetemp "{TEMP}/pytest" -o cache_dir="{TEMP}/pytest-cache"
        python -c "from pathlib import Path; Path(r'{TEMP}/source').mkdir(parents=True, exist_ok=True)"
        git archive --format=tar --output "{TEMP}/source.tar" HEAD
        tar -xf "{TEMP}/source.tar" -C "{TEMP}/source"
