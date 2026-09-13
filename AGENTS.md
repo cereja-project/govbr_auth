@@ -43,6 +43,12 @@ organizados por finalidade em `tests/unit/`, `tests/integration/`,
 - Não afirme que o próprio `state` é de uso único. A proteção contra
   reutilização maliciosa depende também do código de autorização descartável,
   PKCE e nonce.
+- Antes de trocar código ou aceitar erro OAuth, os adapters devem vincular a
+  transação ao navegador que iniciou o login. `state` autêntico sem a prova
+  de navegador não basta; preserve cookies host-only, TTL e isolamento de abas.
+- Em WSGI, execute uso e encerramento do cliente HTTP no mesmo event loop
+  persistente. Teste requisições consecutivas por TCP com keep-alive; transporte
+  em memória não demonstra segurança do ciclo de vida de conexões reais.
 - Valide assinatura, algoritmo permitido, `issuer`, `audience`, `kid`,
   declarações temporais e rotação ou falha de JWKS de forma fechada.
 - Exija HTTPS fora de loopback, valide redirecionamentos e preserve atributos

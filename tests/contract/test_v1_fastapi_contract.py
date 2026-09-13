@@ -27,6 +27,7 @@ class ContractClient:
     """Provide deterministic core results at the FastAPI boundary."""
 
     def __init__(self, claims: Mapping[str, object]) -> None:
+        self.settings = GovBrRuntimeSettings(provider=GovBrProvider.FAKE).oauth
         self.claims = claims
         self.tokens = TokenSet(
             access_token=SecretStr("contract-access-token"),
@@ -171,6 +172,7 @@ async def test_callback_context_is_frozen_copies_claims_and_omits_tokens_by_defa
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
+        await http.get("/auth/govbr/login")
         response = await http.get("/auth/govbr/callback?code=code&state=state")
 
     original_claims["role"] = "changed-after-callback"
@@ -232,6 +234,7 @@ async def test_callback_sanitizes_provider_error_after_validating_state() -> Non
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as http:
+        await http.get("/auth/govbr/login")
         response = await http.get(
             "/auth/govbr/callback?error=access_denied&state=state"
             "&error_description=secret-provider-detail"

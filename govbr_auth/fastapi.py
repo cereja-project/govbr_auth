@@ -5,10 +5,11 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from govbr_auth.adapters._application import create_adapter_application
+from govbr_auth.adapters._browser import BrowserBinding
 from govbr_auth.adapters._errors import (
     INVALID_CALLBACK_MESSAGE,
     describe_auth_error,
@@ -57,6 +58,7 @@ def create_govbr_router(
     service = AuthenticationService(client, expose_tokens=expose_tokens)
     return _create_govbr_router(
         service=service,
+        browser=BrowserBinding(client.settings),
         on_success=on_success,
         on_error=on_error,
         router_prefix=prefix,
@@ -70,6 +72,7 @@ def create_govbr_router(
 def _create_govbr_router(
     *,
     service: AuthenticationService,
+    browser: BrowserBinding,
     on_success: AuthSuccessHandler,
     on_error: AuthErrorHandler | None,
     router_prefix: str,
@@ -81,16 +84,31 @@ def _create_govbr_router(
     router = APIRouter(prefix=router_prefix)
 
     @router.get(login_path)
-    async def login() -> RedirectResponse:
-        authorization = service.authorization_url(now=clock())
-        return RedirectResponse(authorization.url, status_code=302)
+    async def login(request: Request) -> RedirectResponse:
+        now = clock()
+        authorization = service.authorization_url(now=now)
+        response = RedirectResponse(authorization.url, status_code=302)
+        browser.start(response, authorization.state, now=now, cookies=request.cookies)
+        return response
 
     @router.get(callback_path)
     async def callback(
+        request: Request,
         code: str | None = None,
         state: str | None = None,
         error: str | None = None,
         error_description: str | None = None,
+    ) -> Response:
+        response = await handle_callback(request, code, state, error, error_description)
+        browser.finish(response, state)
+        return response
+
+    async def handle_callback(
+        request: Request,
+        code: str | None,
+        state: str | None,
+        error: str | None,
+        error_description: str | None,
     ) -> Response:
         if error is not None:
             if not error.strip() or not isinstance(state, str) or not state.strip():
@@ -100,6 +118,7 @@ def _create_govbr_router(
                     headers={"Cache-Control": "no-store"},
                 )
             try:
+                browser.validate(state, request.cookies, now=clock())
                 service.provider_error(
                     error=error,
                     state=state,
@@ -123,6 +142,7 @@ def _create_govbr_router(
                 headers={"Cache-Control": "no-store"},
             )
         try:
+            browser.validate(state, request.cookies, now=clock())
             context = await service.authenticate(
                 code=code,
                 state=state,
@@ -188,6 +208,7 @@ class GovBrAuth:
         router.include_router(
             _create_govbr_router(
                 service=application.service,
+                browser=BrowserBinding(application.runtime.client.settings),
                 on_success=on_success,
                 on_error=on_error,
                 router_prefix="",

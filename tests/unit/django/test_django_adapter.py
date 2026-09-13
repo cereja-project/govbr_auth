@@ -38,6 +38,7 @@ FIXED_NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 
 class ContractClient:
     def __init__(self, claims: Mapping[str, object]) -> None:
+        self.settings = GovBrRuntimeSettings(provider=GovBrProvider.FAKE).oauth
         self.claims = dict(claims)
         self.tokens = TokenSet(
             access_token=SecretStr("access-token"),
@@ -218,6 +219,8 @@ def test_django_callback_passes_context_and_request_to_success_handler() -> None
         {"code": "code", "state": "state"},
     )
 
+    login = _route(auth, "login")(RequestFactory().get("/auth/govbr/login"))
+    request.COOKIES = {key: value.value for key, value in login.cookies.items()}
     response = _route(auth, "callback")(request)
 
     assert response.status_code == 204

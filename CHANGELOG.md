@@ -7,6 +7,21 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Fixed
+- Os adapters FastAPI, Django e Flask verificam um cookie autenticado específico
+  da transação antes do callback, vinculando-o ao navegador que iniciou o login.
+  A proteção também cobre `create_govbr_router` e callbacks de erro OAuth.
+- Django e Flask mantêm as operações HTTP assíncronas e seu encerramento em um
+  event loop persistente por processo, evitando reutilizar conexões keep-alive
+  vinculadas a loops encerrados entre requisições WSGI.
+
+### Changed
+- Callbacks sem a prova de navegador são rejeitados; fluxos iniciados antes da
+  atualização precisam reiniciar o login. Respostas de login/callback não são
+  armazenáveis em cache, e o cookie da transação é removido ao concluí-la.
+- `GovBrClient.settings` expõe a configuração imutável para as políticas de
+  fronteira dos adapters, sem alterar o envelope OAuth ou a API de troca de código.
+
 ## [1.0.0] - 2026-09-10
 
 ### Added
