@@ -24,24 +24,23 @@ def _load_workflow(name: str) -> dict[str, object]:
 
 def test_release_version_is_consistent_across_package_and_documentation() -> None:
     with (PROJECT_ROOT / "pyproject.toml").open("rb") as pyproject_file:
-        project_version = tomllib.load(pyproject_file)["project"]["version"]
+        project_version = tomllib.load(pyproject_file)["project"]["dynamic"]
     docs_config = runpy.run_path(str(PROJECT_ROOT / "docs" / "conf.py"))
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    base = govbr_auth.__version__
 
     versions = (
-        project_version,
-        govbr_auth.__version__,
+        tuple(project_version),
         govbr_auth.VERSION,
         docs_config["version"],
         docs_config["release"],
     )
 
     assert versions == (
-        "1.0.0",
-        "1.0.0",
-        "1.0.0",
-        "1.0",
-        "1.0.0",
+        ('version',),
+        base,
+        base.rsplit('.', 1)[0],
+        base,
     )
     assert "## [1.0.0] - 2026-09-10" in changelog
 
