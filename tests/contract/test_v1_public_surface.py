@@ -237,4 +237,7 @@ def test_built_distributions_contain_only_publishable_package_artifacts(
     wheel_roots = {entry.split("/", 1)[0] for entry in wheel_entries}
 
     assert invalid_entries == []
-    assert wheel_roots == {"govbr_auth", f"govbr_auth-{govbr_auth.__version__}.dist-info"}
+    assert wheel_roots == {
+        "govbr_auth",
+        f"govbr_auth-{govbr_auth.__version__}.dist-info",
+    }

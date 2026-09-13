@@ -37,9 +37,9 @@ def test_release_version_is_consistent_across_package_and_documentation() -> Non
     )
 
     assert versions == (
-        ('version',),
+        ("version",),
         base,
-        base.rsplit('.', 1)[0],
+        base.rsplit(".", 1)[0],
         base,
     )
     assert "## [1.0.0] - 2026-09-10" in changelog
