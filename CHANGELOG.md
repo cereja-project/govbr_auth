@@ -8,8 +8,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Fixed
-- Payloads de ID tokens profundamente aninhados são rejeitados com o erro
-  público sanitizado `invalid_id_token`, sem propagar `RecursionError` do parser.
+- Payloads inválidos de ID tokens com JSON profundamente aninhado preservam o
+  erro público sanitizado `invalid_id_token`, sem propagar `RecursionError` do
+  parser nos runtimes afetados.
 - Os adapters FastAPI, Django e Flask verificam um cookie autenticado específico
   da transação antes do callback, vinculando-o ao navegador que iniciou o login.
   A proteção também cobre `create_govbr_router` e callbacks de erro OAuth.

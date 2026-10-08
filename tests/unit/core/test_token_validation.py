@@ -117,7 +117,7 @@ def test_naive_now_rejects_validation_call(
         validator.validate(signed_id_token, expected_nonce, jwks=jwks, now=naive_now)
 
 
-def test_deeply_nested_signed_payload_rejects_with_sanitized_domain_error(
+def test_nested_payload_without_required_claims_rejects_with_sanitized_error(
     validator: IdTokenValidator,
     jwks: dict[str, object],
     rsa_signing_key: rsa.RSAPrivateKey,
@@ -137,7 +137,11 @@ def test_deeply_nested_signed_payload_rejects_with_sanitized_domain_error(
 
     assert error.value.code == "invalid_id_token"
     assert str(error.value) == "ID token validation failed"
-    assert isinstance(error.value.__cause__, jwt.DecodeError)
+    # Runtimes may reject nesting or parse it and reject the missing claims.
+    # Both paths must preserve the same sanitized public error boundary.
+    assert isinstance(
+        error.value.__cause__, (jwt.DecodeError, jwt.MissingRequiredClaimError)
+    )
     assert encoded not in str(error.value)
 
 
