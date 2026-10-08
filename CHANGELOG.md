@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-08
+
 ### Fixed
 - O launcher FakeGov rejeita valores OAuth vazios seguidos de comentário no
   `.env`, em vez de interpretar o comentário como client ID, segredo ou escopo.
@@ -22,6 +24,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Django e Flask mantêm as operações HTTP assíncronas e seu encerramento em um
   event loop persistente por processo, evitando reutilizar conexões keep-alive
   vinculadas a loops encerrados entre requisições WSGI.
+- A validação da tag de release resolve a versão dinâmica sem importar o pacote
+  e rejeita tags divergentes antes da publicação no PyPI.
 
 ### Changed
 - O piso de python-dotenv passa de 1.2.3 para 1.2.4 para corrigir a leitura de
