@@ -125,8 +125,8 @@ def test_base_dependencies_are_exactly_framework_neutral() -> None:
     assert set(metadata["dependencies"]) == {
         "httpx>=0.28.1,<1",
         "PyJWT>=2.15.1,<3",
-        "cryptography>=50.0.1,<51",
-        "python-dotenv>=1.2.3,<2",
+        "cryptography>=50.0.2,<51",
+        "python-dotenv>=1.2.4,<2",
         "pydantic>=2.13.5,<3",
     }
 
@@ -152,7 +152,7 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
 
     assert set(optional_dependencies) == {"dev", "fake", "fastapi", "django", "flask"}
     assert optional_dependencies["fastapi"] == [
-        "fastapi>=0.141.1,<1",
+        "fastapi>=0.142.2,<1",
         "python-multipart>=0.0.32,<1",
     ]
     assert optional_dependencies["django"] == [
@@ -164,7 +164,7 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
         "asgiref>=3.12.1,<4",
     ]
     assert optional_dependencies["fake"] == [
-        "fastapi>=0.141.1,<1",
+        "fastapi>=0.142.2,<1",
         "python-multipart>=0.0.32,<1",
         "uvicorn>=0.52.4,<1",
     ]
