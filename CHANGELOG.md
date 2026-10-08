@@ -8,6 +8,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Fixed
+- Requisições consecutivas de login não acumulam encapsuladores de endpoint
+  quando uma instrumentação legada modifica `dependant.call` ao criar handlers
+  FastAPI. A correção evita o crescimento que podia terminar em recursão.
 - Os adapters FastAPI, Django e Flask verificam um cookie autenticado específico
   da transação antes do callback, vinculando-o ao navegador que iniciou o login.
   A proteção também cobre `create_govbr_router` e callbacks de erro OAuth.
@@ -16,6 +19,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   vinculadas a loops encerrados entre requisições WSGI.
 
 ### Changed
+- Os extras `fastapi` e `fake` exigem FastAPI 0.142.2 ou superior, incluindo
+  a correção de instrumentação introduzida em 0.142.1 e a correção de inicialização
+  de OpenTelemetry de 0.142.2. Instalações anteriores precisam atualizar a dependência.
 - Callbacks sem a prova de navegador são rejeitados; fluxos iniciados antes da
   atualização precisam reiniciar o login. Respostas de login/callback não são
   armazenáveis em cache, e o cookie da transação é removido ao concluí-la.

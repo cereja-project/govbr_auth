@@ -404,6 +404,10 @@ de problemas e uso avançado.
 
 ## Desenvolvimento
 
+Os extras FastAPI e FakeGov exigem FastAPI >=0.142.2. Esse piso evita acúmulo
+de instrumentação de endpoints durante logins consecutivos, inclusive quando
+integrações legadas encapsulam os handlers do framework.
+
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pytest --tb=short --disable-warnings -q

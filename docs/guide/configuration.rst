@@ -1,6 +1,10 @@
 Configuração
 ============
 
+Os extras ``fastapi`` e ``fake`` exigem FastAPI >=0.142.2 para preservar logins
+consecutivos com instrumentação legada de endpoints, sem acumular encapsuladores
+a cada requisição. Atualize a dependência ao adotar esta versão do pacote.
+
 Seleção do provedor
 -------------------
 
