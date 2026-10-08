@@ -749,6 +749,30 @@ def test_launcher_rejects_invalid_dotenv_value(
         run()
 
 
+@pytest.mark.parametrize(
+    "variable", ("GOVBR_CLIENT_ID", "GOVBR_CLIENT_SECRET", "GOVBR_SCOPE")
+)
+def test_launcher_rejects_empty_dotenv_value_before_inline_comment(
+    variable: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mocker,
+) -> None:
+    """A placeholder comment must not become an OAuth configuration value."""
+    (tmp_path / ".env").write_text(
+        f"{variable}= # preencha este valor\n", encoding="utf-8"
+    )
+    mocker.patch.dict(os.environ, {}, clear=False)
+    monkeypatch.delenv(variable, raising=False)
+    uvicorn_run = mocker.patch("uvicorn.run")
+    from govbr_auth.fake.fastapi import run
+
+    with pytest.raises(ValueError, match=variable):
+        run()
+
+    uvicorn_run.assert_not_called()
+
+
 def test_fake_module_executes_run(mocker) -> None:
     """Module execution must delegate once to the public launcher."""
     run = mocker.patch("govbr_auth.fake.run")
