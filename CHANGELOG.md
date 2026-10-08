@@ -8,6 +8,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Fixed
+- Payloads de ID tokens profundamente aninhados são rejeitados com o erro
+  público sanitizado `invalid_id_token`, sem propagar `RecursionError` do parser.
 - Os adapters FastAPI, Django e Flask verificam um cookie autenticado específico
   da transação antes do callback, vinculando-o ao navegador que iniciou o login.
   A proteção também cobre `create_govbr_router` e callbacks de erro OAuth.
@@ -16,6 +18,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   vinculadas a loops encerrados entre requisições WSGI.
 
 ### Changed
+- O piso de PyJWT passa de 2.13 para 2.15.1, alinhado ao ambiente mínimo
+  testado. Instalações com versões anteriores precisam atualizar a dependência.
 - Callbacks sem a prova de navegador são rejeitados; fluxos iniciados antes da
   atualização precisam reiniciar o login. Respostas de login/callback não são
   armazenáveis em cache, e o cookie da transação é removido ao concluí-la.

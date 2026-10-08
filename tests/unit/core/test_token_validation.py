@@ -117,6 +117,30 @@ def test_naive_now_rejects_validation_call(
         validator.validate(signed_id_token, expected_nonce, jwks=jwks, now=naive_now)
 
 
+def test_deeply_nested_signed_payload_rejects_with_sanitized_domain_error(
+    validator: IdTokenValidator,
+    jwks: dict[str, object],
+    rsa_signing_key: rsa.RSAPrivateKey,
+    expected_nonce: SecretStr,
+) -> None:
+    depth = 10_000
+    payload = b'{"nested":' + b"[" * depth + b"0" + b"]" * depth + b"}"
+    encoded = jwt.api_jws.encode(
+        payload,
+        rsa_signing_key,
+        algorithm="RS256",
+        headers={"kid": KNOWN_KEY_ID},
+    )
+
+    with pytest.raises(InvalidIdTokenError) as error:
+        validator.validate(SecretStr(encoded), expected_nonce, jwks=jwks, now=FIXED_NOW)
+
+    assert error.value.code == "invalid_id_token"
+    assert str(error.value) == "ID token validation failed"
+    assert isinstance(error.value.__cause__, jwt.DecodeError)
+    assert encoded not in str(error.value)
+
+
 def test_invalid_signature_rejects_id_token_without_leaking_token(
     validator: IdTokenValidator,
     jwks: dict[str, object],
