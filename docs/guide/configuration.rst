@@ -12,6 +12,11 @@ configuração. Nomes desconhecidos com prefixo ``GOVBR_`` são rejeitados;
 variáveis reconhecidas, mas inativas para o provedor selecionado, geram apenas
 warning sem incluir valores ou segredos.
 
+Ao carregar um arquivo ``.env``, valores vazios antes de um comentário continuam
+vazios. Por exemplo, ``GOVBR_CLIENT_ID= # preencher`` é rejeitado, assim como um
+segredo ou escopo vazio. Preencha o valor ou remova a variável para usar um
+default permitido pelo FakeGov; não use comentários como placeholders de valores.
+
 Provedor oficial
 ----------------
 

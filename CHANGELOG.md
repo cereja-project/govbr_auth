@@ -8,6 +8,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Fixed
+- O launcher FakeGov rejeita valores OAuth vazios seguidos de comentário no
+  `.env`, em vez de interpretar o comentário como client ID, segredo ou escopo.
 - Os adapters FastAPI, Django e Flask verificam um cookie autenticado específico
   da transação antes do callback, vinculando-o ao navegador que iniciou o login.
   A proteção também cobre `create_govbr_router` e callbacks de erro OAuth.
@@ -16,6 +18,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   vinculadas a loops encerrados entre requisições WSGI.
 
 ### Changed
+- O piso de python-dotenv passa de 1.2.3 para 1.2.4 para corrigir a leitura de
+  valores vazios com comentários. Instalações anteriores precisam atualizar
+  a dependência e preencher ou remover os placeholders inválidos do `.env`.
 - Callbacks sem a prova de navegador são rejeitados; fluxos iniciados antes da
   atualização precisam reiniciar o login. Respostas de login/callback não são
   armazenáveis em cache, e o cookie da transação é removido ao concluí-la.
