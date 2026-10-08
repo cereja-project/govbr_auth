@@ -178,6 +178,10 @@ GOVBR_PROVIDER=fake
 GOVBR_FAKE_USERS_FILE=./fake-users.local.json
 ```
 
+Um valor vazio seguido de comentário, como `GOVBR_CLIENT_ID= # preencher`,
+continua vazio e é rejeitado na validação. Preencha o valor ou remova a variável
+quando quiser usar um default permitido pelo FakeGov; o comentário não é um valor.
+
 Quando a aplicação ou os testes já possuem um sistema próprio de configuração,
 substitua as duas linhas que criam `settings` e `app` no final de `myapp.py`
 pela composição explícita abaixo. O restante da aplicação permanece igual:
@@ -403,6 +407,10 @@ Consulte a [documentação](https://govbr-auth.readthedocs.io/en/latest/index.ht
 de problemas e uso avançado.
 
 ## Desenvolvimento
+
+Os extras FastAPI e FakeGov exigem FastAPI >=0.142.2. Esse piso evita acúmulo
+de instrumentação de endpoints durante logins consecutivos, inclusive quando
+integrações legadas encapsulam os handlers do framework.
 
 ```bash
 python -m pip install -r requirements-dev.txt
