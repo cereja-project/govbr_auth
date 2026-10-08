@@ -55,6 +55,27 @@ def test_minimum_requirements_match_project_lower_bounds() -> None:
     assert _minimum_pins() == _project_direct_lower_bounds()
 
 
+def test_dependabot_preserves_minimum_fixture_without_ignoring_dependencies() -> None:
+    configuration = yaml.safe_load(
+        (PROJECT_ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
+    )
+    pip_updates = [
+        update
+        for update in configuration["updates"]
+        if update["package-ecosystem"] == "pip"
+    ]
+    assert len(pip_updates) == 1
+    update = pip_updates[0]
+    assert update["directory"] == "/"
+    assert update.get("exclude-paths") == ["requirements-min.txt"]
+    assert update.get("versioning-strategy") == "increase-if-necessary"
+    assert update["schedule"]["interval"] == "daily"
+    assert not update.get("ignore")
+    assert "allow" not in update
+    assert "target-branch" not in update
+    assert update.get("open-pull-requests-limit", 5) > 0
+
+
 def test_ci_runs_the_full_suite_with_minimum_dependencies_on_python_3_11() -> None:
     workflow_path = PROJECT_ROOT / ".github" / "workflows" / "pythonpackage.yml"
     workflow = yaml.load(

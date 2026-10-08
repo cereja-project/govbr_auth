@@ -409,6 +409,19 @@ python -m pip install -r requirements-dev.txt
 python -m pytest --tb=short --disable-warnings -q
 ```
 
+`requirements-min.txt` registra os pisos públicos de `pyproject.toml`, não as
+versões mais recentes. O CI verifica essa igualdade e executa a suíte com os
+pisos em Python 3.11, além da matriz com as versões resolvidas pelos intervalos
+declarados. Atualize os dois arquivos juntos quando elevar um piso por correção,
+segurança ou requisito de compatibilidade e registre o impacto no changelog.
+
+Nas atualizações de versão, o Dependabot não altera automaticamente esse arquivo
+de mínimos; continua analisando os manifestos públicos e de desenvolvimento. A estratégia
+`increase-if-necessary` preserva intervalos que já aceitam a versão nova.
+Essa exclusão não se aplica às atualizações de segurança. Se um PR de segurança
+alterar um piso ou a fixture de mínimos, sincronize ambos e o contrato da
+superfície pública antes de passar pelo CI.
+
 ## Licença
 
 MIT. Consulte `LICENSE`.

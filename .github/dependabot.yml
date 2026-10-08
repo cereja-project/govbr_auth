@@ -7,6 +7,10 @@ version: 2
 updates:
   - package-ecosystem: "pip" # See documentation for possible values
     directory: "/" # Location of package manifests
+    # Este arquivo valida pisos públicos; não é um lockfile de versões recentes.
+    exclude-paths:
+      - "requirements-min.txt"
+    versioning-strategy: "increase-if-necessary"
     schedule:
       interval: "daily"
   - package-ecosystem: "github-actions"
