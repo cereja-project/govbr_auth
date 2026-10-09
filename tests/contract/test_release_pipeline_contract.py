@@ -43,6 +43,7 @@ def test_release_version_is_consistent_across_package_and_documentation() -> Non
         base,
     )
     assert "## [1.0.0] - 2026-09-10" in changelog
+    assert "## [1.0.1] - 2026-10-08" in changelog
 
 
 def test_docs_configuration_does_not_prepend_the_source_checkout() -> None:
@@ -216,6 +217,7 @@ def test_release_verifies_tag_main_commit_tests_and_built_wheel() -> None:
     )
 
     assert "GITHUB_REF_NAME" in commands
+    assert 'python scripts/verify_release_tag.py "$GITHUB_REF_NAME"' in commands
     assert "git merge-base --is-ancestor" in commands
     assert "python -m pytest" in commands
     assert "--cov-fail-under=100" in commands

@@ -28,8 +28,17 @@ pacote ``govbr_auth``, incluindo as execuções em subprocessos dos testes.
 Não exclua código da medição para atingir o limite. Cobertura completa não
 substitui a revisão dos contratos de segurança nem a homologação oficial.
 
-#. Confirme que a versão coincide em ``pyproject.toml``,
-   ``govbr_auth/__init__.py``, ``docs/conf.py`` e ``CHANGELOG.md``.
+#. A versão do pacote é a string literal ``__version__`` em
+   ``govbr_auth/__init__.py``. O ``pyproject.toml`` declara essa origem dinâmica;
+   não adicione uma segunda versão estática. Confirme que a versão resolvida,
+   ``docs/conf.py`` e a entrada de release em ``CHANGELOG.md`` coincidem.
+#. Valide a tag pretendida antes de publicar, por exemplo::
+
+       python scripts/verify_release_tag.py v1.0.1
+
+   O comando não importa o pacote nem exige suas dependências instaladas.
+   Uma tag divergente falha antes das etapas de build e publicação. O workflow
+   também verifica separadamente a ancestralidade do commit em ``origin/main``.
 #. Substitua ``{TEMP}`` por um diretório temporário absoluto fora do checkout e
    configure o arquivo de cobertura. No PowerShell::
 
