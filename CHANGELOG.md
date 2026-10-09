@@ -7,6 +7,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Changed
+- O extra `fake` exige Uvicorn 0.54.0 ou superior. O piso testado acompanha
+  essa versão; instalações existentes com Uvicorn anterior devem atualizá-lo.
+  O Uvicorn passa a confiar também no proxy de loopback IPv6 `::1` por padrão;
+  configurações explícitas de proxies confiáveis continuam sendo respeitadas.
+  O HTTP/2 experimental permanece opcional e não é habilitado pelo launcher.
+
 ## [1.0.1] - 2026-10-08
 
 ### Fixed

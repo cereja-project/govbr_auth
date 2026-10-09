@@ -166,7 +166,7 @@ def test_optional_dependencies_expose_framework_and_development_tools() -> None:
     assert optional_dependencies["fake"] == [
         "fastapi>=0.142.2,<1",
         "python-multipart>=0.0.32,<1",
-        "uvicorn>=0.52.4,<1",
+        "uvicorn>=0.54.0,<1",
     ]
     assert optional_dependencies["dev"] == [
         "uvicorn",
