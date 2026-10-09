@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-09
+
 ### Changed
 - O extra `fake` exige Uvicorn 0.54.0 ou superior. O piso testado acompanha
   essa versão; instalações existentes com Uvicorn anterior devem atualizá-lo.
